@@ -20,7 +20,6 @@ void itoa(char *buf, unsigned long int n, int base) {
 	}
 }
 
-
 void memset(char *buffer, char value, size_t size) {
 	for (size_t i = 0; i < size; i++) {
 		buffer[i] = value;
