@@ -11,7 +11,6 @@ extern "C" void kernel_main() {
 	kmalloc_init();
 	printk_use_interface(new VGAInterface());
 	//char* lol = reinterpret_cast<char*>(kmalloc(1));
-	printk("Hello, World\n");
 	/*short c = 'a' | (0xF << 8);
 	for (uint32_t i = 0xC03FF000; i < 0xC03FF000 + 0x80; i += 2) {
 		*((uint16_t*)i) = c++;
