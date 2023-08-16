@@ -3,8 +3,9 @@
 
 class PrintInterface {
 public:
-	virtual void clear_output();
-	virtual void write_character(char c);
+	PrintInterface() {}
+	virtual void clear_output() = 0;
+	virtual void write_character(char c) = 0;
 };
 
 class VGAInterface : public PrintInterface

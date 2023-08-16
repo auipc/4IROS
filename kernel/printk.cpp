@@ -13,7 +13,7 @@ VGAInterface::VGAInterface()
 
 void VGAInterface::clear_output() {
 	for (int i = 0; i < 80 * 25; i++) {
-		m_screen[i] = 0 | (0xF << 8);
+		m_screen[i] = 0;
 	}
 }
 

@@ -1,11 +1,12 @@
 #include <kernel/mem/malloc.h>
 
-extern "C" uint32_t _kernel_end;
-
-static size_t s_mem_pointer = _kernel_end;
-static size_t s_mem_end = _kernel_end + 2097152;
+extern "C" char _kernel_end;
+size_t s_mem_pointer = 0;
+size_t s_mem_end = 0;
 
 void kmalloc_init() {
+	s_mem_pointer = (size_t)&_kernel_end;
+	s_mem_end = _kernel_end + 2097152;
 	//s_mem_end = _kernel_end + 2097152;
 }
 
