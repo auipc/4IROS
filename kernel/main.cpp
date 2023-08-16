@@ -1,6 +1,7 @@
 #include <kernel/stdint.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
+#include <kernel/gdt.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
@@ -8,6 +9,7 @@ extern "C" void __cxa_pure_virtual() {
 
 extern "C" void kernel_main() {
 	kmalloc_init();
+	GDT::setup();
 	printk_use_interface(new VGAInterface());
 	printk("We're running! %d\n", 100);
 	printk("We're running!\n");

@@ -9,6 +9,8 @@ set(SRCS
 	kernel/string.cpp
 	kernel/printk.cpp
 	kernel/stdarg.h
+		kernel/gdt.h
+		kernel/gdt.cpp
 )
 
 #file(GLOB CXX_SRCS kernel/main.cpp kernel/*.cpp kernel/*.h kernel/mem/*.cpp kernel/mem/*.h)
