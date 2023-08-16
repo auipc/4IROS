@@ -2,23 +2,23 @@
 #include <kernel/stdint.h>
 
 class PrintInterface {
-public:
+  public:
 	PrintInterface() {}
 	virtual void clear_output() = 0;
 	virtual void write_character(char c) = 0;
 };
 
-class VGAInterface : public PrintInterface
-{
-public:
+class VGAInterface : public PrintInterface {
+  public:
 	VGAInterface();
 	void clear_output() override;
 	void write_character(char c) override;
-private:
+
+  private:
 	uint16_t m_x;
 	uint16_t m_y;
-	uint16_t* m_screen;
+	uint16_t *m_screen;
 };
 
-void printk_use_interface(PrintInterface* interface);
-void printk(const char* str, ...);
+void printk_use_interface(PrintInterface *interface);
+void printk(const char *str, ...);

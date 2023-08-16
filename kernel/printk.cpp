@@ -1,5 +1,6 @@
 #include <kernel/printk.h>
 #include <kernel/string.h>
+#include <kernel/stdarg.h>
 
 static PrintInterface *s_interface = nullptr;
 
@@ -30,7 +31,7 @@ void VGAInterface::write_character(char c) {
 
 	// scroll the screen
 	if (m_y >= 25) {
-		memcpy((char *)m_screen, (char *)(m_screen)+160, 160 * 24);
+		memcpy((char *)m_screen, (char *)(m_screen) + 160, 160 * 24);
 		for (int i = 0; i < 80; i++) {
 			m_screen[24 * 80 + i] = ' ' | (0x7 << 8);
 		}
@@ -45,7 +46,57 @@ void printk_use_interface(PrintInterface *interface) {
 void printk(const char *str, ...) {
 	if (!s_interface)
 		return;
+
+	va_list ap;
+	va_start(ap, str);
 	for (int i = 0; i < strlen(str); i++) {
-		s_interface->write_character(str[i]);
+		char c = str[i];
+		switch (c) {
+		case '%': {
+			i++;
+			char c2 = str[i];
+			switch (c2) {
+			case 'd': {
+				int value = va_arg(ap, int);
+				char buffer[32];
+				itoa(buffer, value, 10);
+				for (int i = 0; i < strlen(buffer); i++) {
+					s_interface->write_character(buffer[i]);
+				}
+				break;
+			}
+			case 'x': {
+				int value = va_arg(ap, int);
+				char buffer[32];
+				itoa(buffer, value, 16);
+				for (int i = 0; i < strlen(buffer); i++) {
+					s_interface->write_character(buffer[i]);
+				}
+				break;
+			}
+			case 's': {
+				char *value = va_arg(ap, char *);
+				for (int i = 0; i < strlen(value); i++) {
+					s_interface->write_character(value[i]);
+				}
+				break;
+			}
+			case 'c': {
+				char value = va_arg(ap, int);
+				s_interface->write_character(value);
+				break;
+			}
+			default:
+				s_interface->write_character(c);
+				s_interface->write_character(c2);
+				break;
+			}
+			break;
+		}
+		default:
+			s_interface->write_character(c);
+			break;
+		}
 	}
+	va_end(ap);
 }

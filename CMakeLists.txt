@@ -8,6 +8,7 @@ set(SRCS
 	kernel/mem/malloc.cpp
 	kernel/string.cpp
 	kernel/printk.cpp
+	kernel/stdarg.h
 )
 
 #file(GLOB CXX_SRCS kernel/main.cpp kernel/*.cpp kernel/*.h kernel/mem/*.cpp kernel/mem/*.h)
