@@ -49,7 +49,7 @@ void printk(const char *str, ...) {
 
 	va_list ap;
 	va_start(ap, str);
-	for (int i = 0; i < strlen(str); i++) {
+	for (size_t i = 0; i < strlen(str); i++) {
 		char c = str[i];
 		switch (c) {
 		case '%': {
@@ -60,7 +60,7 @@ void printk(const char *str, ...) {
 				int value = va_arg(ap, int);
 				char buffer[32];
 				itoa(buffer, value, 10);
-				for (int i = 0; i < strlen(buffer); i++) {
+				for (size_t i = 0; i < strlen(buffer); i++) {
 					s_interface->write_character(buffer[i]);
 				}
 				break;
@@ -69,14 +69,14 @@ void printk(const char *str, ...) {
 				int value = va_arg(ap, int);
 				char buffer[32];
 				itoa(buffer, value, 16);
-				for (int i = 0; i < strlen(buffer); i++) {
+				for (size_t i = 0; i < strlen(buffer); i++) {
 					s_interface->write_character(buffer[i]);
 				}
 				break;
 			}
 			case 's': {
 				char *value = va_arg(ap, char *);
-				for (int i = 0; i < strlen(value); i++) {
+				for (size_t i = 0; i < strlen(value); i++) {
 					s_interface->write_character(value[i]);
 				}
 				break;
