@@ -12,3 +12,9 @@ This is the 4th revision of my operating system.
 ```bash
 cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain.cmake ..
 ```
+
+
+##### TODO
+
+- [ ] MMU
+- [ ] Interrupts
