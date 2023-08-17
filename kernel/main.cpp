@@ -2,6 +2,7 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/gdt.h>
+#include <kernel/idt.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
@@ -15,13 +16,21 @@ extern "C" void kernel_main() {
 	printk("We're running!\n");
 	printk("We're running!\n");
 	printk("We're running!\n");
-	// char* lol = reinterpret_cast<char*>(kmalloc(1));
-	/*short c = 'a' | (0xF << 8);
-	for (uint32_t i = 0xC03FF000; i < 0xC03FF000 + 0x80; i += 2) {
-		*((uint16_t*)i) = c++;
-	}*/
-	//*((uint16_t*)0xC03FF000) = 41;
-	//*((uint16_t*)0xC03FF002) = 42;
+	InterruptHandler::setup();
+	printk("lol\n");
+	InterruptHandler::the()->setHandler(0x80, []() {
+		printk("Intentional interrupt!\n");
+	});
+
+	asm volatile("sti");
+	asm volatile("int $0x80");
+	asm volatile("int $0x80");
+	asm volatile("int $0x80");
+	asm volatile("int $0x80");
+	asm volatile("int $0x80");
+	asm volatile("int $0x80");
+	asm volatile("int $0x80");
+
 	while (1)
 		;
 }
