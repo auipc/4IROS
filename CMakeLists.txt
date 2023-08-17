@@ -13,6 +13,9 @@ set(SRCS
 	kernel/gdt.cpp
 	kernel/idt.h
 	kernel/idt.cpp
+		kernel/arch/i386/IO.h
+		kernel/PIC.cpp
+		kernel/PIC.h
 )
 
 #file(GLOB CXX_SRCS kernel/main.cpp kernel/*.cpp kernel/*.h kernel/mem/*.cpp kernel/mem/*.h)

@@ -57,30 +57,66 @@ extern "C" void page_fault() {
 	}
 }
 
-extern "C" void unhandled_interrupt_handler();
-asm("unhandled_interrupt_handler:");
-asm("	pusha");
-/*asm("	pushw %ds");
-asm("    pushw %es");
-asm("    pushw %fs");
-asm("    pushw %gs");
-asm("    pushw %ss");
-asm("    pushw %ss");
-asm("    pushw %ss");
-asm("    pushw %ss");
-asm("    pushw %ss");
-asm("    popw %ds");
-asm("    popw %es");
-asm("    popw %fs");
-asm("    popw %gs");*/
-asm("	call unhandled_interrupt");
-/*asm("	popw %gs");
-asm("    popw %gs");
-asm("    popw %fs");
-asm("    popw %es");
-asm("    popw %ds");*/
-asm("	popa");
-asm("	iret");
+#define INTERRUPT_HANDLER(x) extern "C" void interrupt_##x##_handler(); \
+asm("interrupt_" #x "_handler:");                                     \
+asm("	pusha"); \
+asm("	call interrupt_" #x); \
+asm("	popa"); \
+asm("	iret");                                                         \
+
+#define HALTING_INTERRUPT_STUB(x, msg) \
+	extern "C" void interrupt_##x() {   \
+		printk(msg "\n");                  \
+		while(1) {                         \
+				asm volatile("cli"); \
+				asm volatile("hlt"); \
+		}                                   \
+	}
+
+INTERRUPT_HANDLER(0) // Divide by zero
+INTERRUPT_HANDLER(1) // Debug
+INTERRUPT_HANDLER(2) // Non-maskable interrupt
+INTERRUPT_HANDLER(3) // Breakpoint
+INTERRUPT_HANDLER(4) // Overflow
+INTERRUPT_HANDLER(5) // Bound range exceeded
+INTERRUPT_HANDLER(6) // Invalid opcode
+INTERRUPT_HANDLER(7) // Device not available
+INTERRUPT_HANDLER(8) // Double fault
+INTERRUPT_HANDLER(9) // Coprocessor segment overrun
+INTERRUPT_HANDLER(10) // Invalid TSS
+INTERRUPT_HANDLER(11) // Segment not present
+INTERRUPT_HANDLER(12) // Stack-segment fault
+INTERRUPT_HANDLER(13) // General protection fault
+INTERRUPT_HANDLER(14) // Page fault
+INTERRUPT_HANDLER(15) // Reserved
+INTERRUPT_HANDLER(16) // x87 floating-point exception
+INTERRUPT_HANDLER(17) // Alignment check
+INTERRUPT_HANDLER(18) // Machine check
+INTERRUPT_HANDLER(19) // SIMD floating-point exception
+INTERRUPT_HANDLER(20) // Virtualization exception
+
+HALTING_INTERRUPT_STUB(0, "Divide by zero")
+HALTING_INTERRUPT_STUB(1, "Debug")
+HALTING_INTERRUPT_STUB(2, "Non-maskable interrupt")
+HALTING_INTERRUPT_STUB(3, "Breakpoint")
+HALTING_INTERRUPT_STUB(4, "Overflow")
+HALTING_INTERRUPT_STUB(5, "Bound range exceeded")
+HALTING_INTERRUPT_STUB(6, "Invalid opcode")
+HALTING_INTERRUPT_STUB(7, "Device not available")
+HALTING_INTERRUPT_STUB(8, "Double fault")
+HALTING_INTERRUPT_STUB(9, "Coprocessor segment overrun")
+HALTING_INTERRUPT_STUB(10, "Invalid TSS")
+HALTING_INTERRUPT_STUB(11, "Segment not present")
+HALTING_INTERRUPT_STUB(12, "Stack-segment fault")
+HALTING_INTERRUPT_STUB(13, "General protection fault")
+HALTING_INTERRUPT_STUB(14, "Page fault")
+HALTING_INTERRUPT_STUB(15, "Reserved")
+HALTING_INTERRUPT_STUB(16, "x87 floating-point exception")
+HALTING_INTERRUPT_STUB(17, "Alignment check")
+HALTING_INTERRUPT_STUB(18, "Machine check")
+HALTING_INTERRUPT_STUB(19, "SIMD floating-point exception")
+HALTING_INTERRUPT_STUB(20, "Virtualization exception")
+
 
 void InterruptHandler::setup() {
 	s_the = new InterruptHandler();
@@ -89,8 +125,30 @@ void InterruptHandler::setup() {
 
 	s_the->refresh();
 	for (uint8_t i = 0; i < 255; i++) {
-		s_the->setHandler(i, unhandled_interrupt_handler);
+		s_the->setHandler(i, unhandled_interrupt);
 	}
+
+	s_the->setHandler(0, interrupt_0_handler);
+	s_the->setHandler(1, interrupt_1_handler);
+	s_the->setHandler(2, interrupt_2_handler);
+	s_the->setHandler(3, interrupt_3_handler);
+	s_the->setHandler(4, interrupt_4_handler);
+	s_the->setHandler(5, interrupt_5_handler);
+	s_the->setHandler(6, interrupt_6_handler);
+	s_the->setHandler(7, interrupt_7_handler);
+	s_the->setHandler(8, interrupt_8_handler);
+	s_the->setHandler(9, interrupt_9_handler);
+	s_the->setHandler(10, interrupt_10_handler);
+	s_the->setHandler(11, interrupt_11_handler);
+	s_the->setHandler(12, interrupt_12_handler);
+	s_the->setHandler(13, interrupt_13_handler);
+	s_the->setHandler(14, interrupt_14_handler);
+	s_the->setHandler(15, interrupt_15_handler);
+	s_the->setHandler(16, interrupt_16_handler);
+	s_the->setHandler(17, interrupt_17_handler);
+	s_the->setHandler(18, interrupt_18_handler);
+	s_the->setHandler(19, interrupt_19_handler);
+	s_the->setHandler(20, interrupt_20_handler);
 }
 
 void InterruptHandler::setHandler(uint8_t interrupt, void (*handler)()) {

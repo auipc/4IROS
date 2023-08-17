@@ -1,6 +1,10 @@
 #pragma once
 #include <kernel/stdint.h>
 
+struct InterruptRegisters {
+	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+};
+
 struct IDTPointer {
 	uint16_t limit;
 	size_t base;
