@@ -22,10 +22,16 @@ extern "C" void syscall_interrupt(InterruptRegisters regs) {
 }
 
 extern "C" void kernel_main() {
+	// Kinda hacky, but kernel_main never exits.
+	// Just hope the stack isn't touched.
+	auto vga = VGAInterface();
+	// I guess printing might be the most important function for now.
+	// I've seen other kernels defer enable printing until later,
+	// but maybe they have serial? Better than a black screen I guess.
+	printk_use_interface(&vga);
 	kmalloc_init();
 	PIC::enable();
 	GDT::setup();
-	printk_use_interface(new VGAInterface());
 	printk("We're running! %d\n", 100);
 	printk("We're running!\n");
 	printk("We're running!\n");

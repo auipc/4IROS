@@ -1,45 +1,99 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
+#include <kernel/assert.h>
+#include <kernel/string.h>
 
-extern "C" char _kernel_end;
-size_t s_mem_pointer = 0;
-size_t s_mem_end = 0;
+extern "C" char _heap_start;
+static size_t s_mem_pointer = 0;
+static size_t s_mem_end = 0;
+
+static const size_t k_allocation_block_size = 4096;
+
+// sort of a bitmap
+// include more note keeping information in the header.
+struct AllocationBlockHeader {
+	bool used : 1;
+	size_t span_in_blocks;
+};
+
+static AllocationBlockHeader *block_headers = nullptr;
+static size_t block_headers_length = 0;
+static const size_t TOTAL_MEMORY = 0x100000;
 
 void kmalloc_init() {
-	s_mem_pointer = (size_t)&_kernel_end;
-	s_mem_end = _kernel_end + 2097152;
+	// Reserve space for the block headers.
+	size_t block_header_size = sizeof(AllocationBlockHeader) *
+							   (TOTAL_MEMORY / k_allocation_block_size);
+	block_headers = reinterpret_cast<AllocationBlockHeader *>(&_heap_start);
+	memset(reinterpret_cast<char *>(block_headers), 0, block_header_size);
+
+	block_headers_length = block_header_size / sizeof(AllocationBlockHeader);
+
+	s_mem_pointer = (size_t)&_heap_start + block_header_size;
+	// FIXME: When paging is enabled, this should be able to grow.
+	s_mem_end = reinterpret_cast<size_t>(&_heap_start) +
+				(TOTAL_MEMORY - block_header_size);
+	printk("s_mem_pointer %x, s_mem_end %x\n", s_mem_pointer, s_mem_end);
+	assert(s_mem_pointer != 0);
+	assert(s_mem_end != 0);
+	assert(block_headers_length != 0);
 }
 
-void* kmalloc(size_t size) {
-        // dumb allocation
-	size_t ptr = s_mem_pointer;
-	s_mem_pointer += size;
-	if (s_mem_pointer < s_mem_end) {
-		// This error won't print out if our first allocation doesn't work.
-                // Maybe add a backup printer without formatting?
-		printk("Out of memory, halting...\n");
-		while(1);
+void *allocate_block(size_t blocks_needed) {
+	assert(block_headers_length != 0);
+	assert(block_headers != nullptr);
+	for (size_t i = 0; i < block_headers_length; i++) {
+		if (!block_headers[i].used) {
+			block_headers[i].used = true;
+			block_headers[i].span_in_blocks = blocks_needed;
+			printk("Allocating block at %x\n", s_mem_pointer + (i * k_allocation_block_size));
+			return reinterpret_cast<void *>(s_mem_pointer + (i * k_allocation_block_size));
+		} else {
+			// skip ahead
+			i += block_headers[i].span_in_blocks;
+		}
 	}
 
-	return reinterpret_cast<void*>(ptr);
+	return nullptr;
 }
 
-void *operator new(size_t size)
-{
-    return kmalloc(size);
+void free_blocks(void* block) {
+	assert(block_headers_length != 0);
+	assert(block_headers != nullptr);
+
+	// dumb slow linear search
+	for (size_t i = 0; i < block_headers_length; i++) {
+		if (reinterpret_cast<size_t>(block) == s_mem_pointer + (i * k_allocation_block_size)) {
+			block_headers[i].used = false;
+			block_headers[i].span_in_blocks = 0;
+		}
+	}
 }
- 
-void *operator new[](size_t size)
-{
-    return kmalloc(size);
+
+void *kmalloc(size_t size) {
+	size_t blocks_needed = size / k_allocation_block_size;
+	if (size % k_allocation_block_size != 0) {
+		blocks_needed++;
+	}
+
+	void *block = allocate_block(blocks_needed);
+	if (block == nullptr) {
+		printk("Out of memory, halting...\n");
+		while (1)
+			;
+	}
+
+	return block;
 }
- 
-void operator delete(void *p)
-{
-    //free(p);
+
+void *operator new(size_t size) { return kmalloc(size); }
+
+void *operator new[](size_t size) { return kmalloc(size); }
+
+void operator delete(void *p) {
+	free_blocks(p);
 }
- 
-void operator delete[](void *p)
-{
-    //free(p);
+
+void operator delete[](void *p) {
+	free_blocks(p);
 }

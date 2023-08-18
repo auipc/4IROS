@@ -37,5 +37,10 @@ SECTIONS
 		*(.bootstrap_stack)
 	}
 
+    /* reserve 1MB for the heap on boot */
+    _heap_start = .;
+    . += 0x100000;
+    _heap_end = .;
+
 	_kernel_end = .;
 }
