@@ -6,6 +6,7 @@ extern "C" PageDirectory boot_page_directory;
 
 PageDirectory *PageDirectory::clone(PageDirectory *src) {
 	PageDirectory *dst = new PageDirectory();
+	// TODO find a good way to allocate page tables
 	for (int i = 0; i < 1024; i++) {
 		dst->entries[i].value = src->entries[i].value;
 	}
