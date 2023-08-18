@@ -17,4 +17,4 @@ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain.cmake ..
 ##### TODO
 
 - [ ] MMU
-- [ ] Interrupts
+- [x] Interrupts
