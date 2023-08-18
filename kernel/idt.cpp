@@ -1,23 +1,20 @@
 #include <kernel/idt.h>
 #include <kernel/printk.h>
 
-static InterruptHandler* s_the;
+static InterruptHandler *s_the;
 
 static IDTPointer idtPointer;
 static IDTEntry idtEntries[256];
 
-InterruptHandler::InterruptHandler() {
-	s_the = this;
-}
+InterruptHandler::InterruptHandler() { s_the = this; }
 
-InterruptHandler::~InterruptHandler() {
-	s_the = nullptr;
-}
+InterruptHandler::~InterruptHandler() { s_the = nullptr; }
 
-InterruptHandler* InterruptHandler::the() {
+InterruptHandler *InterruptHandler::the() {
 	if (!s_the) {
 		printk("InterruptHandler not initialized!\n");
-		while(1);
+		while (1)
+			;
 	}
 
 	return s_the;
@@ -57,32 +54,33 @@ extern "C" void interrupt_14() {
 	}
 }
 
-#define INTERRUPT_HANDLER(x) extern "C" void interrupt_##x##_handler(); \
-asm("interrupt_" #x "_handler:");                                     \
-asm("	pusha"); \
-asm("	call interrupt_" #x); \
-asm("	popa"); \
-asm("	iret");                                                         \
+#define INTERRUPT_HANDLER(x)                                                   \
+	extern "C" void interrupt_##x##_handler();                                 \
+	asm("interrupt_" #x "_handler:");                                          \
+	asm("	pusha");                                                           \
+	asm("	call interrupt_" #x);                                              \
+	asm("	popa");                                                            \
+	asm("	iret");
 
-#define HALTING_INTERRUPT_STUB(x, msg) \
-	extern "C" void interrupt_##x() {   \
-		printk(msg "\n");                  \
-		while(1) {                         \
-				asm volatile("cli"); \
-				asm volatile("hlt"); \
-		}                                   \
+#define HALTING_INTERRUPT_STUB(x, msg)                                         \
+	extern "C" void interrupt_##x() {                                          \
+		printk(msg "\n");                                                      \
+		while (1) {                                                            \
+			asm volatile("cli");                                               \
+			asm volatile("hlt");                                               \
+		}                                                                      \
 	}
 
-INTERRUPT_HANDLER(0) // Divide by zero
-INTERRUPT_HANDLER(1) // Debug
-INTERRUPT_HANDLER(2) // Non-maskable interrupt
-INTERRUPT_HANDLER(3) // Breakpoint
-INTERRUPT_HANDLER(4) // Overflow
-INTERRUPT_HANDLER(5) // Bound range exceeded
-INTERRUPT_HANDLER(6) // Invalid opcode
-INTERRUPT_HANDLER(7) // Device not available
-INTERRUPT_HANDLER(8) // Double fault
-INTERRUPT_HANDLER(9) // Coprocessor segment overrun
+INTERRUPT_HANDLER(0)  // Divide by zero
+INTERRUPT_HANDLER(1)  // Debug
+INTERRUPT_HANDLER(2)  // Non-maskable interrupt
+INTERRUPT_HANDLER(3)  // Breakpoint
+INTERRUPT_HANDLER(4)  // Overflow
+INTERRUPT_HANDLER(5)  // Bound range exceeded
+INTERRUPT_HANDLER(6)  // Invalid opcode
+INTERRUPT_HANDLER(7)  // Device not available
+INTERRUPT_HANDLER(8)  // Double fault
+INTERRUPT_HANDLER(9)  // Coprocessor segment overrun
 INTERRUPT_HANDLER(10) // Invalid TSS
 INTERRUPT_HANDLER(11) // Segment not present
 INTERRUPT_HANDLER(12) // Stack-segment fault
@@ -109,14 +107,13 @@ HALTING_INTERRUPT_STUB(10, "Invalid TSS")
 HALTING_INTERRUPT_STUB(11, "Segment not present")
 HALTING_INTERRUPT_STUB(12, "Stack-segment fault")
 HALTING_INTERRUPT_STUB(13, "General protection fault")
-//HALTING_INTERRUPT_STUB(14, "Page fault")
+// HALTING_INTERRUPT_STUB(14, "Page fault")
 HALTING_INTERRUPT_STUB(15, "Reserved")
 HALTING_INTERRUPT_STUB(16, "x87 floating-point exception")
 HALTING_INTERRUPT_STUB(17, "Alignment check")
 HALTING_INTERRUPT_STUB(18, "Machine check")
 HALTING_INTERRUPT_STUB(19, "SIMD floating-point exception")
 HALTING_INTERRUPT_STUB(20, "Virtualization exception")
-
 
 void InterruptHandler::setup() {
 	s_the = new InterruptHandler();
@@ -157,7 +154,8 @@ void InterruptHandler::setHandler(uint8_t interrupt, void (*handler)()) {
 	idtEntries[interrupt].reserved = 0;
 	idtEntries[interrupt].attributes = 0x8E;
 
-	// TODO is there a way we can defer this to a later time? Excessive calls to lidt will increase boot time.
-	// we could just hardcode the interrupts by hand and only call setHandler when we need to change one.
+	// TODO is there a way we can defer this to a later time? Excessive calls to
+	// lidt will increase boot time. we could just hardcode the interrupts by
+	// hand and only call setHandler when we need to change one.
 	refresh();
 }

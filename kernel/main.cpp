@@ -39,9 +39,9 @@ extern "C" void kernel_main() {
 	printk("We're running!\n");
 	InterruptHandler::setup();
 	printk("lol\n");
-	InterruptHandler::the()->setHandler(0x80, syscall_interrupt_handler);/*[]() {
-		printk("Intentional interrupt!\n");
-	});*/
+	InterruptHandler::the()->setHandler(0x80, syscall_interrupt_handler); /*[]()
+	 { printk("Intentional interrupt!\n");
+	 });*/
 	Paging::setup();
 
 	asm volatile("sti");

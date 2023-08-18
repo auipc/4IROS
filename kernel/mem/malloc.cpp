@@ -46,8 +46,10 @@ void *allocate_block(size_t blocks_needed) {
 		if (!block_headers[i].used) {
 			block_headers[i].used = true;
 			block_headers[i].span_in_blocks = blocks_needed;
-			printk("Allocating block at %x\n", s_mem_pointer + (i * k_allocation_block_size));
-			return reinterpret_cast<void *>(s_mem_pointer + (i * k_allocation_block_size));
+			printk("Allocating block at %x\n",
+				   s_mem_pointer + (i * k_allocation_block_size));
+			return reinterpret_cast<void *>(s_mem_pointer +
+											(i * k_allocation_block_size));
 		} else {
 			// skip ahead
 			i += block_headers[i].span_in_blocks;
@@ -57,13 +59,14 @@ void *allocate_block(size_t blocks_needed) {
 	return nullptr;
 }
 
-void free_blocks(void* block) {
+void free_blocks(void *block) {
 	assert(block_headers_length != 0);
 	assert(block_headers != nullptr);
 
 	// dumb slow linear search
 	for (size_t i = 0; i < block_headers_length; i++) {
-		if (reinterpret_cast<size_t>(block) == s_mem_pointer + (i * k_allocation_block_size)) {
+		if (reinterpret_cast<size_t>(block) ==
+			s_mem_pointer + (i * k_allocation_block_size)) {
 			block_headers[i].used = false;
 			block_headers[i].span_in_blocks = 0;
 		}
@@ -90,10 +93,6 @@ void *operator new(size_t size) { return kmalloc(size); }
 
 void *operator new[](size_t size) { return kmalloc(size); }
 
-void operator delete(void *p) {
-	free_blocks(p);
-}
+void operator delete(void *p) { free_blocks(p); }
 
-void operator delete[](void *p) {
-	free_blocks(p);
-}
+void operator delete[](void *p) { free_blocks(p); }

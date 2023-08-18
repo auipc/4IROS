@@ -11,11 +11,11 @@ struct IDTPointer {
 } __attribute__((packed));
 
 struct IDTEntry {
-	uint16_t    base_low;
-	uint16_t    kernel_cs;
-	uint8_t     reserved;
-	uint8_t     attributes;
-	uint16_t    base_high;
+	uint16_t base_low;
+	uint16_t kernel_cs;
+	uint8_t reserved;
+	uint8_t attributes;
+	uint16_t base_high;
 
 	inline void setBase(uint32_t base) {
 		base_low = base & 0xFFFF;

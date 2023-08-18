@@ -52,11 +52,7 @@ void GDT::setup() {
 	gdt[2].flags.granularity = 1;
 	gdt[2].base_high = 0;
 
+	gdt_ptr = {.limit = 3 * sizeof(GDTEntry) - 1, .base = (uint32_t)&gdt};
 
-	gdt_ptr = {
-		.limit = 3 * sizeof(GDTEntry) - 1,
-		.base = (uint32_t)&gdt
-	};
-
-	asm volatile("lgdt %0" : : "m" (gdt_ptr));
+	asm volatile("lgdt %0" : : "m"(gdt_ptr));
 }
