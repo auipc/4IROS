@@ -12,9 +12,10 @@ void Paging::setup() {
 			printk("Page directory entry %d is present\n", i);
 			// page_table_base
 			uint32_t page_table_base = boot_page_directory[i].page_table_base;
-			printk("Page table base: %x\n", page_table_base&0xfffff000u);
-			// page_table_base is a physical address, so we need to convert it to a virtual address
-			uint32_t* page_table = (uint32_t*)(page_table_base + 0xC0000000);
+			printk("Page table base: %x\n", page_table_base & 0xfffff000u);
+			// page_table_base is a physical address, so we need to convert it
+			// to a virtual address
+			uint32_t *page_table = (uint32_t *)(page_table_base + 0xC0000000);
 			printk("page_table: %x\n", page_table);
 			/*for (int j = 0; j < 1024; j++) {
 				if (page_table[j] & 1) {

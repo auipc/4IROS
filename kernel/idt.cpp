@@ -45,7 +45,7 @@ extern "C" void division_by_zero() {
 	}
 }
 
-extern "C" void page_fault() {
+extern "C" void interrupt_14() {
 	size_t faulting_address;
 	asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
 	printk("Page fault at %x\n", faulting_address);
@@ -109,7 +109,7 @@ HALTING_INTERRUPT_STUB(10, "Invalid TSS")
 HALTING_INTERRUPT_STUB(11, "Segment not present")
 HALTING_INTERRUPT_STUB(12, "Stack-segment fault")
 HALTING_INTERRUPT_STUB(13, "General protection fault")
-HALTING_INTERRUPT_STUB(14, "Page fault")
+//HALTING_INTERRUPT_STUB(14, "Page fault")
 HALTING_INTERRUPT_STUB(15, "Reserved")
 HALTING_INTERRUPT_STUB(16, "x87 floating-point exception")
 HALTING_INTERRUPT_STUB(17, "Alignment check")

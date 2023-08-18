@@ -4,6 +4,7 @@
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/PIC.h>
+#include <kernel/mem/Paging.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
@@ -41,8 +42,12 @@ extern "C" void kernel_main() {
 	InterruptHandler::the()->setHandler(0x80, syscall_interrupt_handler);/*[]() {
 		printk("Intentional interrupt!\n");
 	});*/
+	Paging::setup();
 
 	asm volatile("sti");
+	asm volatile("int $0x80");
+	asm volatile("int $0x80");
+	asm volatile("int $0x80");
 	asm volatile("int $0x80");
 
 	while (1)

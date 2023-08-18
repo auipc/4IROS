@@ -23,6 +23,7 @@ stack_top:
 # modules there. This lets the bootloader know it must avoid the addresses.
 .section .bss, "aw", @nobits
 	.align 4096
+.global boot_page_directory
 boot_page_directory:
 	.skip 4096
 boot_page_table1:
