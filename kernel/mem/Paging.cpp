@@ -14,7 +14,6 @@ PageDirectory *PageDirectory::clone(PageDirectory *src) {
 
 
 void Paging::setup() {
-	int num_present = 0;
 	for (int i = 0; i < 1024; i++) {
 		assert(boot_page_directory.entries[i].present <= 1);
 		if (boot_page_directory.entries[i].present) {
@@ -34,6 +33,4 @@ void Paging::setup() {
 			}
 		}
 	}
-
-	printk("Page directory has %d present entries\n", num_present);
 }
