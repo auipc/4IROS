@@ -13,15 +13,18 @@ set(SRCS
 	kernel/gdt.cpp
 	kernel/idt.h
 	kernel/idt.cpp
-		kernel/arch/i386/IO.h
-		kernel/PIC.cpp
-		kernel/PIC.h
+	kernel/arch/i386/IO.h
+	kernel/PIC.cpp
+	kernel/PIC.h
+	kernel/mem/Paging.cpp
+	kernel/mem/Paging.h
+	kernel/assert.h
 )
 
 #file(GLOB CXX_SRCS kernel/main.cpp kernel/*.cpp kernel/*.h kernel/mem/*.cpp kernel/mem/*.h)
 #file(GLOB ASM_SRCS kernel/*.S)
 
-set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O2 -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib")
+set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O3 -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib")
 add_executable(4IROS ${SRCS})
 
 target_include_directories(4IROS PRIVATE ${CMAKE_SOURCE_DIR}/)
