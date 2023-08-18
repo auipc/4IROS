@@ -1,6 +1,6 @@
+#include <kernel/assert.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
-#include <kernel/assert.h>
 #include <kernel/string.h>
 
 extern "C" char _heap_start;

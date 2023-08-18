@@ -1,6 +1,6 @@
 #include <kernel/printk.h>
-#include <kernel/string.h>
 #include <kernel/stdarg.h>
+#include <kernel/string.h>
 
 static PrintInterface *s_interface = nullptr;
 

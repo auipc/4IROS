@@ -1,10 +1,10 @@
-#include <kernel/stdint.h>
-#include <kernel/mem/malloc.h>
-#include <kernel/printk.h>
+#include <kernel/PIC.h>
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
-#include <kernel/PIC.h>
 #include <kernel/mem/Paging.h>
+#include <kernel/mem/malloc.h>
+#include <kernel/printk.h>
+#include <kernel/stdint.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.

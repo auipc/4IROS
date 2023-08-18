@@ -1,6 +1,6 @@
+#include <kernel/assert.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/printk.h>
-#include <kernel/assert.h>
 
 extern "C" PageDirectoryEntry boot_page_directory[4096];
 
