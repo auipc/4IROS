@@ -1,4 +1,5 @@
 #pragma once
+#include <kernel/printk.h>
 
 #define assert(x)                                                              \
 	if (!(x)) {                                                                \
@@ -7,4 +8,5 @@
 			asm volatile("cli");                                               \
 			asm volatile("hlt");                                               \
 		}                                                                      \
-	}
+	}                                                                             \
+

@@ -3,22 +3,28 @@ project(4IROS C CXX ASM)
 set(CMAKE_CXX_STANDARD 17)
 
 set(SRCS
-	kernel/arch/i386/asm/boot.S
-	kernel/main.cpp
-	kernel/mem/malloc.cpp
-	kernel/string.cpp
-	kernel/printk.cpp
-	kernel/stdarg.h
-	kernel/gdt.h
-	kernel/gdt.cpp
-	kernel/idt.h
-	kernel/idt.cpp
-	kernel/arch/i386/IO.h
-	kernel/PIC.cpp
-	kernel/PIC.h
-	kernel/mem/Paging.cpp
-	kernel/mem/Paging.h
-	kernel/assert.h
+        kernel/arch/i386/asm/boot.S
+        kernel/main.cpp
+        kernel/mem/malloc.h
+        kernel/mem/malloc.cpp
+        kernel/string.cpp
+        kernel/printk.cpp
+        kernel/stdarg.h
+        kernel/gdt.h
+        kernel/gdt.cpp
+        kernel/idt.h
+        kernel/idt.cpp
+        kernel/arch/i386/IO.h
+        kernel/PIC.cpp
+        kernel/PIC.h
+        kernel/mem/Paging.cpp
+        kernel/mem/Paging.h
+        kernel/assert.h
+        kernel/mem/PageFrameAllocator.cpp
+        kernel/mem/PageFrameAllocator.h
+        kernel/util/Bitmap.cpp
+        kernel/util/Bitmap.h
+        kernel/arch/i386/kernel.h
 )
 
 #file(GLOB CXX_SRCS kernel/main.cpp kernel/*.cpp kernel/*.h kernel/mem/*.cpp kernel/mem/*.h)

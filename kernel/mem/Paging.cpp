@@ -1,37 +1,80 @@
 #include <kernel/assert.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/printk.h>
+#include <kernel/mem/malloc.h>
 
+// FIXME What should we do with boot_page_directory? Since it's wasted memory
+// after we switch to our own page directory.
+// Maybe move it to a different section that we can discard for extra memory?
 extern "C" PageDirectory boot_page_directory;
+Paging *Paging::s_instance = nullptr;
+PageDirectory *Paging::s_kernel_page_directory = nullptr;
 
-PageDirectory *PageDirectory::clone(PageDirectory *src) {
-	PageDirectory *dst = new PageDirectory();
-	// TODO find a good way to allocate page tables
+Paging *Paging::the() { return s_instance; }
+
+PageTable *PageTable::clone() {
+	PageTable *src = this;
+	PageTable *dst = new PageTable();
+
+	// page aligned
+	assert(reinterpret_cast<uint32_t>(dst) % PAGE_SIZE == 0);
+
+	// TODO find a good way to allocate pages
 	for (int i = 0; i < 1024; i++) {
+		if (!src->entries[i].present)
+			continue;
+		// just copy all values, what could go wrong.
 		dst->entries[i].value = src->entries[i].value;
+		//printk("src->entries[%d].value: %x\n", i, src->entries[i].value);
+		printk("free page: %x\n", Paging::the()->m_allocator->find_free_page());
 	}
+
 	return dst;
 }
 
+PageDirectory *PageDirectory::clone() {
+	PageDirectory *src = this;
+	PageDirectory *dst = new PageDirectory();
+
+	// page aligned
+	assert(reinterpret_cast<uint32_t>(dst) % PAGE_SIZE == 0);
+
+	// TODO find a good way to allocate page tables
+	for (int i = 0; i < 1024; i++) {
+		if (!src->entries[i].present)
+			continue;
+		// just copy all values, what could go wrong.
+		dst->entries[i].value = src->entries[i].value;
+		dst->entries[i].set_page_table(src->entries[i].get_page_table()->clone());
+		printk("src->entries[%d].value: %x\n", i, src->entries[i].value);
+	}
+
+	return dst;
+}
+
+extern "C" char _kernel_start;
+extern "C" char _kernel_end;
+
+Paging::Paging() {
+	m_allocator = new PageFrameAllocator(TOTAL_MEMORY);
+
+	// Reserve memory for the kernel
+	m_allocator->mark_range(0,
+							get_physical_address(&_kernel_end));
+	printk("free page: %x\n", m_allocator->find_free_page());
+}
+
+//Paging::~Paging() { delete m_allocator; }
 
 void Paging::setup() {
-	for (int i = 0; i < 1024; i++) {
-		assert(boot_page_directory.entries[i].present <= 1);
-		if (boot_page_directory.entries[i].present) {
-			printk("Page directory entry %d is present\n", i);
-			// page_table_base
-			uint32_t page_table_base = boot_page_directory.entries[i].page_table_base;
-			printk("Page table base: %x\n", page_table_base & 0xfffff000u);
-			// page_table_base is a physical address, so we need to convert it
-			// to a virtual address
-			auto page_table = boot_page_directory.entries[i].get_page_table();
-			printk("page_table: %x\n", page_table);
+	s_instance = new Paging();
 
-			for (int j = 0; j < 1024; j++) {
-				if (page_table[j].present) {
-					printk("Page table entry %d is present\n", j);
-				}
-			}
-		}
-	}
+	s_kernel_page_directory = boot_page_directory.clone();
+	printk("boot_page_directory: %x\n", &boot_page_directory);
+	printk("boot_page_directory physical: %x\n",
+		   get_physical_address(&boot_page_directory));
+	printk("s_kernel_page_directory: %x\n", s_kernel_page_directory);
+	printk("s_kernel_page_directory physical: %x\n",
+		   get_physical_address(s_kernel_page_directory));
+	switch_page_directory(s_kernel_page_directory);
 }

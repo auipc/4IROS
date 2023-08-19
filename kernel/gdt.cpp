@@ -4,6 +4,21 @@ static GDTEntry gdt[6];
 static GDTPointer gdt_ptr;
 
 void GDT::setup() {
+	/* FIXME This relies on identity mapping being set up. So a page fault
+	 * involving a bad page directory will make it so we are unable to diagnose
+	 * the problem. So we could either just use the physical addresses (which
+	 * would require us to switch page maps during scheduling which might be
+	 * better because it avoids certain page privilege escalation attacks) Or we
+	 * could just make our page fault handler use the boot page directory. For
+	 * the idiots (me) that don't understand what I'm talking about: When
+	 * gdt_ptr is loaded, the CPU will try to read the GDT from a virtual
+	 * address like 0xc01050f0 which resolves to 0x1050f0. But if the page
+	 * directory is invalid, then the CPU will fault.
+	 *
+	 * Now that I think about it, the IDT is also reliant on this. So the
+	 * hardcoded page directory is probably the best solution.
+	 */
+
 	// null descriptor
 	gdt[0].limit_low = 0;
 	gdt[0].base_low = 0;
