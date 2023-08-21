@@ -10,7 +10,7 @@ PageFrameAllocator::PageFrameAllocator(size_t memory_size) {
 	m_bitmap = new Bitmap(m_pages);
 }
 
-// PageFrameAllocator::~PageFrameAllocator() { delete m_bitmap; }
+PageFrameAllocator::~PageFrameAllocator() { delete m_bitmap; }
 
 void PageFrameAllocator::mark_range(uint32_t start, uint32_t end) {
 	for (uint32_t i = start; i < end; i += PAGE_SIZE) {

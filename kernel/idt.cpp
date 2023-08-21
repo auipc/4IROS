@@ -33,15 +33,6 @@ extern "C" void unhandled_interrupt() {
 	}
 }
 
-extern "C" void division_by_zero() {
-	printk("Division by zero!\n");
-	// Halt the CPU
-	while (1) {
-		asm volatile("cli");
-		asm volatile("hlt");
-	}
-}
-
 extern "C" void interrupt_14() {
 	size_t faulting_address;
 	asm volatile("mov %%cr2, %0" : "=r"(faulting_address));

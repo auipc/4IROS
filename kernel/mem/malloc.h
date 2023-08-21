@@ -12,7 +12,8 @@ void kfree(void *ptr);
 #define MUST_BE_PAGE_ALIGNED \
 	void *operator new(size_t size) { return kmalloc_aligned(size, PAGE_SIZE); } \
 	void *operator new[](size_t size) { return kmalloc_aligned(size, PAGE_SIZE); } \
-
+	void operator delete(void *p) { }                                  \
+	void operator delete[](void *p) { }							\
 
 inline void *operator new(size_t, void *p) throw() { return p; }
 inline void *operator new[](size_t, void *p) throw() { return p; }

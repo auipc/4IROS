@@ -124,5 +124,6 @@ void *operator new(size_t size) { return kmalloc(size); }
 void *operator new[](size_t size) { return kmalloc(size); }
 
 void operator delete(void *p) { kfree(p); }
-
+void operator delete(void *p, unsigned long) { kfree(p); }
+void operator delete(void *p, unsigned int) { kfree(p); }
 void operator delete[](void *p) { kfree(p); }
