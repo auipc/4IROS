@@ -23,7 +23,6 @@ PageTable *PageTable::clone() {
 	// page aligned
 	assert(reinterpret_cast<uint32_t>(dst) % PAGE_SIZE == 0);
 
-	// TODO find a good way to allocate pages
 	for (int i = 0; i < 1024; i++) {
 		if (!src->entries[i].present)
 			continue;
@@ -31,6 +30,7 @@ PageTable *PageTable::clone() {
 		// just copy all values, what could go wrong.
 		dst->entries[i].value = src->entries[i].value;
 		auto free_page = Paging::the()->m_allocator->find_free_page();
+		
 		printk("free page: %x\n", free_page);
 		printk("physical address: %x\n", free_page);
 		Paging::the()->map_page(0x888888, free_page, false);
@@ -43,6 +43,9 @@ PageTable *PageTable::clone() {
 										VIRTUAL_ADDRESS),
 			   PAGE_SIZE);
 		dst->entries[i].set_page_base(free_page + VIRTUAL_ADDRESS);*/
+
+		// TODO we need to be able to temporarily identity map this address so we can copy it's contents
+		printk("free page: %x\n", Paging::the()->m_allocator->find_free_page());
 	}
 
 	return dst;
@@ -94,6 +97,7 @@ PageDirectory *PageDirectory::clone() {
 	assert(reinterpret_cast<uint32_t>(dst) % PAGE_SIZE == 0);
 
 	// TODO find a good way to allocate page tables
+	// TODO every page should share the kernels page tables, mostly for interrupts and kernel tasks.
 	for (int i = 0; i < 1024; i++) {
 		if (!src->entries[i].present)
 			continue;
