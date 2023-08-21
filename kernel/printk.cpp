@@ -2,6 +2,7 @@
 #include <kernel/stdarg.h>
 #include <kernel/string.h>
 #include <kernel/arch/i386/IO.h>
+#include <kernel/util/Spinlock.h>
 
 #define PORT 0x3f8
 
@@ -38,6 +39,7 @@ void write_serial(char a) {
 }
 
 
+static Spinlock s_print_spinlock;
 static PrintInterface *s_interface = nullptr;
 
 VGAInterface::VGAInterface()
@@ -85,6 +87,7 @@ void printk_use_interface(PrintInterface *interface) {
 void printk(const char *str, ...) {
 	if (!s_interface)
 		return;
+	s_print_spinlock.acquire();
 
 	va_list ap;
 	va_start(ap, str);
@@ -138,4 +141,5 @@ void printk(const char *str, ...) {
 		}
 	}
 	va_end(ap);
+	s_print_spinlock.release();
 }

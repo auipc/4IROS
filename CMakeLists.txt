@@ -24,6 +24,8 @@ set(SRCS
         kernel/mem/PageFrameAllocator.h
         kernel/util/Bitmap.cpp
         kernel/util/Bitmap.h
+		kernel/util/Spinlock.cpp
+		kernel/util/Spinlock.h
         kernel/arch/i386/kernel.h
 )
 
