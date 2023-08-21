@@ -8,5 +8,4 @@
 			asm volatile("cli");                                               \
 			asm volatile("hlt");                                               \
 		}                                                                      \
-	}                                                                             \
-
+	}

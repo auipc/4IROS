@@ -1,7 +1,7 @@
+#include <kernel/arch/i386/IO.h>
 #include <kernel/printk.h>
 #include <kernel/stdarg.h>
 #include <kernel/string.h>
-#include <kernel/arch/i386/IO.h>
 #include <kernel/util/Spinlock.h>
 
 #define PORT 0x3f8
@@ -37,7 +37,6 @@ void write_serial(char a) {
 
 	outb(PORT, a);
 }
-
 
 static Spinlock s_print_spinlock;
 static PrintInterface *s_interface = nullptr;
