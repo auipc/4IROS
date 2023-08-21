@@ -27,6 +27,8 @@ set(SRCS
 		kernel/util/Spinlock.cpp
 		kernel/util/Spinlock.h
         kernel/arch/i386/kernel.h
+        kernel/icxxabi.h
+		kernel/icxxabi.cpp
 )
 
 #file(GLOB CXX_SRCS kernel/main.cpp kernel/*.cpp kernel/*.h kernel/mem/*.cpp kernel/mem/*.h)
