@@ -58,7 +58,7 @@ extern "C" void interrupt_14() {
 	extern "C" void interrupt_##x##_handler();                                 \
 	asm("interrupt_" #x "_handler:");                                          \
 	asm("	pusha");                                                           \
-	asm("	call interrupt_" #x);                                              \
+	asm("	call interrupt_" #x);                                                   \
 	asm("	popa");                                                            \
 	asm("	iret");
 

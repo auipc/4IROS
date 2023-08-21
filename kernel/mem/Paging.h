@@ -6,6 +6,8 @@
 #include <kernel/printk.h>
 #include <kernel/stdint.h>
 
+struct PageDirectory;
+
 union PageTableEntry {
 	struct {
 		uint32_t present : 1;
@@ -22,6 +24,14 @@ union PageTableEntry {
 	};
 
 	uint32_t value;
+
+	inline void set_page_base(uint32_t base) {
+		page_base = (base - VIRTUAL_ADDRESS) >> 12;
+	}
+
+	inline uint32_t get_page_base() const {
+		return (page_base + VIRTUAL_ADDRESS) << 12;
+	}
 } __attribute__((packed));
 
 struct PageTable {
@@ -60,6 +70,19 @@ struct PageDirectory {
 	MUST_BE_PAGE_ALIGNED
 	PageDirectory *clone();
 
+	inline uint32_t get_page_directory_index(size_t virtual_address) const {
+		return (reinterpret_cast<size_t>(virtual_address) >> 22) & 0x3ff;
+	}
+
+	inline uint32_t get_page_table_index(size_t virtual_address) const {
+		return (reinterpret_cast<size_t>(virtual_address) >> 12) & 0x3ff;
+	}
+
+	void map_page(size_t virtual_address, size_t physical_address,
+				  bool user_supervisor);
+
+	void unmap_page(size_t virtual_address);
+
 	PageDirectoryEntry entries[1024];
 } __attribute__((packed)) __attribute__((aligned(PAGE_SIZE)));
 
@@ -75,15 +98,35 @@ class Paging {
 		return s_kernel_page_directory;
 	}
 
+	inline static PageDirectory *current_page_directory() {
+		return s_current_page_directory;
+	}
+
+	inline void map_page(size_t virtual_address, size_t physical_address,
+						 bool user_supervisor) {
+		s_current_page_directory->map_page(virtual_address, physical_address,
+										   user_supervisor);
+	}
+
+	inline static size_t page_align(size_t address) {
+		return address & ~(PAGE_SIZE - 1);
+	}
+
+	inline void unmap_page(size_t virtual_address) {
+		s_current_page_directory->unmap_page(virtual_address);
+	}
+
 	static Paging *the();
 
   private:
+	friend struct PageDirectory;
 	friend struct PageTable;
 	static PageDirectory *s_kernel_page_directory;
 
 	inline static void switch_page_directory(PageDirectory *page_directory) {
 		asm volatile(
 			"mov %%eax, %%cr3" ::"a"(get_physical_address(page_directory)));
+		s_current_page_directory = page_directory;
 	}
 
 	inline static size_t get_physical_address(void *virtual_address) {
@@ -92,4 +135,5 @@ class Paging {
 
 	PageFrameAllocator *m_allocator;
 	static Paging *s_instance;
+	static PageDirectory *s_current_page_directory;
 };
