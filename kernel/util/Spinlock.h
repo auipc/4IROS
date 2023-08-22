@@ -1,12 +1,13 @@
 #pragma once
 
 class Spinlock {
-public:
+  public:
 	Spinlock();
 	~Spinlock();
 
 	void acquire();
 	void release();
-private:
+
+  private:
 	bool m_locked;
 };

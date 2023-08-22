@@ -131,9 +131,7 @@ Paging::Paging() {
 	m_allocator->mark_range(0, get_physical_address(&_kernel_end));
 }
 
-Paging::~Paging() {
-	delete m_allocator;
-}
+Paging::~Paging() { delete m_allocator; }
 
 void Paging::setup() {
 	s_instance = new Paging();

@@ -43,7 +43,8 @@ void kmalloc_init() {
 int count_used_memory() {
 	int available = 0;
 	for (size_t i = 0; i < block_headers_length; i++) {
-		if (block_headers[i].used) available += k_allocation_block_size;
+		if (block_headers[i].used)
+			available += k_allocation_block_size;
 	}
 
 	return available;
@@ -58,7 +59,8 @@ void *allocate_block(size_t blocks_needed) {
 			block_headers[i].span_in_blocks = blocks_needed;
 			printk("Allocating block at %x\n",
 				   s_mem_pointer + (i * k_allocation_block_size));
-			printk("Memory usage %d/%d KB\n", count_used_memory() / KB, (block_headers_length * k_allocation_block_size) / KB);
+			printk("Memory usage %d/%d KB\n", count_used_memory() / KB,
+				   (block_headers_length * k_allocation_block_size) / KB);
 			return reinterpret_cast<void *>(s_mem_pointer +
 											(i * k_allocation_block_size));
 		} else {
@@ -125,7 +127,7 @@ void *kmalloc_aligned(size_t size, size_t alignment) {
 		block += alignment - misalignment;
 	}
 
-	return reinterpret_cast<void*>(block);
+	return reinterpret_cast<void *>(block);
 }
 
 void kfree(void *ptr) { free_blocks(ptr); }

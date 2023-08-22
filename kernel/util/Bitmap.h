@@ -1,7 +1,7 @@
 #pragma once
 
-#include <kernel/stdint.h>
 #include <kernel/mem/malloc.h>
+#include <kernel/stdint.h>
 
 class Bitmap {
   public:
@@ -12,7 +12,8 @@ class Bitmap {
 	uint8_t get(size_t i) const;
 	uint32_t scan(uint32_t nr);
 	uint32_t count();
+
   private:
-	uint32_t* data;
+	uint32_t *data;
 	size_t size;
 };

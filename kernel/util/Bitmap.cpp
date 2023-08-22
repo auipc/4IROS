@@ -1,15 +1,14 @@
-#include <kernel/util/Bitmap.h>
 #include <kernel/assert.h>
+#include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/stdint.h>
-#include <kernel/mem/malloc.h>
 #include <kernel/string.h>
+#include <kernel/util/Bitmap.h>
 
-Bitmap::Bitmap(size_t elems)
-{
+Bitmap::Bitmap(size_t elems) {
 	// uint32_t containers might be better
 	data = new uint32_t[elems / 32];
-	memset(reinterpret_cast<char*>(data), 0, elems / 32);
+	memset(reinterpret_cast<char *>(data), 0, elems / 32);
 	size = elems / 32;
 }
 

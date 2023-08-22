@@ -4,7 +4,6 @@
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
-#include <kernel/stdint.h>
 #include <kernel/tasking/Scheduler.h>
 
 extern "C" void __cxa_pure_virtual() {
@@ -14,12 +13,22 @@ extern "C" void __cxa_pure_virtual() {
 extern "C" void syscall_interrupt_handler();
 asm("syscall_interrupt_handler:");
 asm("	pusha");
+asm("   push %gs");
+asm("   push %fs");
+asm("   push %es");
+asm("   push %ds");
 asm("	call syscall_interrupt");
+asm("   pop %ds");
+asm("   pop %es");
+asm("   pop %fs");
+asm("   pop %gs");
 asm("	popa");
 asm("	iret");
 
 extern "C" void syscall_interrupt(InterruptRegisters regs) {
 	printk("ESP: 0x%x\n", regs.esp);
+	printk("DS: 0x%x, ES: 0x%x, FS: 0x%x, GS: 0x%x\n", regs.ds, regs.es,
+		   regs.fs, regs.gs);
 	printk("Syscall interrupt!\n");
 }
 
@@ -40,9 +49,7 @@ extern "C" void kernel_main() {
 	printk("We're running!\n");
 	InterruptHandler::setup();
 	printk("lol\n");
-	InterruptHandler::the()->setHandler(0x80, syscall_interrupt_handler); /*[]()
-	 { printk("Intentional interrupt!\n");
-	 });*/
+	InterruptHandler::the()->setHandler(0x80, syscall_interrupt_handler);
 	Paging::setup();
 
 	asm volatile("sti");

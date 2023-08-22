@@ -9,7 +9,8 @@ class PageFrameAllocator {
 	~PageFrameAllocator();
 	void mark_range(uint32_t start, uint32_t end);
 	size_t find_free_page();
+
   private:
 	uint32_t m_pages;
-	Bitmap* m_bitmap;
+	Bitmap *m_bitmap;
 };

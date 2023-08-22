@@ -54,7 +54,7 @@ extern "C" void interrupt_14(InterruptRegisters regs) {
 	asm("	iret");
 
 #define HALTING_INTERRUPT_STUB(x, msg)                                         \
-	extern "C" void interrupt_##x(InterruptRegisters regs) {      \
+	extern "C" void interrupt_##x(InterruptRegisters regs) {                   \
 		printk(msg "\n");                                                      \
 		printk("Error code 0x%x\n", regs.eflags);                              \
 		printk("Registers EAX: 0x%x EBX: 0x%x ECX: 0x%x EDX: 0x%x\n",          \
