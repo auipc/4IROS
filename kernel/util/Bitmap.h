@@ -13,6 +13,6 @@ class Bitmap {
 	uint32_t scan(uint32_t nr);
 	uint32_t count();
   private:
-	uint8_t* data;
+	uint32_t* data;
 	size_t size;
 };
