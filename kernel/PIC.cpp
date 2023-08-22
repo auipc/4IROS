@@ -2,9 +2,6 @@
 #include <kernel/arch/i386/IO.h>
 
 void PIC::enable() {
-	uint8_t a1, a2;
-	a1 = inb(PIC1_DATA);
-	a2 = inb(PIC2_DATA);
 	outb(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);
 	io_wait();
 	outb(PIC2_COMMAND, ICW1_INIT | ICW1_ICW4);

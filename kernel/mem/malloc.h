@@ -1,6 +1,7 @@
 #pragma once
 #include <kernel/stdint.h>
 #include <kernel/arch/i386/kernel.h>
+#include <kernel/assert.h>
 
 // TODO Specify the amount of memory available to us
 void kmalloc_init();
@@ -12,8 +13,8 @@ void kfree(void *ptr);
 #define MUST_BE_PAGE_ALIGNED \
 	void *operator new(size_t size) { return kmalloc_aligned(size, PAGE_SIZE); } \
 	void *operator new[](size_t size) { return kmalloc_aligned(size, PAGE_SIZE); } \
-	void operator delete(void *p) { }                                  \
-	void operator delete[](void *p) { }							\
+	void operator delete(void *) { assert(false); }                                  \
+	void operator delete[](void *) { assert(false); }							\
 
 inline void *operator new(size_t, void *p) throw() { return p; }
 inline void *operator new[](size_t, void *p) throw() { return p; }

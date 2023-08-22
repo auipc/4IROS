@@ -34,7 +34,7 @@ set(SRCS
 #file(GLOB CXX_SRCS kernel/main.cpp kernel/*.cpp kernel/*.h kernel/mem/*.cpp kernel/mem/*.h)
 #file(GLOB ASM_SRCS kernel/*.S)
 
-set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O3 -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib")
+set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O3 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib")
 add_executable(4IROS ${SRCS})
 
 target_include_directories(4IROS PRIVATE ${CMAKE_SOURCE_DIR}/)

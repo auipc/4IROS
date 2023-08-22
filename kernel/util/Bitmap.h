@@ -7,9 +7,9 @@ class Bitmap {
   public:
 	Bitmap(size_t elems);
 	~Bitmap();
-	void set(int i);
-	void unset(int i);
-	uint8_t get(int i) const;
+	void set(size_t i);
+	void unset(size_t i);
+	uint8_t get(size_t i) const;
 	uint32_t scan(uint32_t nr);
 	uint32_t count();
   private:

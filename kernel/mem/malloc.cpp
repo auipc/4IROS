@@ -95,8 +95,8 @@ void *kmalloc_aligned(size_t size, size_t alignment) {
 		blocks_needed++;
 	}
 
-	void *block = allocate_block(blocks_needed);
-	if (block == nullptr) {
+	size_t block = reinterpret_cast<size_t>(allocate_block(blocks_needed));
+	if (!block) {
 		printk("Out of memory, halting...\n");
 		while (1)
 			;
@@ -104,7 +104,7 @@ void *kmalloc_aligned(size_t size, size_t alignment) {
 
 	// TODO hack, discards too much memory, also might fail on crazy
 	// misalignment's.
-	size_t misalignment = reinterpret_cast<size_t>(block) % alignment;
+	size_t misalignment = block % alignment;
 	if (misalignment != 0) {
 		if ((k_allocation_block_size - misalignment) > size) {
 			printk("Aligned allocation failed, halting...\n");
@@ -114,7 +114,7 @@ void *kmalloc_aligned(size_t size, size_t alignment) {
 		block += alignment - misalignment;
 	}
 
-	return block;
+	return reinterpret_cast<void*>(block);
 }
 
 void kfree(void *ptr) { free_blocks(ptr); }
@@ -127,3 +127,5 @@ void operator delete(void *p) { kfree(p); }
 void operator delete(void *p, unsigned long) { kfree(p); }
 void operator delete(void *p, unsigned int) { kfree(p); }
 void operator delete[](void *p) { kfree(p); }
+void operator delete[](void *p, unsigned long) { kfree(p); }
+void operator delete[](void *p, unsigned int) { kfree(p); }

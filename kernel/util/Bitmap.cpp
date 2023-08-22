@@ -15,8 +15,8 @@ Bitmap::Bitmap(size_t elems)
 
 Bitmap::~Bitmap() { delete[] data; }
 
-void Bitmap::set(int i) {
-	if (i < 0 || i >= size) {
+void Bitmap::set(size_t i) {
+	if (i >= size) {
 		assert(false);
 		return;
 	}
@@ -26,8 +26,8 @@ void Bitmap::set(int i) {
 	data[byteIndex] |= mask; // Set the bit to 1
 }
 
-void Bitmap::unset(int i) {
-	if (i < 0 || i >= size) {
+void Bitmap::unset(size_t i) {
+	if (i >= size) {
 		assert(false);
 		return;
 	}
@@ -37,8 +37,8 @@ void Bitmap::unset(int i) {
 	data[byteIndex] &= ~mask; // Set the bit to 0
 }
 
-uint8_t Bitmap::get(int i) const {
-	if (i < 0 || i >= size) {
+uint8_t Bitmap::get(size_t i) const {
+	if (i >= size) {
 		assert(false);
 	}
 	int byteIndex = i / 8;
@@ -48,7 +48,7 @@ uint8_t Bitmap::get(int i) const {
 
 uint32_t Bitmap::scan(uint32_t nr) {
 	uint32_t streak = 0;
-	for (int i = 0; i < size; i++) {
+	for (size_t i = 0; i < size; i++) {
 		if (!get(i)) {
 			streak++;
 		} else {
@@ -57,7 +57,7 @@ uint32_t Bitmap::scan(uint32_t nr) {
 
 		if (streak == nr) {
 			// FIXME does this work?
-			for (int j = i; j > i - streak; j--)
+			for (size_t j = i; j > i - streak; j--)
 				set(j);
 
 			return i;
@@ -68,7 +68,7 @@ uint32_t Bitmap::scan(uint32_t nr) {
 
 uint32_t Bitmap::count() {
 	uint32_t c = 0;
-	for (int i = 0; i < size; i++)
+	for (size_t i = 0; i < size; i++)
 		if (i)
 			c++;
 	return c;
