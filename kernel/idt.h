@@ -2,7 +2,8 @@
 #include <kernel/stdint.h>
 
 struct InterruptRegisters {
-	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
+	uint32_t eip, cs, eflags; // Pushed by the processor.
 };
 
 struct IDTPointer {

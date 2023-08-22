@@ -49,6 +49,7 @@ extern "C" void kernel_main() {
 	asm volatile("int $0x80");
 	asm volatile("int $0x80");
 	asm volatile("int $0x80");
+	printk("We're running!\n");
 
 	while (1)
 		;

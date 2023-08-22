@@ -33,11 +33,11 @@ extern "C" void unhandled_interrupt() {
 	}
 }
 
-extern "C" void interrupt_14() {
+extern "C" void interrupt_14(InterruptRegisters regs) {
 	size_t faulting_address;
 	asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
 	printk("Page fault at %x\n", faulting_address);
-	printk("Page fault!\n");
+	printk("Error code 0x%x\n", regs.eflags);
 	// Halt the CPU
 	while (1) {
 		asm volatile("cli");
@@ -54,8 +54,11 @@ extern "C" void interrupt_14() {
 	asm("	iret");
 
 #define HALTING_INTERRUPT_STUB(x, msg)                                         \
-	extern "C" void interrupt_##x() {                                          \
+	extern "C" void interrupt_##x(InterruptRegisters regs) {      \
 		printk(msg "\n");                                                      \
+		printk("Error code 0x%x\n", regs.eflags);                              \
+		printk("Registers EAX: 0x%x EBX: 0x%x ECX: 0x%x EDX: 0x%x\n",          \
+			   regs.eax, regs.ebx, regs.ecx, regs.edx);                        \
 		while (1) {                                                            \
 			asm volatile("cli");                                               \
 			asm volatile("hlt");                                               \
