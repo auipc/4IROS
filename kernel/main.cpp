@@ -5,6 +5,7 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/stdint.h>
+#include <kernel/tasking/Scheduler.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
@@ -50,6 +51,7 @@ extern "C" void kernel_main() {
 	asm volatile("int $0x80");
 	asm volatile("int $0x80");
 	printk("We're running!\n");
+	Scheduler::setup();
 
 	while (1)
 		;

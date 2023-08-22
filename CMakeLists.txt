@@ -29,6 +29,10 @@ set(SRCS
         kernel/arch/i386/kernel.h
         kernel/icxxabi.h
 		kernel/icxxabi.cpp
+        kernel/tasking/Process.cpp
+        kernel/tasking/Process.h
+		kernel/tasking/Scheduler.cpp
+		kernel/tasking/Scheduler.h
 )
 
 set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O3 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib")

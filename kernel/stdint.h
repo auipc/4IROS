@@ -8,3 +8,4 @@ typedef signed int int32_t;
 typedef unsigned int uint32_t;
 
 typedef __SIZE_TYPE__ size_t;
+typedef __UINTPTR_TYPE__ uintptr_t;
