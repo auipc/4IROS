@@ -30,6 +30,7 @@ void kmalloc_init() {
 	block_headers_length = block_header_size / sizeof(AllocationBlockHeader);
 
 	s_mem_pointer = (size_t)&_heap_start + block_header_size;
+
 	// FIXME: When paging is enabled, this should be able to grow.
 	s_mem_end = reinterpret_cast<size_t>(&_heap_start) +
 				(BOOTSTRAP_MEMORY - block_header_size);
@@ -37,6 +38,15 @@ void kmalloc_init() {
 	assert(s_mem_pointer != 0);
 	assert(s_mem_end != 0);
 	assert(block_headers_length != 0);
+}
+
+int count_used_memory() {
+	int available = 0;
+	for (size_t i = 0; i < block_headers_length; i++) {
+		if (block_headers[i].used) available += k_allocation_block_size;
+	}
+
+	return available;
 }
 
 void *allocate_block(size_t blocks_needed) {
@@ -48,6 +58,7 @@ void *allocate_block(size_t blocks_needed) {
 			block_headers[i].span_in_blocks = blocks_needed;
 			printk("Allocating block at %x\n",
 				   s_mem_pointer + (i * k_allocation_block_size));
+			printk("Memory usage %d/%d KB\n", count_used_memory() / KB, (block_headers_length * k_allocation_block_size) / KB);
 			return reinterpret_cast<void *>(s_mem_pointer +
 											(i * k_allocation_block_size));
 		} else {
