@@ -95,7 +95,18 @@ void printk(const char *str, ...) {
 		switch (c) {
 		case '%': {
 			j++;
+			int precision = 6;
 			char c2 = str[j];
+			if (c2 == '.') {
+				precision = str[j+1] - '0';
+				j += 2;
+				c2 = str[j];
+
+				// Skip invalid precision
+				if (precision > 9)
+					break;
+			}
+
 			switch (c2) {
 			case 'd': {
 				int value = va_arg(ap, int);
@@ -130,7 +141,7 @@ void printk(const char *str, ...) {
 			case 'f': {
 				float value = va_arg(ap, double);
 				char buffer[32];
-				ftoa(buffer, value);
+				ftoa(buffer, value, precision);
 				for (size_t i = 0; i < strlen(buffer); i++) {
 					s_interface->write_character(buffer[i]);
 				}

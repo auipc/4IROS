@@ -20,7 +20,7 @@ void itoa(char *buf, unsigned long int n, int base) {
 	}
 }
 
-void ftoa(char *buf, double f) {
+void ftoa(char *buf, double f, int precision) {
 	int pos = 0;
 	if (f < 0) {
 		buf[pos++] = '-';
@@ -35,7 +35,7 @@ void ftoa(char *buf, double f) {
 
 	buf[pos++] = '.';
 
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < precision; i++) {
 		remainder *= 10;
 		int digit = (int)remainder;
 		buf[pos++] = digit + '0';

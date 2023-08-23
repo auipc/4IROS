@@ -59,7 +59,7 @@ void *allocate_block(size_t blocks_needed) {
 			block_headers[i].span_in_blocks = blocks_needed;
 			printk("Allocating block at %x\n",
 				   s_mem_pointer + (i * k_allocation_block_size));
-			printk("Memory usage %f/%d KB\n", ((float)count_used_memory()) / ((float)KB),
+			printk("Memory usage %.2f/%d KB\n", ((float)count_used_memory()) / ((float)KB),
 				   (block_headers_length * k_allocation_block_size) / KB);
 			return reinterpret_cast<void *>(s_mem_pointer +
 											(i * k_allocation_block_size));
