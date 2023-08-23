@@ -18,6 +18,9 @@ asm("   push %fs");
 asm("   push %es");
 asm("   push %ds");
 asm("	call syscall_interrupt");
+// We could pop gs, fs, es, and ds, but something goes wrong on -O3
+// because of the compiler optimizing functions to use "jmp" instead of "call".
+// Saving gs, fs, es, and ds seems pointless anyway.
 asm("   add $0x10, %esp");
 asm("	popa");
 asm("	iret");
