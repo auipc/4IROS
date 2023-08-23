@@ -90,12 +90,12 @@ void printk(const char *str, ...) {
 
 	va_list ap;
 	va_start(ap, str);
-	for (size_t i = 0; i < strlen(str); i++) {
-		char c = str[i];
+	for (size_t j = 0; j < strlen(str); j++) {
+		char c = str[j];
 		switch (c) {
 		case '%': {
-			i++;
-			char c2 = str[i];
+			j++;
+			char c2 = str[j];
 			switch (c2) {
 			case 'd': {
 				int value = va_arg(ap, int);
@@ -125,6 +125,15 @@ void printk(const char *str, ...) {
 			case 'c': {
 				char value = va_arg(ap, int);
 				s_interface->write_character(value);
+				break;
+			}
+			case 'f': {
+				float value = va_arg(ap, double);
+				char buffer[32];
+				ftoa(buffer, value);
+				for (size_t i = 0; i < strlen(buffer); i++) {
+					s_interface->write_character(buffer[i]);
+				}
 				break;
 			}
 			default:

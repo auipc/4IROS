@@ -20,6 +20,31 @@ void itoa(char *buf, unsigned long int n, int base) {
 	}
 }
 
+void ftoa(char *buf, double f) {
+	int pos = 0;
+	if (f < 0) {
+		buf[pos++] = '-';
+		f = -f;
+	}
+
+	int intPart = (int)f;
+	double remainder = f - (double)intPart;
+
+	itoa(buf + pos, intPart, 10);
+	pos += strlen(buf + pos);
+
+	buf[pos++] = '.';
+
+	for (int i = 0; i < 6; i++) {
+		remainder *= 10;
+		int digit = (int)remainder;
+		buf[pos++] = digit + '0';
+		remainder -= digit;
+	}
+
+	buf[pos] = '\0';
+}
+
 void memset(char *buffer, char value, size_t size) {
 	for (size_t i = 0; i < size; i++) {
 		buffer[i] = value;
