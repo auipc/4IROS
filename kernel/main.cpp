@@ -18,10 +18,7 @@ asm("   push %fs");
 asm("   push %es");
 asm("   push %ds");
 asm("	call syscall_interrupt");
-asm("   pop %ds");
-asm("   pop %es");
-asm("   pop %fs");
-asm("   pop %gs");
+asm("   add $0x10, %esp");
 asm("	popa");
 asm("	iret");
 

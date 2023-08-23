@@ -49,9 +49,15 @@ extern "C" void interrupt_14(InterruptRegisters regs) {
 	extern "C" void interrupt_##x##_handler();                                 \
 	asm("interrupt_" #x "_handler:");                                          \
 	asm("	pusha");                                                           \
+	asm("   push %gs");                                                        \
+	asm("   push %fs");                                                        \
+	asm("   push %es");                                                        \
+	asm("   push %ds");                                                        \
 	asm("	call interrupt_" #x);                                              \
+	asm("   add $0x10, %esp");                                                 \
 	asm("	popa");                                                            \
-	asm("	iret");
+	asm("	iret");														       \
+
 
 #define HALTING_INTERRUPT_STUB(x, msg)                                         \
 	extern "C" void interrupt_##x(InterruptRegisters regs) {                   \
