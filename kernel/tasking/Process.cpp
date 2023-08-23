@@ -1,6 +1,7 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/string.h>
 #include <kernel/tasking/Process.h>
+#include <kernel/arch/i386/i386.h>
 
 Process::Process(void *entry) {
 	uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
@@ -16,7 +17,7 @@ void Process::setup(void *entry) {
 	uint32_t ebp = m_stacktop;
 	// EFLAGS
 	m_stacktop -= sizeof(uint32_t);
-	*(uint32_t *)m_stacktop = 0x202;
+	*(uint32_t *)m_stacktop = EFlags::InterruptEnable | EFlags::AlwaysSet;
 	// CS
 	m_stacktop -= sizeof(uint32_t);
 	*(uint32_t *)m_stacktop = 0x8;
