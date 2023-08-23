@@ -7,7 +7,7 @@ extern "C" char _heap_start;
 static size_t s_mem_pointer = 0;
 static size_t s_mem_end = 0;
 
-static const size_t k_allocation_block_size = 4096;
+static const size_t k_allocation_block_size = 512;
 
 // sort of a bitmap
 // include more note keeping information in the header.
