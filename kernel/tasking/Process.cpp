@@ -72,21 +72,18 @@ void Process::setup(void *entry) {
 	m_stacktop -= sizeof(uint32_t);
 	*(uint32_t *)m_stacktop = 0x10;
 
-	if (m_pid > 0) {
-		m_stacktop -= sizeof(uint32_t);
-		*(uint32_t *)m_stacktop = (uint32_t)task_switch_shim;
-		m_stacktop -= sizeof(uint32_t);
-		*(uint32_t *)m_stacktop = EFlags::InterruptEnable | EFlags::AlwaysSet;
-		m_stacktop -= sizeof(uint32_t);
-		*(uint32_t *)m_stacktop = 0;
-		m_stacktop -= sizeof(uint32_t);
-		*(uint32_t *)m_stacktop = 0;
-		m_stacktop -= sizeof(uint32_t);
-		*(uint32_t *)m_stacktop = 0;
-		m_stacktop -= sizeof(uint32_t);
-		*(uint32_t *)m_stacktop = 0;
-		printk("stack\n");
-	}
+	m_stacktop -= sizeof(uint32_t);
+	*(uint32_t *)m_stacktop = (uint32_t)task_switch_shim;
+	m_stacktop -= sizeof(uint32_t);
+	*(uint32_t *)m_stacktop = EFlags::InterruptEnable | EFlags::AlwaysSet;
+	m_stacktop -= sizeof(uint32_t);
+	*(uint32_t *)m_stacktop = 0;
+	m_stacktop -= sizeof(uint32_t);
+	*(uint32_t *)m_stacktop = 0;
+	m_stacktop -= sizeof(uint32_t);
+	*(uint32_t *)m_stacktop = 0;
+	m_stacktop -= sizeof(uint32_t);
+	*(uint32_t *)m_stacktop = 0;
 
 	m_stacktop = reinterpret_cast<uintptr_t>(m_stacktop);
 }

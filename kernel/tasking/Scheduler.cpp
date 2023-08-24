@@ -10,6 +10,7 @@ Scheduler::~Scheduler() { s_the = nullptr; }
 void next_process() {
 	printk("test\n");
 	Scheduler::the()->schedule();
+	printk("this works\n");
 	while(1)
 		;
 }
@@ -18,6 +19,8 @@ void kernel_idle() {
 	printk("idle\n");
 	//asm volatile("int $0x80");
 	//printk("test\n");
+	Scheduler::the()->schedule();
+	printk("this works\n");
 	Scheduler::the()->schedule();
 	while (1)
 		;
@@ -35,12 +38,19 @@ void Scheduler::setup() {
 	next->set_next(idle);
 
 	asm volatile("mov %%eax, %%esp" : : "a"(Scheduler::the()->m_current->stack_top()));
+	asm volatile("pop %ebp");
+	asm volatile("pop %edi");
+	asm volatile("pop %esi");
+	asm volatile("pop %ebx");
+	asm volatile("popf");
+	asm volatile("ret");
+	/*
 	asm volatile("pop %ds");
 	asm volatile("pop %es");
 	asm volatile("pop %fs");
 	asm volatile("pop %gs");
 	asm volatile("popa");
-	asm volatile("iret");
+	asm volatile("iret");*/
 }
 
 /*
@@ -52,7 +62,7 @@ asm("mov (%ebx), %esp");
 asm("ret");
 */
 
-static int lol = 0;
+static int schedules = 0;
 
 void Scheduler::schedule() {
 	if (m_current == m_current->next()) return;
@@ -75,11 +85,11 @@ void Scheduler::schedule() {
 	asm volatile("pop %edi");
 	asm volatile("pop %esi");
 	asm volatile("pop %ebx");
-	asm volatile("popf");
+	asm volatile("popf"); 
 
-	lol++;
-	// ugly hack
-	if (lol > 1)
+	// TODO remove ugly hack
+	if (++schedules > 1)
 		asm volatile("add $4, %esp");
+
 	asm volatile("ret");
 }
