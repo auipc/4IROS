@@ -17,9 +17,11 @@ class Process {
 	inline void set_prev(Process *prev) { m_prev = prev; }
 
   private:
+	friend class Scheduler;
 	PageDirectory *m_page_directory;
 	uintptr_t m_stacktop;
 	uintptr_t m_stack;
 	Process *m_next;
 	Process *m_prev;
+	uint32_t m_pid;
 };

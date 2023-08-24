@@ -3,7 +3,11 @@
 #include <kernel/tasking/Process.h>
 #include <kernel/arch/i386/i386.h>
 
-Process::Process(void *entry) {
+static uint32_t s_pid = 0;
+
+Process::Process(void *entry) 
+	: m_pid(s_pid++)
+{
 	uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
 	m_stack = stack;
 	m_stacktop = m_stack + STACK_SIZE;
@@ -12,6 +16,15 @@ Process::Process(void *entry) {
 }
 
 Process::~Process() { kfree((void *)(m_stack)); }
+
+extern "C" void task_switch_shim();
+asm("task_switch_shim:");
+asm("pop %ds");
+asm("pop %es");
+asm("pop %fs");
+asm("pop %gs");
+asm("popa");
+asm("iret");
 
 void Process::setup(void *entry) {
 	uint32_t ebp = m_stacktop;
@@ -58,6 +71,22 @@ void Process::setup(void *entry) {
 	// GS
 	m_stacktop -= sizeof(uint32_t);
 	*(uint32_t *)m_stacktop = 0x10;
+
+	if (m_pid > 0) {
+		m_stacktop -= sizeof(uint32_t);
+		*(uint32_t *)m_stacktop = (uint32_t)task_switch_shim;
+		m_stacktop -= sizeof(uint32_t);
+		*(uint32_t *)m_stacktop = EFlags::InterruptEnable | EFlags::AlwaysSet;
+		m_stacktop -= sizeof(uint32_t);
+		*(uint32_t *)m_stacktop = 0;
+		m_stacktop -= sizeof(uint32_t);
+		*(uint32_t *)m_stacktop = 0;
+		m_stacktop -= sizeof(uint32_t);
+		*(uint32_t *)m_stacktop = 0;
+		m_stacktop -= sizeof(uint32_t);
+		*(uint32_t *)m_stacktop = 0;
+		printk("stack\n");
+	}
 
 	m_stacktop = reinterpret_cast<uintptr_t>(m_stacktop);
 }
