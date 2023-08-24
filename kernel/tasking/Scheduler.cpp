@@ -10,9 +10,10 @@ Scheduler::~Scheduler() { s_the = nullptr; }
 void next_process() {
 	printk("test\n");
 	Scheduler::the()->schedule();
-	printk("this works\n");
-	while(1)
-		;
+	while(1) {
+		printk("proc 1\n");
+		Scheduler::the()->schedule();
+	}
 }
 
 void kernel_idle() {
@@ -22,8 +23,10 @@ void kernel_idle() {
 	Scheduler::the()->schedule();
 	printk("this works\n");
 	Scheduler::the()->schedule();
-	while (1)
-		;
+	while(1) {
+		printk("proc 2\n");
+		Scheduler::the()->schedule();
+	}
 }
 
 void Scheduler::setup() {
