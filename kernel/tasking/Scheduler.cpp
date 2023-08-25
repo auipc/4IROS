@@ -25,6 +25,11 @@ void kernel_idle() {
 	}
 }
 
+
+extern "C" void _schedule() {
+	Scheduler::schedule();
+}
+
 extern "C" void schedule_handler();
 asm("schedule_handler:");
 asm("	pusha");
@@ -33,7 +38,7 @@ asm("   push %fs");
 asm("   push %es");
 asm("   push %ds");
 // TODO UGLY HACK
-asm("	call _ZN9Scheduler8scheduleEv");
+asm("	call _schedule");
 asm("   add $0x10, %esp");
 asm("	popa");
 asm("	iret");
