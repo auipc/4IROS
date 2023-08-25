@@ -23,3 +23,12 @@ size_t PageFrameAllocator::find_free_page() {
 	assert(address % PAGE_SIZE == 0);
 	return address;
 }
+
+void PageFrameAllocator::release_page(size_t page) {
+	if (!m_bitmap->get(page / PAGE_SIZE)) {
+		printk("Trying to free page that doesn't exist!\n");
+		return;
+	}
+
+	m_bitmap->unset(page / PAGE_SIZE);
+}

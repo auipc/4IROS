@@ -8,10 +8,16 @@ Scheduler::Scheduler() { s_the = this; }
 
 Scheduler::~Scheduler() { s_the = nullptr; }
 
-void next_process() {
-	printk("test\n");
+void next_process2() {
+	printk("proc 2\n");
 	while(1) {
-		//printk("proc 1\n");
+		asm volatile("int $0x7F");
+	}
+}
+
+void next_process() {
+	printk("proc 1\n");
+	while(1) {
 		asm volatile("int $0x7F");
 	}
 }
@@ -37,7 +43,6 @@ asm("   push %gs");
 asm("   push %fs");
 asm("   push %es");
 asm("   push %ds");
-// TODO UGLY HACK
 asm("	call _schedule");
 asm("   add $0x10, %esp");
 asm("	popa");
@@ -54,9 +59,14 @@ void Scheduler::setup() {
 	idle->set_next(next);
 	next->set_next(idle);
 
+	Process *next2 = new Process((void *)next_process2);
+	next->set_next(next2);
+	next2->set_next(idle);
+
 	InterruptHandler::the()->setHandler(0x7F, schedule_handler);
 
-	asm volatile("mov %%eax, %%esp" : : "a"(Scheduler::the()->m_current->stack_top()));
+	asm volatile("mov %%eax, %%esp" : : "a"(Scheduler::the()->m_current->m_stacktop));
+	//asm volatile("mov %%eax, %%cr3" : : "a"(Scheduler::the()->m_current->page_directory()));
 	asm volatile("pop %ebp");
 	asm volatile("pop %edi");
 	asm volatile("pop %esi");
@@ -72,6 +82,24 @@ void Scheduler::setup() {
 	asm volatile("iret");*/
 }
 
+extern "C" void sched_asm(uintptr_t *prev_stack, uintptr_t *next_stack);
+asm("sched_asm:");
+asm("pop %eax");
+asm("pop %ebx");
+asm("pushf");
+asm("push %ebx");
+asm("push %esi");
+asm("push %edi");
+asm("push %ebp");
+asm("mov %esp, (%eax)");
+asm("mov (%ebx), %esp");
+asm("pop %ebp");
+asm("pop %edi");
+asm("pop %esi");
+asm("pop %ebx");
+asm("popf");
+asm("ret");
+
 void Scheduler::schedule() {
 	if (Scheduler::the()->current() == Scheduler::the()->current()->next()) return;
 
@@ -79,17 +107,19 @@ void Scheduler::schedule() {
 	Scheduler::the()->set_current(Scheduler::the()->current()->next());
 	auto next_stack = &Scheduler::the()->current()->m_stacktop;
 
-	asm volatile("pushf");
+	sched_asm(prev_stack, next_stack);
+	/*asm volatile("pushf");
 	asm volatile("push %ebx");
 	asm volatile("push %esi");
 	asm volatile("push %edi");
 	asm volatile("push %ebp");
 	asm volatile("mov %%esp, %%eax":"=a"(*prev_stack));
 	asm volatile("mov %%eax, %%esp"::"a"(*next_stack));
+	//asm volatile("mov %%eax, %%cr3" : : "a"(Scheduler::the()->current()->page_directory()));
 	asm volatile("pop %ebp");
 	asm volatile("pop %edi");
 	asm volatile("pop %esi");
 	asm volatile("pop %ebx");
 	asm volatile("popf"); 
-	asm volatile("ret");
+	asm volatile("ret");*/
 }

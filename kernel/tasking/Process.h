@@ -15,6 +15,7 @@ class Process {
 	inline Process *prev() { return m_prev; }
 	inline void set_next(Process *next) { m_next = next; }
 	inline void set_prev(Process *prev) { m_prev = prev; }
+	inline PageDirectory* page_directory() { return m_page_directory; }
 
   private:
 	friend class Scheduler;

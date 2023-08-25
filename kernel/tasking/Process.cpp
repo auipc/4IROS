@@ -9,6 +9,7 @@ Process::Process(void *entry)
 	: m_pid(s_pid++)
 {
 	uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
+	m_page_directory = Paging::the()->kernel_page_directory()->clone();
 	m_stack = stack;
 	m_stacktop = m_stack + STACK_SIZE;
 	// memset((char*)stack, 0, STACK_SIZE);
