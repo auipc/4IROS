@@ -82,18 +82,18 @@ void Scheduler::setup() {
 	asm volatile("iret");*/
 }
 
-extern "C" void sched_asm(uintptr_t *prev_stack, uintptr_t *next_stack);
+extern "C" void sched_asm(uintptr_t* prev_stack, uintptr_t* next_stack);
 asm("sched_asm:");
-asm("add $4, %esp");
-asm("pop %eax");
-asm("pop %ebx");
+asm("mov %eax, %ecx");
 asm("pushf");
 asm("push %ebx");
 asm("push %esi");
 asm("push %edi");
 asm("push %ebp");
-asm("mov %esp, (%eax)");
-asm("mov (%ebx), %esp");
+asm("mov %esp,%eax");
+asm("mov %eax,(%ecx)");
+asm("mov (%edx),%eax");
+asm("mov %eax,%esp");
 asm("pop %ebp");
 asm("pop %edi");
 asm("pop %esi");
@@ -101,6 +101,7 @@ asm("pop %ebx");
 asm("popf");
 asm("ret");
 
+/*
 void test(uintptr_t* prev_stack, uintptr_t* next_stack) {
 	asm volatile("pushf");
 	asm volatile("push %ebx");
@@ -115,8 +116,8 @@ void test(uintptr_t* prev_stack, uintptr_t* next_stack) {
 	asm volatile("pop %esi");
 	asm volatile("pop %ebx");
 	asm volatile("popf");
-	//asm volatile("ret");
-}
+	asm volatile("ret");
+}*/
 
 // FIXME This only works on -O1-3 due to needing a certain stack layout.
 // Try to figure out how to fix this later
@@ -126,5 +127,7 @@ void Scheduler::schedule() {
 	s_current = s_current->m_next;
 	auto next_stack = &s_current->m_stacktop;
 
-	test(prev_stack, next_stack);
+	printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
+
+	sched_asm(prev_stack, next_stack);
 }
