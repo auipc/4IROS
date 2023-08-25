@@ -3,21 +3,22 @@
 #include <kernel/idt.h>
 
 Scheduler *Scheduler::s_the = nullptr;
+Process *Scheduler::s_current = nullptr;
 
 Scheduler::Scheduler() { s_the = this; }
 
 Scheduler::~Scheduler() { s_the = nullptr; }
 
 void next_process2() {
-	printk("proc 2\n");
 	while(1) {
+		printk("proc 2\n");
 		asm volatile("int $0x7F");
 	}
 }
 
 void next_process() {
-	printk("proc 1\n");
 	while(1) {
+		printk("proc 1\n");
 		asm volatile("int $0x7F");
 	}
 }
@@ -51,7 +52,7 @@ asm("	iret");
 void Scheduler::setup() {
 	s_the = new Scheduler();
 	Process *idle = new Process((void *)kernel_idle);
-	Scheduler::the()->m_current = idle;
+	Scheduler::the()->s_current = idle;
 	idle->set_next(idle);
 	idle->set_prev(idle);
 
@@ -65,16 +66,15 @@ void Scheduler::setup() {
 
 	InterruptHandler::the()->setHandler(0x7F, schedule_handler);
 
-	asm volatile("mov %%eax, %%esp" : : "a"(Scheduler::the()->m_current->m_stacktop));
-	//asm volatile("mov %%eax, %%cr3" : : "a"(Scheduler::the()->m_current->page_directory()));
+	asm volatile("mov %%eax, %%esp" : : "a"(Scheduler::the()->s_current->m_stacktop));
+	//asm volatile("mov %%eax, %%cr3" : : "a"(Scheduler::the()->s_current->page_directory()));
 	asm volatile("pop %ebp");
 	asm volatile("pop %edi");
 	asm volatile("pop %esi");
 	asm volatile("pop %ebx");
 	asm volatile("popf");
 	asm volatile("ret");
-	/*
-	asm volatile("pop %ds");
+	/*asm volatile("pop %ds");
 	asm volatile("pop %es");
 	asm volatile("pop %fs");
 	asm volatile("pop %gs");
@@ -84,6 +84,7 @@ void Scheduler::setup() {
 
 extern "C" void sched_asm(uintptr_t *prev_stack, uintptr_t *next_stack);
 asm("sched_asm:");
+asm("add $4, %esp");
 asm("pop %eax");
 asm("pop %ebx");
 asm("pushf");
@@ -100,15 +101,8 @@ asm("pop %ebx");
 asm("popf");
 asm("ret");
 
-void Scheduler::schedule() {
-	if (Scheduler::the()->current() == Scheduler::the()->current()->next()) return;
-
-	auto prev_stack = &Scheduler::the()->current()->m_stacktop;
-	Scheduler::the()->set_current(Scheduler::the()->current()->next());
-	auto next_stack = &Scheduler::the()->current()->m_stacktop;
-
-	sched_asm(prev_stack, next_stack);
-	/*asm volatile("pushf");
+void test(uintptr_t* prev_stack, uintptr_t* next_stack) {
+	asm volatile("pushf");
 	asm volatile("push %ebx");
 	asm volatile("push %esi");
 	asm volatile("push %edi");
@@ -120,6 +114,17 @@ void Scheduler::schedule() {
 	asm volatile("pop %edi");
 	asm volatile("pop %esi");
 	asm volatile("pop %ebx");
-	asm volatile("popf"); 
-	asm volatile("ret");*/
+	asm volatile("popf");
+	//asm volatile("ret");
+}
+
+// FIXME This only works on -O1-3 due to needing a certain stack layout.
+// Try to figure out how to fix this later
+void Scheduler::schedule() {
+	if (s_current == s_current->m_next) return;
+	auto prev_stack = &s_current->m_stacktop;
+	s_current = s_current->m_next;
+	auto next_stack = &s_current->m_stacktop;
+
+	test(prev_stack, next_stack);
 }

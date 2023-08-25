@@ -7,9 +7,9 @@ class Scheduler {
 	~Scheduler();
 
 	inline static Scheduler *the() { return s_the; }
-	inline Process *current() { return m_current; }
+	inline Process *current() { return s_current; }
 	inline void set_current(Process* current) {
-		m_current = current;
+		s_current = current;
 	}
 
 	static void setup();
@@ -20,5 +20,5 @@ class Scheduler {
 
   private:
 	static Scheduler *s_the;
-	Process *m_current;
+	static Process *s_current;
 };
