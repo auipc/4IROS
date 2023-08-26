@@ -101,24 +101,6 @@ asm("pop %ebx");
 asm("popf");
 asm("ret");
 
-/*
-void test(uintptr_t* prev_stack, uintptr_t* next_stack) {
-	asm volatile("pushf");
-	asm volatile("push %ebx");
-	asm volatile("push %esi");
-	asm volatile("push %edi");
-	asm volatile("push %ebp");
-	asm volatile("mov %%esp, %%eax":"=a"(*prev_stack));
-	asm volatile("mov %%eax, %%esp"::"a"(*next_stack));
-	//asm volatile("mov %%eax, %%cr3" : : "a"(Scheduler::the()->current()->page_directory()));
-	asm volatile("pop %ebp");
-	asm volatile("pop %edi");
-	asm volatile("pop %esi");
-	asm volatile("pop %ebx");
-	asm volatile("popf");
-	asm volatile("ret");
-}*/
-
 // FIXME This only works on -O1-3 due to needing a certain stack layout.
 // Try to figure out how to fix this later
 void Scheduler::schedule() {
@@ -127,7 +109,7 @@ void Scheduler::schedule() {
 	s_current = s_current->m_next;
 	auto next_stack = &s_current->m_stacktop;
 
-	printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
+	//printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
 
 	sched_asm(prev_stack, next_stack);
 }
