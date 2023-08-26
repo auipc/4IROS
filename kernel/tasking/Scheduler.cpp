@@ -1,6 +1,7 @@
+#include <kernel/idt.h>
+#include <kernel/mem/Paging.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
-#include <kernel/idt.h>
 
 Scheduler *Scheduler::s_the = nullptr;
 Process *Scheduler::s_current = nullptr;
@@ -10,14 +11,14 @@ Scheduler::Scheduler() { s_the = this; }
 Scheduler::~Scheduler() { s_the = nullptr; }
 
 void next_process2() {
-	while(1) {
+	while (1) {
 		printk("proc 2\n");
 		asm volatile("int $0x7F");
 	}
 }
 
 void next_process() {
-	while(1) {
+	while (1) {
 		printk("proc 1\n");
 		asm volatile("int $0x7F");
 	}
@@ -26,16 +27,13 @@ void next_process() {
 void kernel_idle() {
 	printk("idle\n");
 	printk("this works\n");
-	while(1) {
-		//printk("proc 2\n");
+	while (1) {
+		// printk("proc 2\n");
 		asm volatile("int $0x7F");
 	}
 }
 
-
-extern "C" void _schedule() {
-	Scheduler::schedule();
-}
+extern "C" void _schedule() { Scheduler::schedule(); }
 
 extern "C" void schedule_handler();
 asm("schedule_handler:");
@@ -66,8 +64,14 @@ void Scheduler::setup() {
 
 	InterruptHandler::the()->setHandler(0x7F, schedule_handler);
 
-	asm volatile("mov %%eax, %%esp" : : "a"(Scheduler::the()->s_current->m_stacktop));
-	//asm volatile("mov %%eax, %%cr3" : : "a"(Scheduler::the()->s_current->page_directory()));
+	asm volatile("mov %%eax, %%esp"
+				 :
+				 : "a"(Scheduler::the()->s_current->m_stacktop));
+	asm volatile(
+		"mov %%eax, %%cr3"
+		:
+		: "a"((uintptr_t)Paging::get_physical_address(reinterpret_cast<void *>(
+			Scheduler::the()->s_current->page_directory()))));
 	asm volatile("pop %ebp");
 	asm volatile("pop %edi");
 	asm volatile("pop %esi");
@@ -82,8 +86,10 @@ void Scheduler::setup() {
 	asm volatile("iret");*/
 }
 
-extern "C" void sched_asm(uintptr_t* prev_stack, uintptr_t* next_stack);
+extern "C" void sched_asm(uintptr_t *prev_stack, uintptr_t *next_stack,
+						  uintptr_t cr3);
 asm("sched_asm:");
+asm("mov %ecx, %esi");
 asm("mov %eax, %ecx");
 asm("pushf");
 asm("push %ebx");
@@ -92,6 +98,7 @@ asm("push %edi");
 asm("push %ebp");
 asm("mov %esp,%eax");
 asm("mov %eax,(%ecx)");
+asm("mov %esi, %cr3");
 asm("mov (%edx),%eax");
 asm("mov %eax,%esp");
 asm("pop %ebp");
@@ -101,15 +108,16 @@ asm("pop %ebx");
 asm("popf");
 asm("ret");
 
-// FIXME This only works on -O1-3 due to needing a certain stack layout.
-// Try to figure out how to fix this later
 void Scheduler::schedule() {
-	if (s_current == s_current->m_next) return;
+	if (s_current == s_current->m_next)
+		return;
 	auto prev_stack = &s_current->m_stacktop;
 	s_current = s_current->m_next;
 	auto next_stack = &s_current->m_stacktop;
 
-	//printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
+	// printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
 
-	sched_asm(prev_stack, next_stack);
+	sched_asm(prev_stack, next_stack,
+			  (uintptr_t)Paging::get_physical_address(
+				  reinterpret_cast<void *>(s_current->page_directory())));
 }

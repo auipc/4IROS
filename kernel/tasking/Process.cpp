@@ -86,5 +86,5 @@ void Process::setup(void *entry) {
 	m_stacktop -= sizeof(uint32_t);
 	*(uint32_t *)m_stacktop = 0;
 
-	m_stacktop = reinterpret_cast<uintptr_t>(m_stacktop);
+	//m_stacktop = reinterpret_cast<uintptr_t>(m_stacktop);
 }

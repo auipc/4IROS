@@ -8,15 +8,11 @@ class Scheduler {
 
 	inline static Scheduler *the() { return s_the; }
 	inline Process *current() { return s_current; }
-	inline void set_current(Process* current) {
-		s_current = current;
-	}
+	inline void set_current(Process *current) { s_current = current; }
 
 	static void setup();
 
-
-	__attribute__((fastcall))
-	static void schedule();
+	__attribute__((fastcall)) static void schedule();
 
   private:
 	static Scheduler *s_the;

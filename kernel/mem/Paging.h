@@ -102,6 +102,12 @@ class Paging {
 		return s_current_page_directory;
 	}
 
+	// FIXME We should be consistent with addresses
+	inline static uintptr_t current_page_directory_physical() {
+		return reinterpret_cast<uintptr_t>(get_physical_address(
+			reinterpret_cast<void *>(s_current_page_directory)));
+	}
+
 	inline void map_page(size_t virtual_address, size_t physical_address,
 						 bool user_supervisor) {
 		s_current_page_directory->map_page(virtual_address, physical_address,
@@ -118,6 +124,10 @@ class Paging {
 
 	static Paging *the();
 
+	inline static size_t get_physical_address(void *virtual_address) {
+		return reinterpret_cast<size_t>(virtual_address) - VIRTUAL_ADDRESS;
+	}
+
   private:
 	friend struct PageDirectory;
 	friend struct PageTable;
@@ -127,10 +137,6 @@ class Paging {
 		asm volatile(
 			"mov %%eax, %%cr3" ::"a"(get_physical_address(page_directory)));
 		s_current_page_directory = page_directory;
-	}
-
-	inline static size_t get_physical_address(void *virtual_address) {
-		return reinterpret_cast<size_t>(virtual_address) - VIRTUAL_ADDRESS;
 	}
 
 	PageFrameAllocator *m_allocator;
