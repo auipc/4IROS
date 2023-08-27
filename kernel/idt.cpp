@@ -149,7 +149,7 @@ void InterruptHandler::setup() {
 }
 
 void InterruptHandler::setHandler(uint8_t interrupt, void (*handler)()) {
-	idtEntries[interrupt].setBase((uint32_t)handler);
+	idtEntries[interrupt].setBase(reinterpret_cast<uintptr_t>(handler));
 	idtEntries[interrupt].kernel_cs = 0x08;
 	idtEntries[interrupt].reserved = 0;
 	idtEntries[interrupt].attributes = 0x8E;

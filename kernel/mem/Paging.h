@@ -57,7 +57,7 @@ union PageDirectoryEntry {
 	uint32_t value;
 
 	inline PageTable *get_page_table() {
-		return (PageTable *)((page_table_base << 12) + VIRTUAL_ADDRESS);
+		return reinterpret_cast<PageTable*>((page_table_base << 12) + VIRTUAL_ADDRESS);
 	}
 
 	inline void set_page_table(PageTable *page_table) {

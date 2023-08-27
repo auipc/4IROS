@@ -100,7 +100,7 @@ void GDT::setup() {
 	gdt[4].flags.granularity = 1;
 	gdt[4].base_high = 0;
 
-	uint32_t tss_base = (uint32_t) &tss_entry;
+	uintptr_t tss_base = reinterpret_cast<uintptr_t>(&tss_entry);
 	uint32_t tss_limit = sizeof(TSS);
 	// tss descriptor
 	gdt[5].limit_low = tss_limit;
@@ -121,7 +121,9 @@ void GDT::setup() {
 	memset(reinterpret_cast<char*>(&tss_entry), 0, sizeof(TSS));
 	tss_entry.ss0 = 0x10;
 
-	gdt_ptr = {.limit = 6 * sizeof(GDTEntry) - 1, .base = (uint32_t)&gdt};
+	gdt_ptr.limit = 6 * sizeof(GDTEntry);
+	gdt_ptr.base = reinterpret_cast<uintptr_t>(&gdt);
+	//gdt_ptr = {.limit = 6 * sizeof(GDTEntry) - 1, .base = &gdt};
 
 	asm volatile("lgdt %0" : : "m"(gdt_ptr));
 	asm volatile("ltr %w0" : : "q"(5*8));
