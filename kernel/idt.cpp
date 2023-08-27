@@ -63,8 +63,8 @@ extern "C" void interrupt_14(InterruptRegisters regs) {
 	extern "C" void interrupt_##x(InterruptRegisters regs) {                   \
 		printk(msg "\n");                                                      \
 		printk("Error code 0x%x\n", regs.eflags);                              \
-		printk("Registers EAX: 0x%x EBX: 0x%x ECX: 0x%x EDX: 0x%x\n",          \
-			   regs.eax, regs.ebx, regs.ecx, regs.edx);                        \
+		printk("Registers EAX: 0x%x EBX: 0x%x ECX: 0x%x EDX: 0x%x EIP: 0x%x CS: 0x%x\n",          \
+			   regs.eax, regs.ebx, regs.ecx, regs.edx, regs.eip, regs.cs);                        \
 		while (1) {                                                            \
 			asm volatile("cli");                                               \
 			asm volatile("hlt");                                               \

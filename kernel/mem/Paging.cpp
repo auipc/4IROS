@@ -75,6 +75,7 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 								 ->entries[page_table_index];
 
 	page_table_entry.set_page_base(physical_address);
+	page_table_entry.user_supervisor = user_supervisor;
 	page_table_entry.read_write = 1;
 	page_table_entry.present = 1;
 

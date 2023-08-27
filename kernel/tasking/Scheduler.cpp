@@ -2,6 +2,7 @@
 #include <kernel/mem/Paging.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/gdt.h>
 
 Scheduler *Scheduler::s_the = nullptr;
 Process *Scheduler::s_current = nullptr;
@@ -43,10 +44,15 @@ asm("   push %fs");
 asm("   push %es");
 asm("   push %ds");
 asm("	call _schedule");
-asm("   add $0x10, %esp");
+asm("   pop %ds");
+asm("   pop %es");
+asm("   pop %fs");
+asm("   pop %gs");
+//asm("   add $0x10, %esp");
 asm("	popa");
 asm("	iret");
 
+extern TSS tss_entry;
 void Scheduler::setup() {
 	s_the = new Scheduler();
 	Process *idle = new Process((void *)kernel_idle);
@@ -63,10 +69,11 @@ void Scheduler::setup() {
 	next2->set_next(idle);
 
 	InterruptHandler::the()->setHandler(0x7F, schedule_handler);
+	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
 
 	asm volatile("mov %%eax, %%esp"
 				 :
-				 : "a"(Scheduler::the()->s_current->m_stacktop));
+				 : "a"(Scheduler::the()->s_current->m_stack_top));
 	asm volatile(
 		"mov %%eax, %%cr3"
 		:
@@ -111,9 +118,9 @@ asm("ret");
 void Scheduler::schedule() {
 	if (s_current == s_current->m_next)
 		return;
-	auto prev_stack = &s_current->m_stacktop;
+	auto prev_stack = &s_current->m_stack_top;
 	s_current = s_current->m_next;
-	auto next_stack = &s_current->m_stacktop;
+	auto next_stack = &s_current->m_stack_top;
 
 	// printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
 

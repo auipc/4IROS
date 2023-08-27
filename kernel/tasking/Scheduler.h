@@ -12,7 +12,7 @@ class Scheduler {
 
 	static void setup();
 
-	__attribute__((fastcall)) static void schedule();
+	static void schedule();
 
   private:
 	static Scheduler *s_the;

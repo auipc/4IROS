@@ -8,3 +8,5 @@
 
 // TODO this shouldn't be static
 #define TOTAL_MEMORY 128 * MB
+
+#define PACKED __attribute__((packed))
