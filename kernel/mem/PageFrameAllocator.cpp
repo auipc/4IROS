@@ -1,9 +1,8 @@
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
 #include <kernel/mem/PageFrameAllocator.h>
-#include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
-#include <kernel/stdint.h>
+#include <kernel/util/Bitmap.h>
 
 PageFrameAllocator::PageFrameAllocator(size_t memory_size) {
 	m_pages = memory_size / PAGE_SIZE;

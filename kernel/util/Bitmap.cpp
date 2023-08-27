@@ -1,7 +1,4 @@
 #include <kernel/assert.h>
-#include <kernel/mem/malloc.h>
-#include <kernel/printk.h>
-#include <kernel/stdint.h>
 #include <kernel/string.h>
 #include <kernel/util/Bitmap.h>
 

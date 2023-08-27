@@ -2,6 +2,7 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/string.h>
+#include <kernel/arch/i386/kernel.h>
 
 extern "C" char _heap_start;
 static size_t s_mem_pointer = 0;
