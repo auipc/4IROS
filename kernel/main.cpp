@@ -41,6 +41,7 @@ extern "C" void kernel_main() {
 
 	asm volatile("sti");
 	printk("We're running!\n");
+	Scheduler::setup();
 
 	while (1)
 		;
