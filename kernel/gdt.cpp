@@ -21,7 +21,7 @@ void GDT::setup() {
 	 * hardcoded page directory is probably the best solution.
 	 */
 
-	memset(reinterpret_cast<char*>(gdt), 0, sizeof(gdt));
+	memset(reinterpret_cast<char *>(gdt), 0, sizeof(gdt));
 
 	// null descriptor
 	gdt[0].limit_low = 0;
@@ -118,13 +118,13 @@ void GDT::setup() {
 	gdt[5].flags.granularity = 1;
 	gdt[5].base_high = ((tss_base & (0xff << 24)) >> 24);
 
-	memset(reinterpret_cast<char*>(&tss_entry), 0, sizeof(TSS));
+	memset(reinterpret_cast<char *>(&tss_entry), 0, sizeof(TSS));
 	tss_entry.ss0 = 0x10;
 
 	gdt_ptr.limit = 6 * sizeof(GDTEntry);
 	gdt_ptr.base = reinterpret_cast<uintptr_t>(&gdt);
-	//gdt_ptr = {.limit = 6 * sizeof(GDTEntry) - 1, .base = &gdt};
+	// gdt_ptr = {.limit = 6 * sizeof(GDTEntry) - 1, .base = &gdt};
 
 	asm volatile("lgdt %0" : : "m"(gdt_ptr));
-	asm volatile("ltr %w0" : : "q"(5*8));
+	asm volatile("ltr %w0" : : "q"(5 * 8));
 }

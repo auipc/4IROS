@@ -3,11 +3,11 @@
 #include <kernel/stdint.h>
 
 static const size_t STACK_SIZE = 4096;
-static const size_t USER_STACK_SIZE = 8*4096;
+static const size_t USER_STACK_SIZE = 8 * 4096;
 
 class Process {
   public:
-	Process(void *entry, bool userspace=false);
+	Process(void *entry, bool userspace = false);
 	~Process();
 	void setup(void *entry);
 
@@ -16,7 +16,7 @@ class Process {
 	inline Process *prev() { return m_prev; }
 	inline void set_next(Process *next) { m_next = next; }
 	inline void set_prev(Process *prev) { m_prev = prev; }
-	inline PageDirectory* page_directory() { return m_page_directory; }
+	inline PageDirectory *page_directory() { return m_page_directory; }
 
   private:
 	friend class Scheduler;

@@ -1,14 +1,12 @@
+#include <kernel/arch/i386/i386.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/string.h>
 #include <kernel/tasking/Process.h>
-#include <kernel/arch/i386/i386.h>
 
 static uint32_t s_pid = 0;
 
-Process::Process(void *entry, bool userspace) 
-	: m_pid(s_pid++)
-	, m_userspace(userspace)
-{
+Process::Process(void *entry, bool userspace)
+	: m_pid(s_pid++), m_userspace(userspace) {
 	uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
 	m_page_directory = Paging::the()->kernel_page_directory()->clone();
 	m_stack_base = stack;
@@ -23,12 +21,12 @@ Process::Process(void *entry, bool userspace)
 	setup(entry);
 }
 
-Process::~Process() { 
+Process::~Process() {
 	if (m_userspace) {
-		kfree((void *)(m_user_stack_base)); 
+		kfree((void *)(m_user_stack_base));
 	}
 
-	kfree((void *)(m_stack_base)); 
+	kfree((void *)(m_stack_base));
 }
 
 extern "C" void task_switch_shim();
@@ -132,5 +130,5 @@ void Process::setup(void *entry) {
 	m_stack_top -= sizeof(uint32_t);
 	*(uint32_t *)m_stack_top = 0;
 
-	//m_stack_top = reinterpret_cast<uintptr_t>(m_stack_top);
+	// m_stack_top = reinterpret_cast<uintptr_t>(m_stack_top);
 }

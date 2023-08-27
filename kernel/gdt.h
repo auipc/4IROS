@@ -1,14 +1,16 @@
 #pragma once
-#include <kernel/stdint.h>
 #include <kernel/arch/i386/kernel.h>
+#include <kernel/stdint.h>
 
 // https://wiki.osdev.org/Getting_to_Ring_3#The_TSS
 struct TSS {
-	uint32_t prev_tss; // The previous TSS - with hardware task switching these form a kind of backward linked list.
-	uint32_t esp0;     // The stack pointer to load when changing to kernel mode.
-	uint32_t ss0;      // The stack segment to load when changing to kernel mode.
+	uint32_t prev_tss; // The previous TSS - with hardware task switching these
+					   // form a kind of backward linked list.
+	uint32_t esp0; // The stack pointer to load when changing to kernel mode.
+	uint32_t ss0;  // The stack segment to load when changing to kernel mode.
 	// Everything below here is unused.
-	uint32_t esp1; // esp and ss 1 and 2 would be used when switching to rings 1 or 2.
+	uint32_t esp1; // esp and ss 1 and 2 would be used when switching to rings 1
+				   // or 2.
 	uint32_t ss1;
 	uint32_t esp2;
 	uint32_t ss2;

@@ -2,11 +2,10 @@
 #include <kernel/string.h>
 #include <kernel/util/Bitmap.h>
 
-Bitmap::Bitmap(size_t elems)
-{
+Bitmap::Bitmap(size_t elems) {
 	// uint32_t containers might be better
 	data = new uint8_t[elems];
-	memset(reinterpret_cast<char*>(data), 0, elems);
+	memset(reinterpret_cast<char *>(data), 0, elems);
 	size = elems / 8;
 }
 

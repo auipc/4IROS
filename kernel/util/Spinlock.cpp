@@ -11,6 +11,4 @@ void Spinlock::acquire() {
 		;
 }
 
-void Spinlock::release() {
-	__atomic_store_n(&m_locked, 0, __ATOMIC_SEQ_CST);
-}
+void Spinlock::release() { __atomic_store_n(&m_locked, 0, __ATOMIC_SEQ_CST); }

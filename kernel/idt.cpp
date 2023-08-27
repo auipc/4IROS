@@ -56,15 +56,15 @@ extern "C" void interrupt_14(InterruptRegisters regs) {
 	asm("	call interrupt_" #x);                                              \
 	asm("   add $0x10, %esp");                                                 \
 	asm("	popa");                                                            \
-	asm("	iret");														       \
-
+	asm("	iret");
 
 #define HALTING_INTERRUPT_STUB(x, msg)                                         \
 	extern "C" void interrupt_##x(InterruptRegisters regs) {                   \
 		printk(msg "\n");                                                      \
 		printk("Error code 0x%x\n", regs.eflags);                              \
-		printk("Registers EAX: 0x%x EBX: 0x%x ECX: 0x%x EDX: 0x%x EIP: 0x%x CS: 0x%x\n",          \
-			   regs.eax, regs.ebx, regs.ecx, regs.edx, regs.eip, regs.cs);                        \
+		printk("Registers EAX: 0x%x EBX: 0x%x ECX: 0x%x EDX: 0x%x EIP: 0x%x "  \
+			   "CS: 0x%x\n",                                                   \
+			   regs.eax, regs.ebx, regs.ecx, regs.edx, regs.eip, regs.cs);     \
 		while (1) {                                                            \
 			asm volatile("cli");                                               \
 			asm volatile("hlt");                                               \

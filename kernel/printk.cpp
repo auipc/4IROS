@@ -98,7 +98,7 @@ void printk(const char *str, ...) {
 			int precision = 6;
 			char c2 = str[j];
 			if (c2 == '.') {
-				precision = str[j+1] - '0';
+				precision = str[j + 1] - '0';
 				j += 2;
 				c2 = str[j];
 

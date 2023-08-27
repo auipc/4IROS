@@ -1,8 +1,8 @@
+#include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
-#include <kernel/gdt.h>
 
 Scheduler *Scheduler::s_the = nullptr;
 Process *Scheduler::s_current = nullptr;
@@ -48,7 +48,7 @@ asm("   pop %ds");
 asm("   pop %es");
 asm("   pop %fs");
 asm("   pop %gs");
-//asm("   add $0x10, %esp");
+// asm("   add $0x10, %esp");
 asm("	popa");
 asm("	iret");
 

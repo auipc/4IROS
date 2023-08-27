@@ -1,9 +1,9 @@
+#include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
+#include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/string.h>
-#include <kernel/arch/i386/kernel.h>
-#include <kernel/mem/Paging.h>
 
 extern "C" char _heap_start;
 static size_t s_mem_pointer = 0;
@@ -36,7 +36,9 @@ void kmalloc_init() {
 	// FIXME: When paging is enabled, this should be able to grow.
 	// 400 padding to grow not really growth lol
 	s_mem_end = reinterpret_cast<size_t>(&_heap_start) +
-				(BOOTSTRAP_MEMORY - block_header_size - ((TOTAL_MEMORY/k_allocation_block_size)*sizeof(AllocationBlockHeader)));
+				(BOOTSTRAP_MEMORY - block_header_size -
+				 ((TOTAL_MEMORY / k_allocation_block_size) *
+				  sizeof(AllocationBlockHeader)));
 	printk("s_mem_pointer %x, s_mem_end %x\n", s_mem_pointer, s_mem_end);
 	assert(s_mem_pointer != 0);
 	assert(s_mem_end != 0);
@@ -62,7 +64,8 @@ void *allocate_block(size_t blocks_needed) {
 			block_headers[i].span_in_blocks = blocks_needed;
 			printk("Allocating block at %x\n",
 				   s_mem_pointer + (i * k_allocation_block_size));
-			printk("Memory usage %.2f/%d KB\n", ((float)count_used_memory()) / ((float)KB),
+			printk("Memory usage %.2f/%d KB\n",
+				   ((float)count_used_memory()) / ((float)KB),
 				   (block_headers_length * k_allocation_block_size) / KB);
 			return reinterpret_cast<void *>(s_mem_pointer +
 											(i * k_allocation_block_size));
@@ -73,16 +76,27 @@ void *allocate_block(size_t blocks_needed) {
 	}
 
 	// If we're out of memory and paging isn't setup, return nullptr.
-	if (!Paging::the()) return nullptr;
+	if (!Paging::the())
+		return nullptr;
 
 	printk("Out of memory, allocating more...\n");
 	// Allocate more memory
-	Paging::the()->map_range(Paging::page_align(reinterpret_cast<size_t>(block_headers)+(block_headers_length*sizeof(AllocationBlockHeader))), k_allocation_block_size*blocks_needed, false);
+	Paging::the()->map_range(
+		Paging::page_align(
+			reinterpret_cast<size_t>(block_headers) +
+			(block_headers_length * sizeof(AllocationBlockHeader))),
+		k_allocation_block_size * blocks_needed, false);
 	block_headers_length += blocks_needed;
 
-	printk("LOLOLOLOL 0x%x\n", reinterpret_cast<void*>((reinterpret_cast<size_t>(block_headers_length-blocks_needed) * reinterpret_cast<size_t>(k_allocation_block_size))));
-	return reinterpret_cast<void*>((reinterpret_cast<size_t>(block_headers_length-blocks_needed) * reinterpret_cast<size_t>(k_allocation_block_size)));
-	//Paging::the()->map_page(size_t virtual_address, size_t physical_address, bool user_supervisor)
+	printk("LOLOLOLOL 0x%x\n",
+		   reinterpret_cast<void *>(
+			   (reinterpret_cast<size_t>(block_headers_length - blocks_needed) *
+				reinterpret_cast<size_t>(k_allocation_block_size))));
+	return reinterpret_cast<void *>(
+		(reinterpret_cast<size_t>(block_headers_length - blocks_needed) *
+		 reinterpret_cast<size_t>(k_allocation_block_size)));
+	// Paging::the()->map_page(size_t virtual_address, size_t physical_address,
+	// bool user_supervisor)
 }
 
 void free_blocks(void *block) {

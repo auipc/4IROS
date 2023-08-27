@@ -57,7 +57,8 @@ union PageDirectoryEntry {
 	uint32_t value;
 
 	inline PageTable *get_page_table() {
-		return reinterpret_cast<PageTable*>((page_table_base << 12) + VIRTUAL_ADDRESS);
+		return reinterpret_cast<PageTable *>((page_table_base << 12) +
+											 VIRTUAL_ADDRESS);
 	}
 
 	inline void set_page_table(PageTable *page_table) {
@@ -116,9 +117,9 @@ class Paging {
 	}
 
 	inline void map_range(size_t virtual_address, size_t length,
-						 bool user_supervisor) {
+						  bool user_supervisor) {
 		s_current_page_directory->map_range(virtual_address, length,
-										   user_supervisor);
+											user_supervisor);
 	}
 
 	inline static size_t page_align(size_t address) {
