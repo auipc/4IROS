@@ -2,11 +2,12 @@
 #include <kernel/string.h>
 #include <kernel/util/Bitmap.h>
 
-Bitmap::Bitmap(size_t elems) {
+Bitmap::Bitmap(size_t elems)
+{
 	// uint32_t containers might be better
-	data = new uint32_t[elems / 32];
-	memset(reinterpret_cast<char *>(data), 0, elems / 32);
-	size = elems / 32;
+	data = new uint8_t[elems];
+	memset(reinterpret_cast<char*>(data), 0, elems);
+	size = elems / 8;
 }
 
 Bitmap::~Bitmap() { delete[] data; }
@@ -16,8 +17,8 @@ void Bitmap::set(size_t i) {
 		assert(false);
 		return;
 	}
-	int byteIndex = i / 32;
-	int bitIndex = i % 32;
+	int byteIndex = i / 8;
+	int bitIndex = i % 8;
 	unsigned char mask = 1 << bitIndex;
 	data[byteIndex] |= mask; // Set the bit to 1
 }
@@ -27,8 +28,8 @@ void Bitmap::unset(size_t i) {
 		assert(false);
 		return;
 	}
-	int byteIndex = i / 32;
-	int bitIndex = i % 32;
+	int byteIndex = i / 8;
+	int bitIndex = i % 8;
 	unsigned char mask = 1 << bitIndex;
 	data[byteIndex] &= ~mask; // Set the bit to 0
 }
@@ -37,8 +38,8 @@ uint8_t Bitmap::get(size_t i) const {
 	if (i >= size) {
 		assert(false);
 	}
-	int byteIndex = i / 32;
-	int bitIndex = i % 32;
+	int byteIndex = i / 8;
+	int bitIndex = i % 8;
 	return (data[byteIndex] >> bitIndex) & 1;
 }
 

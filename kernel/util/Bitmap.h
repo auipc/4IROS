@@ -14,6 +14,6 @@ class Bitmap {
 	uint32_t count();
 
   private:
-	uint32_t *data;
+	uint8_t *data;
 	size_t size;
 };

@@ -20,6 +20,7 @@ void PageFrameAllocator::mark_range(uint32_t start, uint32_t end) {
 size_t PageFrameAllocator::find_free_page() {
 	size_t address = (m_bitmap->scan(1) * PAGE_SIZE);
 	assert(address % PAGE_SIZE == 0);
+	m_bitmap->set(address/PAGE_SIZE);
 	return address;
 }
 

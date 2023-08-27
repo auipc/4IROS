@@ -80,6 +80,7 @@ struct PageDirectory {
 
 	void map_page(size_t virtual_address, size_t physical_address,
 				  bool user_supervisor);
+	void map_range(size_t virtual_address, size_t length, bool user_supervisor);
 
 	void unmap_page(size_t virtual_address);
 
@@ -111,6 +112,12 @@ class Paging {
 	inline void map_page(size_t virtual_address, size_t physical_address,
 						 bool user_supervisor) {
 		s_current_page_directory->map_page(virtual_address, physical_address,
+										   user_supervisor);
+	}
+
+	inline void map_range(size_t virtual_address, size_t length,
+						 bool user_supervisor) {
+		s_current_page_directory->map_range(virtual_address, length,
 										   user_supervisor);
 	}
 
