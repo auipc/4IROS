@@ -4,7 +4,6 @@ void itoa(char *buf, unsigned long int n, int base) {
 	unsigned long int tmp;
 	int i, j;
 
-	tmp = n;
 	i = 0;
 
 	do {

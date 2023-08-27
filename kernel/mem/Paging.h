@@ -62,7 +62,7 @@ union PageDirectoryEntry {
 
 	inline void set_page_table(PageTable *page_table) {
 		page_table_base =
-			(reinterpret_cast<uint32_t>(page_table) - VIRTUAL_ADDRESS) >> 12;
+			(reinterpret_cast<uintptr_t>(page_table) - VIRTUAL_ADDRESS) >> 12;
 	}
 } __attribute__((packed));
 
