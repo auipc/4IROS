@@ -30,7 +30,7 @@ jobs:
       run: |
         git clone https://github.com/lordmilko/i686-elf-tools
         cd i686-elf-tools
-        ./i686-elf-tools.sh linux
+        ./i686-elf-tools.sh linux -parallel
         cd ..
 
     - name: Set reusable strings
