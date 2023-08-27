@@ -1,0 +1,48 @@
+# This starter workflow is for a CMake project running on multiple platforms. There is a different starter workflow if you just want a single platform.
+# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-single-platform.yml
+name: CMake on multiple platforms
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        os: [ubuntu-latest]
+        c_compiler: [i686-elf-gcc]
+        include:
+          - os: ubuntu-latest
+            c_compiler: i686-elf-gcc
+            cpp_compiler: i686-elf-g++
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: switch to gcc-10 on linux
+      if: matrix.configurations.os == "ubuntu-latest"
+      run: |
+        git clone https://github.com/lordmilko/i686-elf-tools
+        cd i686-elf-tools
+        ./i686-elf-tools.sh linux
+        cd ..
+
+    - name: Set reusable strings
+      id: strings
+      shell: bash
+      run: |
+        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
+    - name: Configure CMake
+      run: >
+        cmake -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/toolchain.cmake -S ${{ github.workspace }}
+
+    - name: Build
+      run: cmake --build ${{ steps.strings.outputs.build-output-dir }}
