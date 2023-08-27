@@ -5,13 +5,13 @@ SECTIONS
 	. = 0x00100000;
 
 	_kernel_start = .;
-        .multiboot.data : {
-            *(.multiboot.data)
-        }
+	.multiboot.data : {
+		*(.multiboot.data)
+	}
 
-       .multiboot.text : {
-           *(.multiboot.text)
-       }
+	.multiboot.text : {
+		*(.multiboot.text)
+	}
 
 	. += 0xC0000000;
 

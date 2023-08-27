@@ -4,7 +4,7 @@ set(CMAKE_SYSTEM_NAME 4IROS)
 # which compilers to use for C and C++
 set(CMAKE_C_COMPILER   i686-elf-gcc)
 set(CMAKE_CXX_COMPILER i686-elf-g++)
-set(CMAKE_ASM_COMPILER i686-elf-as)
+set(CMAKE_ASM_COMPILER i686-elf-gcc)
 set(CMAKE_LINKER i686-elf-ld)
 
 set(CMAKE_C_COMPILER_WORKS 1)

@@ -4,7 +4,7 @@
 struct InterruptRegisters {
 	uint32_t ds, es, fs, gs;
 	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
-	uint32_t eip, cs, eflags;						 // Pushed by the processor.
+	uint32_t cs, eip, eflags;						 // Pushed by the processor.
 } __attribute__((packed));
 
 struct IDTPointer {

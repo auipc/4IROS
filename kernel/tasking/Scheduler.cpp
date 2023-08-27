@@ -30,6 +30,7 @@ void kernel_idle() {
 	printk("this works\n");
 	while (1) {
 		// printk("proc 2\n");
+		asm volatile("int $0x80");
 		asm volatile("int $0x7F");
 	}
 }

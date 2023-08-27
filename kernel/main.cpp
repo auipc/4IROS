@@ -10,27 +10,9 @@ extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
 }
 
-// FIXME this breaks in grub figure out why
 extern "C" void syscall_interrupt_handler();
-asm("syscall_interrupt_handler:");
-asm("	pusha");
-asm("   pushw %gs");
-asm("   pushw %fs");
-asm("   pushw %es");
-asm("   pushw %ds");
-asm("	call syscall_interrupt");
-// We could pop gs, fs, es, and ds, but something goes wrong on -O3
-// because of the compiler optimizing functions to use "jmp" instead of "call".
-// Saving gs, fs, es, and ds seems pointless anyway. Plus the TSS should set them back if we're in userspace. <-- WRONG
-//asm("   add $0x10, %esp");
-asm("   popw %ds");
-asm("   popw %es");
-asm("   popw %fs");
-asm("   popw %gs");
-asm("	popa");
-asm("	iret");
 
-extern "C" void syscall_interrupt(InterruptRegisters regs) {
+extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	printk("ESP: 0x%x\n", regs.esp);
 	printk("DS: 0x%x, ES: 0x%x, FS: 0x%x, GS: 0x%x\n", regs.ds, regs.es,
 		   regs.fs, regs.gs);
@@ -53,15 +35,11 @@ extern "C" void kernel_main() {
 	printk("We're running!\n");
 	printk("We're running!\n");
 	InterruptHandler::setup();
-	printk("lol\n");
-	InterruptHandler::the()->setHandler(0x80, syscall_interrupt_handler);
+	printk("lol 0x%x\n", &syscall_interrupt_handler);
+	InterruptHandler::the()->setHandler(0x80, &syscall_interrupt_handler);
 	Paging::setup();
 
 	asm volatile("sti");
-	/*asm volatile("int $0x80");
-	asm volatile("int $0x80");
-	asm volatile("int $0x80");
-	asm volatile("int $0x80");*/
 	printk("We're running!\n");
 	Scheduler::setup();
 

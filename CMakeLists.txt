@@ -4,6 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(SRCS
         kernel/arch/i386/asm/boot.S
+        kernel/arch/i386/asm/interrupt.S
         kernel/main.cpp
         kernel/mem/malloc.h
         kernel/mem/malloc.cpp
@@ -35,7 +36,7 @@ set(SRCS
 		kernel/tasking/Scheduler.h
 )
 
-set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O0 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -mregparm=3")
+set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -Os -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -mregparm=3")
 add_executable(4IROS ${SRCS})
 
 target_include_directories(4IROS PRIVATE ${CMAKE_SOURCE_DIR}/)
