@@ -146,8 +146,6 @@ void Process::setup(void *entry) {
 	m_stack_top -= sizeof(uint32_t);
 	*(uint32_t *)m_stack_top = (uint32_t)task_switch_shim;
 	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = EFlags::InterruptEnable | EFlags::AlwaysSet;
-	m_stack_top -= sizeof(uint32_t);
 	*(uint32_t *)m_stack_top = 0;
 	m_stack_top -= sizeof(uint32_t);
 	*(uint32_t *)m_stack_top = 0;
