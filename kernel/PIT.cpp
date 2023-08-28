@@ -1,7 +1,7 @@
-#include <kernel/PIT.h>
 #include <kernel/PIC.h>
-#include <kernel/idt.h>
+#include <kernel/PIT.h>
 #include <kernel/arch/i386/IO.h>
+#include <kernel/idt.h>
 #include <kernel/printk.h>
 #include <kernel/tasking/Scheduler.h>
 
@@ -11,8 +11,8 @@ extern "C" void pit_interrupt() {
 		Scheduler::the()->schedule();
 	}
 	// lol
-	outb(0x20,0x20);
-	outb(0xA0,0x20);
+	outb(0x20, 0x20);
+	outb(0xA0, 0x20);
 }
 
 void PIT::setup() {

@@ -1,6 +1,6 @@
 #pragma once
 
 class PIT {
-public:
+  public:
 	static void setup();
 };
