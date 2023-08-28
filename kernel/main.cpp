@@ -5,6 +5,7 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/test_program.h>
 #include <kernel/tasking/ELF.h>
 
 extern "C" void __cxa_pure_virtual() {
@@ -42,6 +43,8 @@ extern "C" void kernel_main() {
 
 	asm volatile("sti");
 	printk("We're running!\n");
+	Paging::current_page_directory()->map_page(0x8000, 0x8000, false);
+
 	Scheduler::setup();
 
 	while (1)

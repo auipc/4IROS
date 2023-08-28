@@ -1,3 +1,4 @@
+#include "kernel/arch/i386/kernel.h"
 #include <kernel/tasking/ELF.h>
 #include <kernel/string.h>
 #include <kernel/printk.h>
@@ -19,15 +20,12 @@ uintptr_t ELF::program_entry() {
 void ELF::load_sections(PageDirectory* pd) {
 	m_headers.iterator([&](ELFSectionHeader header) {
 		if (header.seg != 1) return;
-		//pd->map_range(header.vaddr, header.memsz, true);
-		//auto current_page_directory = Paging::current_page_directory();
+		auto current_page_directory = Paging::current_page_directory();
 		printk("vaddr %x off %x memsz %x\n", header.vaddr, header.off, header.memsz);
-		auto physical_pages = pd->map_range(header.vaddr, header.memsz, true);
-		for (size_t i = 0; i < physical_pages.size(); i++) {
-			auto address = physical_pages[i];
-			Paging::current_page_directory()->map_page(address, address, false);
-			memcpy(reinterpret_cast<void*>(address), m_buffer + header.off, header.memsz);
-		}
+		pd->map_range(header.vaddr, header.memsz, true);
+		asm volatile("mov %%eax, %%cr3"::"a"(Paging::get_physical_address(pd)));
+		memcpy(reinterpret_cast<void*>(header.vaddr), m_buffer+header.off, header.memsz);
+		asm volatile("mov %%eax, %%cr3"::"a"(Paging::get_physical_address(current_page_directory)));
 	});
 }
 

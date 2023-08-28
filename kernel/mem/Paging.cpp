@@ -73,7 +73,8 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 	auto &page_table_entry = entries[page_directory_index]
 								 .get_page_table()
 								 ->entries[page_table_index];
-	memset(reinterpret_cast<char*>(&page_table_entry), 0, sizeof(PageTableEntry));
+	memset(reinterpret_cast<char *>(&page_table_entry), 0,
+		   sizeof(PageTableEntry));
 	page_table_entry.set_page_base(physical_address);
 	page_table_entry.user_supervisor = user_supervisor;
 	page_table_entry.read_write = 1;
@@ -88,7 +89,7 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 }
 
 Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
-							  bool user_supervisor) {
+										bool user_supervisor) {
 	Vec<uintptr_t> physical_addresses;
 	if (!length)
 		return physical_addresses;
@@ -99,8 +100,7 @@ Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
 	for (size_t i = 0; i < (length / PAGE_SIZE); i++) {
 		auto free_page = Paging::the()->m_allocator->find_free_page();
 		physical_addresses.push(free_page);
-		map_page(virtual_address + (i * PAGE_SIZE),
-				 free_page, user_supervisor);
+		map_page(virtual_address + (i * PAGE_SIZE), free_page, user_supervisor);
 	}
 
 	return physical_addresses;

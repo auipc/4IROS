@@ -78,7 +78,7 @@ struct PageDirectory {
 
 	void map_page(size_t virtual_address, size_t physical_address,
 				  bool user_supervisor);
-	Vec<uintptr_t> map_range(size_t virtual_address, size_t length,
+	[[maybe_unused]] Vec<uintptr_t> map_range(size_t virtual_address, size_t length,
 							 bool user_supervisor);
 
 	void unmap_page(size_t virtual_address);
@@ -116,7 +116,7 @@ class Paging {
 										   user_supervisor);
 	}
 
-	inline Vec<uintptr_t> map_range(size_t virtual_address, size_t length,
+	[[maybe_unused]] inline Vec<uintptr_t> map_range(size_t virtual_address, size_t length,
 									bool user_supervisor) {
 		return current_page_directory()->map_range(virtual_address, length,
 												   user_supervisor);

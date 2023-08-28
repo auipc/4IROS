@@ -40,7 +40,7 @@ set(SRCS
 		kernel/test_program.h
 )
 
-set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -Os -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -mregparm=3 -I.")
+set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O0 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -mregparm=3 -I.")
 add_executable(4IROS ${SRCS})
 
 target_include_directories(4IROS PRIVATE ${CMAKE_SOURCE_DIR}/)
