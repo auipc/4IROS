@@ -40,6 +40,7 @@ set(SRCS
 		kernel/PIT.h
 		kernel/PIT.cpp
 		kernel/test_program.h
+		kernel/multiboot.h
 )
 
 set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O3 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -mregparm=3 -I.")

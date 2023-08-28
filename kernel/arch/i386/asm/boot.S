@@ -11,6 +11,15 @@
 .long MAGIC
 .long FLAGS
 .long CHECKSUM
+.long 0
+.long 0
+.long 0
+.long 0
+.long 0
+.long 0
+.long 0
+.long 0
+.long 32
 
 # Allocate the initial stack.
 .section .bootstrap_stack, "aw", @nobits
@@ -111,6 +120,9 @@ _start:
 
 	# Set up the stack.
 	mov $stack_top, %esp
+
+	/* Push the magic value. */
+	pushl   %eax
 
 	# Enter the high-level kernel.
 	call kernel_main

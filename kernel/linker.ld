@@ -6,6 +6,7 @@ SECTIONS
 
 	_kernel_start = .;
 	.multiboot.data : {
+		_multiboot_data = .;
 		*(.multiboot.data)
 	}
 
