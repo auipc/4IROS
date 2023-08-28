@@ -118,7 +118,7 @@ asm("popf");
 asm("ret");
 
 extern "C" void sched_asm_no_save(uintptr_t *prev_stack, uintptr_t *next_stack,
-						  uintptr_t cr3);
+								  uintptr_t cr3);
 asm("sched_asm_no_save:");
 asm("mov %ecx, %esi");
 asm("mov %eax, %ecx");
@@ -148,7 +148,6 @@ void Scheduler::schedule() {
 				  reinterpret_cast<void *>(s_current->page_directory())));
 }
 
-
 void Scheduler::schedule_no_save() {
 	if (s_current == s_current->m_next)
 		return;
@@ -158,7 +157,8 @@ void Scheduler::schedule_no_save() {
 
 	printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
 
-	sched_asm_no_save(prev_stack, next_stack,
-			  (uintptr_t)Paging::get_physical_address(
-				  reinterpret_cast<void *>(s_current->page_directory())));
+	sched_asm_no_save(
+		prev_stack, next_stack,
+		(uintptr_t)Paging::get_physical_address(
+			reinterpret_cast<void *>(s_current->page_directory())));
 }

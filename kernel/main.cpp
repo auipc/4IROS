@@ -18,18 +18,18 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	bool schedule_away = false;
 
 	switch (syscall_no) {
-		case 1: {
-			Process* current = Scheduler::the()->current();
-			current->prev()->set_next(current->next());
-			current->next()->set_prev(current->prev());
-			// FIXME There's a chance the kernel stack is still used
-			// High chance
-			delete current;
-			schedule_away = true;
-			} break;
-		default:
-			printk("Unknown syscall\n");
-			break;
+	case 1: {
+		Process *current = Scheduler::the()->current();
+		current->prev()->set_next(current->next());
+		current->next()->set_prev(current->prev());
+		// FIXME There's a chance the kernel stack is still used
+		// High chance
+		delete current;
+		schedule_away = true;
+	} break;
+	default:
+		printk("Unknown syscall\n");
+		break;
 	}
 
 	printk("EAX: 0x%x\n", regs.eax);
