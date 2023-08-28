@@ -26,13 +26,9 @@ union PageTableEntry {
 
 	uint32_t value;
 
-	inline void set_page_base(uint32_t base) {
-		page_base = (base - VIRTUAL_ADDRESS) >> 12;
-	}
+	inline void set_page_base(uint32_t base) { page_base = (base) >> 12; }
 
-	inline uint32_t get_page_base() const {
-		return (page_base + VIRTUAL_ADDRESS) << 12;
-	}
+	inline uint32_t get_page_base() const { return (page_base) << 12; }
 } __attribute__((packed));
 
 struct PageTable {
@@ -82,7 +78,8 @@ struct PageDirectory {
 
 	void map_page(size_t virtual_address, size_t physical_address,
 				  bool user_supervisor);
-	Vec<uintptr_t> map_range(size_t virtual_address, size_t length, bool user_supervisor);
+	Vec<uintptr_t> map_range(size_t virtual_address, size_t length,
+							 bool user_supervisor);
 
 	void unmap_page(size_t virtual_address);
 
@@ -102,7 +99,8 @@ class Paging {
 	}
 
 	inline static PageDirectory *current_page_directory() {
-		auto pd = reinterpret_cast<PageDirectory*>(get_cr3() + VIRTUAL_ADDRESS);
+		auto pd =
+			reinterpret_cast<PageDirectory *>(get_cr3() + VIRTUAL_ADDRESS);
 		return pd;
 	}
 
@@ -119,9 +117,9 @@ class Paging {
 	}
 
 	inline Vec<uintptr_t> map_range(size_t virtual_address, size_t length,
-						  bool user_supervisor) {
+									bool user_supervisor) {
 		return current_page_directory()->map_range(virtual_address, length,
-											user_supervisor);
+												   user_supervisor);
 	}
 
 	inline static size_t page_align(size_t address) {
@@ -144,6 +142,7 @@ class Paging {
 		assert(cr3);
 		return cr3;
 	}
+
   private:
 	friend struct PageDirectory;
 	friend struct PageTable;

@@ -73,7 +73,7 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 	auto &page_table_entry = entries[page_directory_index]
 								 .get_page_table()
 								 ->entries[page_table_index];
-
+	memset(reinterpret_cast<char*>(&page_table_entry), 0, sizeof(PageTableEntry));
 	page_table_entry.set_page_base(physical_address);
 	page_table_entry.user_supervisor = user_supervisor;
 	page_table_entry.read_write = 1;
