@@ -87,18 +87,23 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 	}
 }
 
-void PageDirectory::map_range(size_t virtual_address, size_t length,
+Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
 							  bool user_supervisor) {
+	Vec<uintptr_t> physical_addresses;
 	if (!length)
-		return;
+		return physical_addresses;
 	if (length < PAGE_SIZE) {
 		length += PAGE_SIZE - length;
 	}
 
 	for (size_t i = 0; i < (length / PAGE_SIZE); i++) {
+		auto free_page = Paging::the()->m_allocator->find_free_page();
+		physical_addresses.push(free_page);
 		map_page(virtual_address + (i * PAGE_SIZE),
-				 Paging::the()->m_allocator->find_free_page(), user_supervisor);
+				 free_page, user_supervisor);
 	}
+
+	return physical_addresses;
 }
 
 void PageDirectory::unmap_page(size_t virtual_address) {

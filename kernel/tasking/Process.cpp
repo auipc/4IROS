@@ -2,6 +2,8 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/string.h>
 #include <kernel/tasking/Process.h>
+#include <kernel/tasking/ELF.h>
+#include <kernel/test_program.h>
 
 static uint32_t s_pid = 0;
 
@@ -19,6 +21,30 @@ Process::Process(void *entry, bool userspace)
 	}
 	// memset((char*)stack, 0, STACK_SIZE);
 	setup(entry);
+}
+
+Process::Process(const char *elf_file) 
+	: m_pid(s_pid++)
+	, m_userspace(true)
+{
+	(void)elf_file;
+	ELF* elf = new ELF((char*)test_program, test_program_len);
+	uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
+	m_page_directory = Paging::the()->kernel_page_directory()->clone();
+	m_stack_base = stack;
+	m_stack_top = m_stack_base + STACK_SIZE;
+
+	if (m_userspace) {
+		m_user_stack_base = 0x10000000;
+		m_page_directory->map_range(m_user_stack_base, USER_STACK_SIZE, true);
+		m_user_stack_top = 0x10000000 + USER_STACK_SIZE;
+	}
+	elf->load_sections(m_page_directory);
+
+	printk("lol %x\n", m_page_directory);
+	printk("lol %x\n", elf->program_entry());
+
+	setup(reinterpret_cast<void*>(elf->program_entry()));
 }
 
 Process::~Process() {

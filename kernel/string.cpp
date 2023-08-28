@@ -1,5 +1,27 @@
 #include <kernel/string.h>
 
+int
+strncmp(const char *s1, const char *s2, size_t n)
+{
+
+	if (n == 0)
+		return (0);
+	do {
+		if (*s1 != *s2++)
+			return (*(unsigned char *)s1 - *(unsigned char *)--s2);
+		if (*s1++ == 0)
+			break;
+	} while (--n != 0);
+	return (0);
+}
+
+int strcmp(const char* s1, const char* s2) {
+	while (*s1 == *s2++)
+		if (*s1++ == 0)
+			return (0);
+	return (*(unsigned char *)s1 - *(unsigned char *)--s2);
+}
+
 void itoa(char *buf, unsigned long int n, int base) {
 	unsigned long int tmp;
 	int i, j;
@@ -50,12 +72,13 @@ void memset(char *buffer, char value, size_t size) {
 	}
 }
 
-void *memcpy(void *dest, const void *src, size_t size) {
-	for (size_t i = 0; i < size; i++) {
-		((char *)dest)[i] = ((char *)src)[i];
-	}
+void *memcpy(void *s1, const void *s2, size_t n) {
+	const char *f = reinterpret_cast<const char*>(s2);
+	char *t = reinterpret_cast<char*>(s1);
 
-	return dest;
+	while (n-- > 0)
+		*t++ = *f++;
+	return s1;
 }
 
 size_t strlen(const char *str) {

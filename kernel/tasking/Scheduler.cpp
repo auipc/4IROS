@@ -60,13 +60,14 @@ void Scheduler::setup() {
 	idle->set_next(idle);
 	idle->set_prev(idle);
 
-	Process *next = new Process((void *)next_process);
+	Process *next = new Process("lol");
 	idle->set_next(next);
 	next->set_next(idle);
 
-	Process *next2 = new Process((void *)next_process2);
+	/*
+	Process *next2 = new Process("lol");
 	next->set_next(next2);
-	next2->set_next(idle);
+	next2->set_next(idle);*/
 
 	InterruptHandler::the()->setHandler(0x7F, schedule_handler);
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;

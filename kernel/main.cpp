@@ -5,6 +5,7 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/tasking/ELF.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.

@@ -27,6 +27,7 @@ set(SRCS
         kernel/util/Bitmap.h
 		kernel/util/Spinlock.cpp
 		kernel/util/Spinlock.h
+		kernel/util/Vec.h
         kernel/arch/i386/kernel.h
         kernel/icxxabi.h
 		kernel/icxxabi.cpp
@@ -34,6 +35,9 @@ set(SRCS
         kernel/tasking/Process.h
 		kernel/tasking/Scheduler.cpp
 		kernel/tasking/Scheduler.h
+		kernel/tasking/ELF.h
+		kernel/tasking/ELF.cpp
+		kernel/test_program.h
 )
 
 set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -Os -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -mregparm=3 -I.")

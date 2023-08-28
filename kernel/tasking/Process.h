@@ -8,6 +8,7 @@ static const size_t USER_STACK_SIZE = 8 * 4096;
 class Process {
   public:
 	Process(void *entry, bool userspace = false);
+	Process(const char *elf_file);
 	~Process();
 	void setup(void *entry);
 

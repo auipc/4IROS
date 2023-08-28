@@ -5,6 +5,7 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/stdint.h>
+#include <kernel/util/Vec.h>
 
 struct PageDirectory;
 
@@ -72,16 +73,16 @@ struct PageDirectory {
 	PageDirectory *clone();
 
 	inline uint32_t get_page_directory_index(size_t virtual_address) const {
-		return (reinterpret_cast<size_t>(virtual_address) >> 22) & 0x3ff;
+		return (virtual_address >> 22) & 0x3ff;
 	}
 
 	inline uint32_t get_page_table_index(size_t virtual_address) const {
-		return (reinterpret_cast<size_t>(virtual_address) >> 12) & 0x3ff;
+		return (virtual_address >> 12) & 0x3ff;
 	}
 
 	void map_page(size_t virtual_address, size_t physical_address,
 				  bool user_supervisor);
-	void map_range(size_t virtual_address, size_t length, bool user_supervisor);
+	Vec<uintptr_t> map_range(size_t virtual_address, size_t length, bool user_supervisor);
 
 	void unmap_page(size_t virtual_address);
 
@@ -101,24 +102,25 @@ class Paging {
 	}
 
 	inline static PageDirectory *current_page_directory() {
-		return s_current_page_directory;
+		auto pd = reinterpret_cast<PageDirectory*>(get_cr3() + VIRTUAL_ADDRESS);
+		return pd;
 	}
 
 	// FIXME We should be consistent with addresses
 	inline static uintptr_t current_page_directory_physical() {
 		return reinterpret_cast<uintptr_t>(get_physical_address(
-			reinterpret_cast<void *>(s_current_page_directory)));
+			reinterpret_cast<void *>(current_page_directory())));
 	}
 
 	inline void map_page(size_t virtual_address, size_t physical_address,
 						 bool user_supervisor) {
-		s_current_page_directory->map_page(virtual_address, physical_address,
+		current_page_directory()->map_page(virtual_address, physical_address,
 										   user_supervisor);
 	}
 
-	inline void map_range(size_t virtual_address, size_t length,
+	inline Vec<uintptr_t> map_range(size_t virtual_address, size_t length,
 						  bool user_supervisor) {
-		s_current_page_directory->map_range(virtual_address, length,
+		return current_page_directory()->map_range(virtual_address, length,
 											user_supervisor);
 	}
 
@@ -127,7 +129,7 @@ class Paging {
 	}
 
 	inline void unmap_page(size_t virtual_address) {
-		s_current_page_directory->unmap_page(virtual_address);
+		current_page_directory()->unmap_page(virtual_address);
 	}
 
 	static Paging *the();
@@ -136,6 +138,12 @@ class Paging {
 		return reinterpret_cast<size_t>(virtual_address) - VIRTUAL_ADDRESS;
 	}
 
+	inline static uint32_t get_cr3() {
+		uint32_t cr3 = 0;
+		asm volatile("mov %%cr3, %%eax" : "=a"(cr3));
+		assert(cr3);
+		return cr3;
+	}
   private:
 	friend struct PageDirectory;
 	friend struct PageTable;
