@@ -14,14 +14,12 @@ Scheduler::~Scheduler() { s_the = nullptr; }
 void next_process2() {
 	while (1) {
 		printk("proc 2\n");
-		asm volatile("int $0x7F");
 	}
 }
 
 void next_process() {
 	while (1) {
 		printk("proc 1\n");
-		asm volatile("int $0x7F");
 	}
 }
 
@@ -29,28 +27,8 @@ void kernel_idle() {
 	printk("idle\n");
 	printk("this works\n");
 	while (1) {
-		// printk("proc 2\n");
-		asm volatile("int $0x7F");
 	}
 }
-
-extern "C" void _schedule() { Scheduler::schedule(); }
-
-extern "C" void schedule_handler();
-asm("schedule_handler:");
-asm("	pusha");
-asm("   push %gs");
-asm("   push %fs");
-asm("   push %es");
-asm("   push %ds");
-asm("	call _schedule");
-asm("   pop %ds");
-asm("   pop %es");
-asm("   pop %fs");
-asm("   pop %gs");
-// asm("   add $0x10, %esp");
-asm("	popa");
-asm("	iret");
 
 extern TSS tss_entry;
 void Scheduler::setup() {
@@ -65,12 +43,10 @@ void Scheduler::setup() {
 	next->set_prev(idle);
 	next->set_next(idle);
 
-	/*
-	Process *next2 = new Process("lol");
+	/*Process *next2 = new Process((void*)next_process);
 	next->set_next(next2);
 	next2->set_next(idle);*/
 
-	InterruptHandler::the()->setHandler(0x7F, schedule_handler);
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
 
 	asm volatile("mov %%eax, %%esp"
@@ -141,8 +117,6 @@ void Scheduler::schedule() {
 
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
 
-	printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
-
 	sched_asm(prev_stack, next_stack,
 			  (uintptr_t)Paging::get_physical_address(
 				  reinterpret_cast<void *>(s_current->page_directory())));
@@ -154,8 +128,6 @@ void Scheduler::schedule_no_save() {
 	auto prev_stack = &s_current->m_stack_top;
 	s_current = s_current->m_next;
 	auto next_stack = &s_current->m_stack_top;
-
-	printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
 
 	sched_asm_no_save(
 		prev_stack, next_stack,

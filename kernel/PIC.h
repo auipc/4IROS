@@ -26,5 +26,7 @@ class PIC {
 
 	};
 
-	static void enable();
+	static void enable(uint8_t irq);
+	static void setup();
+	static void eoi(uint8_t irq);
 };

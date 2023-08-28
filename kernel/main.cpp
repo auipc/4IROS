@@ -1,4 +1,5 @@
 #include <kernel/PIC.h>
+#include <kernel/PIT.h>
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
@@ -54,7 +55,6 @@ extern "C" void kernel_main() {
 	// but maybe they have serial? Better than a black screen I guess.
 	printk_use_interface(&vga);
 	kmalloc_init();
-	PIC::enable();
 	GDT::setup();
 	printk("We're running! %d\n", 100);
 	printk("We're running!\n");
@@ -64,11 +64,11 @@ extern "C" void kernel_main() {
 	printk("lol 0x%x\n", &syscall_interrupt_handler);
 	InterruptHandler::the()->setUserHandler(0x80, &syscall_interrupt_handler);
 	Paging::setup();
+	PIT::setup();
+	PIC::setup();
 
-	asm volatile("sti");
 	printk("We're running!\n");
-	Paging::current_page_directory()->map_page(0x8000, 0x8000, false);
-
+	asm volatile("sti");
 	Scheduler::setup();
 
 	while (1)
