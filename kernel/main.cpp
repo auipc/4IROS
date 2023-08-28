@@ -49,7 +49,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 }
 
 extern "C" char _multiboot_data;
-extern "C" void kernel_main(uint32_t magic) {
+extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	assert(magic == 0x2BADB002);
 	// Kinda hacky, but kernel_main never exits.
 	// Just hope the stack isn't touched.
@@ -60,7 +60,9 @@ extern "C" void kernel_main(uint32_t magic) {
 	printk_use_interface(&vga);
 
 	MultiBootInfo* mb = reinterpret_cast<MultiBootInfo*>(reinterpret_cast<uintptr_t>(&_multiboot_data) + VIRTUAL_ADDRESS);
-	printk("MB flags %d\n", mb->flags);
+	printk("MB ptr %x\n", ptr);
+	printk("MB mods count %d\n", mb->mods_count);
+	printk("MB mods addr 0x%x\n", mb->mods_addr);
 
 	kmalloc_init();
 	GDT::setup();
