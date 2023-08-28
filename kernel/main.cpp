@@ -18,6 +18,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	bool schedule_away = false;
 
 	switch (syscall_no) {
+	// exit
 	case 1: {
 		Process *current = Scheduler::the()->current();
 		current->prev()->set_next(current->next());
