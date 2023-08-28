@@ -1,8 +1,8 @@
 #pragma once
 #include <kernel/arch/i386/kernel.h>
+#include <kernel/mem/Paging.h>
 #include <kernel/stdint.h>
 #include <kernel/util/Vec.h>
-#include <kernel/mem/Paging.h>
 
 struct ELFHeader32 {
 	char magic[4];
@@ -45,16 +45,17 @@ typedef ELFSectionHeader32 ELFSectionHeader;
 #endif
 
 class ELF {
-public:
-	ELF(char* buffer, size_t buffer_length);
+  public:
+	ELF(char *buffer, size_t buffer_length);
 	~ELF();
 
 	uintptr_t program_entry();
-	void load_sections(PageDirectory* pd);
-private:
+	void load_sections(PageDirectory *pd);
+
+  private:
 	void parse();
 	ElfHeader m_elf_header;
-	char* m_buffer;
+	char *m_buffer;
 	size_t m_buffer_length;
 	Vec<ELFSectionHeader> m_headers;
 };

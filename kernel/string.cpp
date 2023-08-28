@@ -1,8 +1,6 @@
 #include <kernel/string.h>
 
-int
-strncmp(const char *s1, const char *s2, size_t n)
-{
+int strncmp(const char *s1, const char *s2, size_t n) {
 
 	if (n == 0)
 		return (0);
@@ -15,7 +13,7 @@ strncmp(const char *s1, const char *s2, size_t n)
 	return (0);
 }
 
-int strcmp(const char* s1, const char* s2) {
+int strcmp(const char *s1, const char *s2) {
 	while (*s1 == *s2++)
 		if (*s1++ == 0)
 			return (0);
@@ -73,8 +71,8 @@ void memset(char *buffer, char value, size_t size) {
 }
 
 void *memcpy(void *s1, const void *s2, size_t n) {
-	const char *f = reinterpret_cast<const char*>(s2);
-	char *t = reinterpret_cast<char*>(s1);
+	const char *f = reinterpret_cast<const char *>(s2);
+	char *t = reinterpret_cast<char *>(s1);
 
 	while (n-- > 0)
 		*t++ = *f++;
