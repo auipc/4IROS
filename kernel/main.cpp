@@ -60,12 +60,12 @@ extern "C" void kernel_main() {
 	printk("We're running!\n");
 	printk("We're running!\n");
 	printk("We're running!\n");
+	PIC::setup();
 	InterruptHandler::setup();
 	printk("lol 0x%x\n", &syscall_interrupt_handler);
 	InterruptHandler::the()->setUserHandler(0x80, &syscall_interrupt_handler);
 	Paging::setup();
 	PIT::setup();
-	PIC::setup();
 
 	printk("We're running!\n");
 	asm volatile("sti");

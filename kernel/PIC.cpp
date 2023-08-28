@@ -12,7 +12,7 @@ void PIC::enable(uint8_t irq) {
 		port = PIC2_DATA;
 		irq -= 8;
 	}
-	value = inb(port) | (1 << irq);
+	value = inb(port) & ~(1 << irq);
 	outb(port, value);
 }
 
@@ -39,6 +39,6 @@ void PIC::setup() {
 	io_wait();
 	outb(PIC2_DATA, ICW4_8086);
 	io_wait();
-	outb(PIC1_DATA, 0xfe);
+	outb(PIC1_DATA, 0xff);
 	outb(PIC2_DATA, 0xff);
 }
