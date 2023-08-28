@@ -61,7 +61,6 @@ void Scheduler::setup() {
 	asm volatile("pop %edi");
 	asm volatile("pop %esi");
 	asm volatile("pop %ebx");
-	asm volatile("popf");
 	asm volatile("ret");
 	/*asm volatile("pop %ds");
 	asm volatile("pop %es");
@@ -76,7 +75,6 @@ extern "C" void sched_asm(uintptr_t *prev_stack, uintptr_t *next_stack,
 asm("sched_asm:");
 asm("mov %ecx, %esi");
 asm("mov %eax, %ecx");
-asm("pushf");
 asm("push %ebx");
 asm("push %esi");
 asm("push %edi");
@@ -90,7 +88,6 @@ asm("pop %ebp");
 asm("pop %edi");
 asm("pop %esi");
 asm("pop %ebx");
-asm("popf");
 asm("ret");
 
 extern "C" void sched_asm_no_save(uintptr_t *prev_stack, uintptr_t *next_stack,
@@ -105,7 +102,6 @@ asm("pop %ebp");
 asm("pop %edi");
 asm("pop %esi");
 asm("pop %ebx");
-asm("popf");
 asm("ret");
 
 void Scheduler::schedule() {
