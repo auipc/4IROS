@@ -5,8 +5,6 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/tasking/Scheduler.h>
-#include <kernel/test_program.h>
-#include <kernel/tasking/ELF.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
@@ -15,10 +13,35 @@ extern "C" void __cxa_pure_virtual() {
 extern "C" void syscall_interrupt_handler();
 
 extern "C" void syscall_interrupt(InterruptRegisters &regs) {
+	asm volatile("cli");
+	uint32_t syscall_no = regs.eax;
+	bool schedule_away = false;
+
+	switch (syscall_no) {
+		case 1: {
+			Process* current = Scheduler::the()->current();
+			current->prev()->set_next(current->next());
+			current->next()->set_prev(current->prev());
+			// FIXME There's a chance the kernel stack is still used
+			// High chance
+			delete current;
+			schedule_away = true;
+			} break;
+		default:
+			printk("Unknown syscall\n");
+			break;
+	}
+
+	printk("EAX: 0x%x\n", regs.eax);
 	printk("ESP: 0x%x\n", regs.esp);
 	printk("DS: 0x%x, ES: 0x%x, FS: 0x%x, GS: 0x%x\n", regs.ds, regs.es,
 		   regs.fs, regs.gs);
 	printk("Syscall interrupt!\n");
+	asm volatile("sti");
+	if (schedule_away) {
+		Scheduler::schedule_no_save();
+		assert(false);
+	}
 }
 
 extern "C" void kernel_main() {
@@ -38,7 +61,7 @@ extern "C" void kernel_main() {
 	printk("We're running!\n");
 	InterruptHandler::setup();
 	printk("lol 0x%x\n", &syscall_interrupt_handler);
-	InterruptHandler::the()->setHandler(0x80, &syscall_interrupt_handler);
+	InterruptHandler::the()->setUserHandler(0x80, &syscall_interrupt_handler);
 	Paging::setup();
 
 	asm volatile("sti");

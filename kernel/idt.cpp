@@ -159,3 +159,11 @@ void InterruptHandler::setHandler(uint8_t interrupt, void (*handler)()) {
 	// hand and only call setHandler when we need to change one.
 	refresh();
 }
+
+void InterruptHandler::setUserHandler(uint8_t interrupt, void (*handler)()) {
+	idtEntries[interrupt].setBase(reinterpret_cast<uintptr_t>(handler));
+	idtEntries[interrupt].kernel_cs = 0x08;
+	idtEntries[interrupt].reserved = 0;
+	idtEntries[interrupt].attributes = 0xEF;
+	refresh();
+}

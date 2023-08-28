@@ -62,6 +62,7 @@ void Scheduler::setup() {
 
 	Process *next = new Process("lol");
 	idle->set_next(next);
+	next->set_prev(idle);
 	next->set_next(idle);
 
 	/*
@@ -116,6 +117,21 @@ asm("pop %ebx");
 asm("popf");
 asm("ret");
 
+extern "C" void sched_asm_no_save(uintptr_t *prev_stack, uintptr_t *next_stack,
+						  uintptr_t cr3);
+asm("sched_asm_no_save:");
+asm("mov %ecx, %esi");
+asm("mov %eax, %ecx");
+asm("mov %esi, %cr3");
+asm("mov (%edx),%eax");
+asm("mov %eax,%esp");
+asm("pop %ebp");
+asm("pop %edi");
+asm("pop %esi");
+asm("pop %ebx");
+asm("popf");
+asm("ret");
+
 void Scheduler::schedule() {
 	if (s_current == s_current->m_next)
 		return;
@@ -123,9 +139,26 @@ void Scheduler::schedule() {
 	s_current = s_current->m_next;
 	auto next_stack = &s_current->m_stack_top;
 
-	// printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
+	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
+
+	printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
 
 	sched_asm(prev_stack, next_stack,
+			  (uintptr_t)Paging::get_physical_address(
+				  reinterpret_cast<void *>(s_current->page_directory())));
+}
+
+
+void Scheduler::schedule_no_save() {
+	if (s_current == s_current->m_next)
+		return;
+	auto prev_stack = &s_current->m_stack_top;
+	s_current = s_current->m_next;
+	auto next_stack = &s_current->m_stack_top;
+
+	printk("prev_stack %x next_stack %x\n", prev_stack, next_stack);
+
+	sched_asm_no_save(prev_stack, next_stack,
 			  (uintptr_t)Paging::get_physical_address(
 				  reinterpret_cast<void *>(s_current->page_directory())));
 }

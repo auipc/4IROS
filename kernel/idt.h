@@ -37,6 +37,7 @@ class InterruptHandler {
 	static void setup();
 
 	void setHandler(uint8_t interrupt, void (*handler)());
+	void setUserHandler(uint8_t interrupt, void (*handler)());
 
   private:
 	void refresh();

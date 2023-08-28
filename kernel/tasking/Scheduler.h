@@ -13,6 +13,7 @@ class Scheduler {
 	static void setup();
 
 	static void schedule();
+	static void schedule_no_save();
 
   private:
 	static Scheduler *s_the;
