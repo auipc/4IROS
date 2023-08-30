@@ -9,6 +9,12 @@
 
 struct PageDirectory;
 
+enum PageFlags {
+	NONE,
+	READONLY,
+	USER,
+};
+
 union PageTableEntry {
 	struct {
 		uint32_t present : 1;
@@ -76,10 +82,11 @@ struct PageDirectory {
 		return (virtual_address >> 12) & 0x3ff;
 	}
 
+	bool is_mapped(size_t virtual_address);
 	void map_page(size_t virtual_address, size_t physical_address,
-				  bool user_supervisor);
+				  int flags);
 	[[maybe_unused]] Vec<uintptr_t>
-	map_range(size_t virtual_address, size_t length, bool user_supervisor);
+	map_range(size_t virtual_address, size_t length, int flags);
 
 	void unmap_page(size_t virtual_address);
 
@@ -111,15 +118,15 @@ class Paging {
 	}
 
 	inline void map_page(size_t virtual_address, size_t physical_address,
-						 bool user_supervisor) {
+						 int flags) {
 		current_page_directory()->map_page(virtual_address, physical_address,
-										   user_supervisor);
+										   flags);
 	}
 
 	[[maybe_unused]] inline Vec<uintptr_t>
-	map_range(size_t virtual_address, size_t length, bool user_supervisor) {
+	map_range(size_t virtual_address, size_t length, int flags) {
 		return current_page_directory()->map_range(virtual_address, length,
-												   user_supervisor);
+												   flags);
 	}
 
 	inline static size_t page_align(size_t address) {

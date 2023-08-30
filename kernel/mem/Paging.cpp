@@ -54,7 +54,11 @@ PageTable *PageTable::clone() {
 }
 
 void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
-							 bool user_supervisor) {
+							 int flags) {
+	bool user_supervisor = (flags & PageFlags::USER) != 0;
+	bool read_only = (flags & PageFlags::READONLY) != 0;
+	printk("user_supervisor %d read_only %d\n", user_supervisor, read_only);
+
 	auto page_directory_index = get_page_directory_index(virtual_address);
 	auto page_table_index = get_page_table_index(virtual_address);
 
@@ -73,11 +77,13 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 	auto &page_table_entry = entries[page_directory_index]
 								 .get_page_table()
 								 ->entries[page_table_index];
+
 	memset(reinterpret_cast<char *>(&page_table_entry), 0,
 		   sizeof(PageTableEntry));
+
 	page_table_entry.set_page_base(physical_address);
 	page_table_entry.user_supervisor = user_supervisor;
-	page_table_entry.read_write = 1;
+	page_table_entry.read_write = !read_only;
 	page_table_entry.present = 1;
 
 	printk("Mapped page: %x -> %x\n", virtual_address, physical_address);
@@ -88,8 +94,18 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 	}
 }
 
+bool PageDirectory::is_mapped(size_t virtual_address) {
+	auto page_directory_index = get_page_directory_index(virtual_address);
+	auto page_table_index = get_page_table_index(virtual_address);
+
+	if (!entries[page_directory_index].present) return false;
+	if (!entries[page_directory_index].get_page_table()->entries[page_table_index].present) return false;
+
+	return true;
+}
+
 Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
-										bool user_supervisor) {
+										int flags) {
 	Vec<uintptr_t> physical_addresses;
 	if (!length)
 		return physical_addresses;
@@ -98,9 +114,27 @@ Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
 	}
 
 	for (size_t i = 0; i < (length / PAGE_SIZE); i++) {
-		auto free_page = Paging::the()->m_allocator->find_free_page();
-		physical_addresses.push(free_page);
-		map_page(virtual_address + (i * PAGE_SIZE), free_page, user_supervisor);
+		if (!is_mapped(virtual_address + (i * PAGE_SIZE))) {
+			auto free_page = Paging::the()->m_allocator->find_free_page();
+			physical_addresses.push(free_page);
+			map_page(virtual_address + (i * PAGE_SIZE), free_page, flags);
+		} else {
+			// Just modify the flags
+			bool user_supervisor = (flags & PageFlags::USER) != 0;
+			bool read_only = (flags & PageFlags::READONLY) != 0;
+			auto page_directory_index = get_page_directory_index(virtual_address);
+			auto page_table_index = get_page_table_index(virtual_address);
+			auto &page_table_entry = entries[page_directory_index]
+										 .get_page_table()
+										 ->entries[page_table_index];
+			// risky
+			entries[page_directory_index].user_supervisor = user_supervisor;
+			entries[page_directory_index].read_write = !read_only;
+
+			page_table_entry.user_supervisor = user_supervisor;
+			page_table_entry.read_write = !read_only;
+			page_table_entry.present = 1;
+		}
 	}
 
 	return physical_addresses;

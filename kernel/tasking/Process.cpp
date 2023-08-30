@@ -16,7 +16,7 @@ Process::Process(void *entry, bool userspace)
 
 	if (m_userspace) {
 		m_user_stack_base = 0x10000000;
-		m_page_directory->map_range(m_user_stack_base, USER_STACK_SIZE, true);
+		m_page_directory->map_range(m_user_stack_base, USER_STACK_SIZE, PageFlags::USER);
 		m_user_stack_top = 0x10000000 + USER_STACK_SIZE;
 	}
 	// memset((char*)stack, 0, STACK_SIZE);
@@ -33,7 +33,7 @@ Process::Process(const char *elf_file) : m_pid(s_pid++), m_userspace(true) {
 
 	if (m_userspace) {
 		m_user_stack_base = 0x10000000;
-		m_page_directory->map_range(m_user_stack_base, USER_STACK_SIZE, true);
+		m_page_directory->map_range(m_user_stack_base, USER_STACK_SIZE, PageFlags::USER);
 		m_user_stack_top = 0x10000000 + USER_STACK_SIZE;
 	}
 	elf->load_sections(m_page_directory);

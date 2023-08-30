@@ -85,7 +85,7 @@ void *allocate_block(size_t blocks_needed) {
 		Paging::page_align(
 			reinterpret_cast<size_t>(block_headers) +
 			(block_headers_length * sizeof(AllocationBlockHeader))),
-		k_allocation_block_size * blocks_needed, false);
+		k_allocation_block_size * blocks_needed, PageFlags::NONE);
 	block_headers_length += blocks_needed;
 
 	printk("LOLOLOLOL 0x%x\n",

@@ -53,6 +53,12 @@ class ELF {
 	void load_sections(PageDirectory *pd);
 
   private:
+	enum SegmentFlags {
+		EXEC = 1,
+		WRITE = 2,
+		READ = 4
+	};
+
 	void parse();
 	ElfHeader m_elf_header;
 	char *m_buffer;
