@@ -2,8 +2,7 @@
 #include <kernel/stdint.h>
 
 // https://www.gnu.org/software/grub/manual/multiboot/multiboot.html#multiboot_002eh
-struct MultiBootInfo 
-{
+struct MultiBootInfo {
 	/* Multiboot magic */
 	uint32_t magic;
 	/* Multiboot info version number */

@@ -4,7 +4,7 @@
 #include <kernel/printk.h>
 #include <kernel/string.h>
 
-//#define DEBUG_PAGING
+// #define DEBUG_PAGING
 
 // FIXME What should we do with boot_page_directory? Since it's wasted memory
 // after we switch to our own page directory.
@@ -116,8 +116,13 @@ bool PageDirectory::is_mapped(size_t virtual_address) {
 	auto page_directory_index = get_page_directory_index(virtual_address);
 	auto page_table_index = get_page_table_index(virtual_address);
 
-	if (!entries[page_directory_index].present) return false;
-	if (!entries[page_directory_index].get_page_table()->entries[page_table_index].present) return false;
+	if (!entries[page_directory_index].present)
+		return false;
+	if (!entries[page_directory_index]
+			 .get_page_table()
+			 ->entries[page_table_index]
+			 .present)
+		return false;
 
 	return true;
 }
@@ -140,7 +145,8 @@ Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
 			// Just modify the flags
 			bool user_supervisor = (flags & PageFlags::USER) != 0;
 			bool read_only = (flags & PageFlags::READONLY) != 0;
-			auto page_directory_index = get_page_directory_index(virtual_address);
+			auto page_directory_index =
+				get_page_directory_index(virtual_address);
 			auto page_table_index = get_page_table_index(virtual_address);
 			auto &page_table_entry = entries[page_directory_index]
 										 .get_page_table()

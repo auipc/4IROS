@@ -1,9 +1,9 @@
+#include <kernel/PIT.h>
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
-#include <kernel/PIT.h>
 
 Scheduler *Scheduler::s_the = nullptr;
 Process *Scheduler::s_current = nullptr;
@@ -113,7 +113,7 @@ void Scheduler::schedule() {
 	auto next_stack = &s_current->m_stack_top;
 
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
-	
+
 	// esoteric enough?
 	printk("%d -> %d\n", s_current->prev()->m_pid, s_current->m_pid);
 

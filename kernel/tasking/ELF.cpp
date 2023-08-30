@@ -25,15 +25,17 @@ void ELF::load_sections(PageDirectory *pd) {
 
 		asm volatile(
 			"mov %%eax, %%cr3" ::"a"(Paging::get_physical_address(pd)));
-		memset(reinterpret_cast<char*>(header.vaddr), 0, header.memsz);
+		memset(reinterpret_cast<char *>(header.vaddr), 0, header.memsz);
 		memcpy(reinterpret_cast<void *>(header.vaddr), m_buffer + header.off,
 			   header.filesz);
 		asm volatile("mov %%eax, %%cr3" ::"a"(
 			Paging::get_physical_address(current_page_directory)));
 
-		// Remap with permissions specified by ELF and with the page userspace accessible
+		// Remap with permissions specified by ELF and with the page userspace
+		// accessible
 		int flags = PageFlags::USER;
-		if (!is_writable) flags |= PageFlags::READONLY;
+		if (!is_writable)
+			flags |= PageFlags::READONLY;
 		pd->map_range(header.vaddr, header.filesz, flags);
 	});
 }

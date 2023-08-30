@@ -1,13 +1,13 @@
-#include <kernel/arch/i386/kernel.h>
 #include <kernel/PIC.h>
+#include <kernel/arch/i386/kernel.h>
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
-#include <kernel/printk.h>
 #include <kernel/multiboot.h>
-#include <kernel/tasking/Scheduler.h>
+#include <kernel/printk.h>
 #include <kernel/tasking/Process.h>
+#include <kernel/tasking/Scheduler.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
@@ -70,7 +70,8 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	// but maybe they have serial? Better than a black screen I guess.
 	printk_use_interface(&vga);
 
-	MultiBootInfo* mb = reinterpret_cast<MultiBootInfo*>(reinterpret_cast<uintptr_t>(&_multiboot_data) + VIRTUAL_ADDRESS);
+	MultiBootInfo *mb = reinterpret_cast<MultiBootInfo *>(
+		reinterpret_cast<uintptr_t>(&_multiboot_data) + VIRTUAL_ADDRESS);
 	printk("MB ptr %x\n", ptr);
 	printk("MB mods count %d\n", mb->mods_count);
 	printk("MB mods addr 0x%x\n", mb->mods_addr);
