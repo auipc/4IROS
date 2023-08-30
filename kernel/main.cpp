@@ -23,6 +23,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	switch (syscall_no) {
 	// exit
 	case 1: {
+		/*
 		Process *current = Scheduler::the()->current();
 		current->prev()->set_next(current->next());
 		current->next()->set_prev(current->prev());
@@ -30,6 +31,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 		// High chance
 		delete current;
 		schedule_away = true;
+		*/
 	} break;
 	default:
 		printk("Unknown syscall\n");

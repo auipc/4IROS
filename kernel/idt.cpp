@@ -37,6 +37,7 @@ extern "C" void interrupt_14(InterruptRegisters regs) {
 	size_t faulting_address;
 	asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
 	printk("Page fault at %x\n", faulting_address);
+	printk("EIP: %x\n", regs.eip);
 	printk("Error code 0x%x\n", regs.eflags);
 	// Halt the CPU
 	while (1) {

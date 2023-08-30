@@ -38,14 +38,17 @@ void Scheduler::setup() {
 	idle->set_next(idle);
 	idle->set_prev(idle);
 
-	Process *next = new Process("lol");
+	Process *next = new Process("init");
 	idle->set_next(next);
 	next->set_prev(idle);
 	next->set_next(idle);
 
-	/*Process *next2 = new Process((void*)next_process);
+	printk("init2\n");
+
+	Process *next2 = new Process("init2");
 	next->set_next(next2);
-	next2->set_next(idle);*/
+	next2->set_prev(next);
+	next2->set_next(next->next());
 
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
 

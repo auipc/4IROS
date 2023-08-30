@@ -38,9 +38,6 @@ Process::Process(const char *elf_file) : m_pid(s_pid++), m_userspace(true) {
 	}
 	elf->load_sections(m_page_directory);
 
-	printk("lol %x\n", m_page_directory);
-	printk("lol %x\n", elf->program_entry());
-
 	setup(reinterpret_cast<void *>(elf->program_entry()));
 }
 
