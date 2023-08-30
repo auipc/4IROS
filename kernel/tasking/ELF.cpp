@@ -19,11 +19,13 @@ void ELF::load_sections(PageDirectory *pd) {
 		auto current_page_directory = Paging::current_page_directory();
 		printk("vaddr %x off %x memsz %x\n", header.vaddr, header.off,
 			   header.memsz);
-		pd->map_range(header.vaddr, header.memsz, true);
+		pd->map_range(header.vaddr, header.filesz, true);
 		asm volatile(
 			"mov %%eax, %%cr3" ::"a"(Paging::get_physical_address(pd)));
+
+		memset(reinterpret_cast<void *>(header.vaddr), 0, header.memsz);
 		memcpy(reinterpret_cast<void *>(header.vaddr), m_buffer + header.off,
-			   header.memsz);
+			   header.filesz);
 		asm volatile("mov %%eax, %%cr3" ::"a"(
 			Paging::get_physical_address(current_page_directory)));
 	});
