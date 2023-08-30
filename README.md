@@ -17,6 +17,6 @@ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchain.cmake ..
 ##### TODO
 
 - [ ] Some type of way to handle exceptions in the kernel, maybe a panic function?
-- [ ] Better memory allocator
+- [ ] Better memory allocator, that won't intersect with existing memory too.
 - [x] MMU
 - [x] Interrupts
