@@ -1,5 +1,6 @@
 #include <kernel/PIC.h>
 #include <kernel/arch/i386/kernel.h>
+#include <kernel/assert.h>
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/mem/Paging.h>

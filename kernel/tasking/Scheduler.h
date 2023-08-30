@@ -1,5 +1,6 @@
 #pragma once
-#include <kernel/tasking/Process.h>
+
+class Process;
 
 class Scheduler {
   public:

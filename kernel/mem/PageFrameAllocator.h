@@ -3,6 +3,8 @@
 #include <kernel/stdint.h>
 #include <kernel/util/Bitmap.h>
 
+class Bitmap;
+
 class PageFrameAllocator {
   public:
 	PageFrameAllocator(size_t memory_size);

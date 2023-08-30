@@ -1,9 +1,9 @@
 #include <kernel/PIT.h>
 #include <kernel/gdt.h>
-#include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/printk.h>
 
 Scheduler *Scheduler::s_the = nullptr;
 Process *Scheduler::s_current = nullptr;
