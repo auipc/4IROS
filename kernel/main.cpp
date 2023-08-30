@@ -20,6 +20,8 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	uint32_t syscall_no = regs.eax;
 	bool schedule_away = false;
 
+	printk("Current process PID %d\n", Scheduler::the()->current()->pid());
+
 	switch (syscall_no) {
 	// exit
 	case 1: {

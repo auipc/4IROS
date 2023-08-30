@@ -19,6 +19,8 @@ class Process {
 	inline void set_prev(Process *prev) { m_prev = prev; }
 	inline PageDirectory *page_directory() { return m_page_directory; }
 
+	inline uint32_t pid() { return m_pid; }
+
   private:
 	friend class Scheduler;
 	PageDirectory *m_page_directory;
