@@ -19,9 +19,6 @@ void ELF::load_sections(PageDirectory *pd) {
 
 		bool is_writable = (header.flags & ELF::SegmentFlags::WRITE) != 0;
 
-		printk("is_writable %d\n", is_writable);
-		printk("flags: %d\n", header.flags);
-
 		auto current_page_directory = Paging::current_page_directory();
 
 		pd->map_range(header.vaddr, header.filesz, 0);

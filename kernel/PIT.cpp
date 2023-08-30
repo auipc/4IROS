@@ -10,6 +10,7 @@ extern "C" void pit_interrupt() {
 	if (Scheduler::the()) {
 		Scheduler::the()->schedule();
 	}
+
 	// lol
 	outb(0x20, 0x20);
 	outb(0xA0, 0x20);

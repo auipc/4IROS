@@ -1,6 +1,5 @@
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/PIC.h>
-#include <kernel/PIT.h>
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
@@ -8,6 +7,7 @@
 #include <kernel/printk.h>
 #include <kernel/multiboot.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/tasking/Process.h>
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
@@ -77,7 +77,6 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	printk("lol 0x%x\n", &syscall_interrupt_handler);
 	InterruptHandler::the()->setUserHandler(0x80, &syscall_interrupt_handler);
 	Paging::setup();
-	PIT::setup();
 
 	printk("We're running!\n");
 	asm volatile("sti");

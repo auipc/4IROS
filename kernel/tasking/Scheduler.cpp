@@ -3,6 +3,7 @@
 #include <kernel/mem/Paging.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/PIT.h>
 
 Scheduler *Scheduler::s_the = nullptr;
 Process *Scheduler::s_current = nullptr;
@@ -24,6 +25,7 @@ void next_process() {
 }
 
 void kernel_idle() {
+	PIT::setup();
 	printk("idle\n");
 	printk("this works\n");
 	while (1) {
