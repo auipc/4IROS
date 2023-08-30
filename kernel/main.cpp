@@ -33,6 +33,13 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 		schedule_away = true;
 		*/
 	} break;
+	case 2: {
+		Process *next2 = new Process("init2");
+		next2->set_next(Scheduler::the()->current()->next());
+		next2->next()->set_prev(next2);
+		next2->set_prev(Scheduler::the()->current());
+		Scheduler::the()->current()->set_next(next2);
+	} break;
 	default:
 		printk("Unknown syscall\n");
 		break;

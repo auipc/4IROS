@@ -4,6 +4,7 @@
 #include <kernel/tasking/ELF.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/test_program.h>
+#include <kernel/test_program2.h>
 
 static uint32_t s_pid = 0;
 
@@ -25,7 +26,12 @@ Process::Process(void *entry, bool userspace)
 
 Process::Process(const char *elf_file) : m_pid(s_pid++), m_userspace(true) {
 	(void)elf_file;
-	ELF *elf = new ELF((char *)test_program, test_program_len);
+	ELF *elf;
+	if (m_pid > 2)
+		elf = new ELF((char *)test_program2, test_program2_len);
+	else
+		elf = new ELF((char *)test_program, test_program_len);
+
 	uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
 	m_page_directory = Paging::the()->kernel_page_directory()->clone();
 	m_stack_base = stack;
