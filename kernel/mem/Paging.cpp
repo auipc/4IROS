@@ -4,6 +4,8 @@
 #include <kernel/printk.h>
 #include <kernel/string.h>
 
+//#define DEBUG_PAGING
+
 // FIXME What should we do with boot_page_directory? Since it's wasted memory
 // after we switch to our own page directory.
 // Maybe move it to a different section that we can discard for extra memory?
@@ -32,13 +34,17 @@ PageTable *PageTable::clone() {
 		dst->entries[i].value = src->entries[i].value;
 		auto free_page = Paging::the()->m_allocator->find_free_page();
 
+#ifdef DEBUG_PAGING
 		printk("free page: %x\n", free_page);
 		printk("physical address: %x\n", free_page);
+#endif
 
 		Paging::the()->map_page(free_page + VIRTUAL_ADDRESS, free_page, false);
+#ifdef DEBUG_PAGING
 		printk("Copying from %x to %x\n",
 			   src->entries[i].get_page_base() + VIRTUAL_ADDRESS,
 			   free_page + VIRTUAL_ADDRESS);
+#endif
 		memcpy(reinterpret_cast<void *>(free_page + VIRTUAL_ADDRESS),
 			   reinterpret_cast<void *>(src->entries[i].get_page_base() +
 										VIRTUAL_ADDRESS),
@@ -46,7 +52,9 @@ PageTable *PageTable::clone() {
 
 		// TODO we need to be able to temporarily identity map this address so
 		// we can copy it's contents
+#ifdef DEBUG_PAGING
 		printk("free page: %x\n", Paging::the()->m_allocator->find_free_page());
+#endif
 	}
 
 	// FIXME memory leak
@@ -57,7 +65,9 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 							 int flags) {
 	bool user_supervisor = (flags & PageFlags::USER) != 0;
 	bool read_only = (flags & PageFlags::READONLY) != 0;
+#ifdef DEBUG_PAGING
 	printk("user_supervisor %d read_only %d\n", user_supervisor, read_only);
+#endif
 
 	auto page_directory_index = get_page_directory_index(virtual_address);
 	auto page_table_index = get_page_table_index(virtual_address);
@@ -67,11 +77,15 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 		entries[page_directory_index].present = 1;
 		entries[page_directory_index].read_write = 1;
 		entries[page_directory_index].user_supervisor = user_supervisor;
+#ifdef DEBUG_PAGING
 		printk("Allocating page table: %x\n",
 			   entries[page_directory_index].get_page_table());
+#endif
 	} else {
+#ifdef DEBUG_PAGING
 		printk("Page table already exists: %x\n", page_directory_index);
 		printk("Is writable: %d\n", entries[page_directory_index].read_write);
+#endif
 	}
 
 	auto &page_table_entry = entries[page_directory_index]
@@ -86,10 +100,14 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 	page_table_entry.read_write = !read_only;
 	page_table_entry.present = 1;
 
+#ifdef DEBUG_PAGING
 	printk("Mapped page: %x -> %x\n", virtual_address, physical_address);
+#endif
 
 	if (this == Paging::the()->current_page_directory()) {
+#ifdef DEBUG_PAGING
 		printk("Invalidating page: %x\n", virtual_address);
+#endif
 		asm volatile("invlpg (%0)" ::"r"(virtual_address) : "memory");
 	}
 }
@@ -162,14 +180,20 @@ PageDirectory *PageDirectory::clone() {
 		dst->entries[i].value = src->entries[i].value;
 
 		if (Paging::the()->s_kernel_page_directory->entries[i].present) {
+#ifdef DEBUG_PAGING
 			printk("Skipping full clone of kernel page table\n");
+#endif
 			continue;
 		}
 
+#ifdef DEBUG_PAGING
 		printk("Cloning page table: %d\n", i);
+#endif
 		dst->entries[i].set_page_table(
 			src->entries[i].get_page_table()->clone());
+#ifdef DEBUG_PAGING
 		printk("src->entries[%d].value: %x\n", i, src->entries[i].value);
+#endif
 	}
 
 	return dst;

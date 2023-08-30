@@ -39,7 +39,6 @@ void kmalloc_init() {
 				(BOOTSTRAP_MEMORY - block_header_size -
 				 ((TOTAL_MEMORY / k_allocation_block_size) *
 				  sizeof(AllocationBlockHeader)));
-	printk("s_mem_pointer %x, s_mem_end %x\n", s_mem_pointer, s_mem_end);
 	assert(s_mem_pointer != 0);
 	assert(s_mem_end != 0);
 	assert(block_headers_length != 0);
@@ -62,8 +61,6 @@ void *allocate_block(size_t blocks_needed) {
 		if (!block_headers[i].used) {
 			block_headers[i].used = true;
 			block_headers[i].span_in_blocks = blocks_needed;
-			printk("Allocating block at %x\n",
-				   s_mem_pointer + (i * k_allocation_block_size));
 			printk("Memory usage %.2f/%d KB\n",
 				   ((float)count_used_memory()) / ((float)KB),
 				   (block_headers_length * k_allocation_block_size) / KB);
@@ -88,10 +85,6 @@ void *allocate_block(size_t blocks_needed) {
 		k_allocation_block_size * blocks_needed, PageFlags::NONE);
 	block_headers_length += blocks_needed;
 
-	printk("LOLOLOLOL 0x%x\n",
-		   reinterpret_cast<void *>(
-			   (reinterpret_cast<size_t>(block_headers_length - blocks_needed) *
-				reinterpret_cast<size_t>(k_allocation_block_size))));
 	return reinterpret_cast<void *>(
 		(reinterpret_cast<size_t>(block_headers_length - blocks_needed) *
 		 reinterpret_cast<size_t>(k_allocation_block_size)));
