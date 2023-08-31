@@ -25,10 +25,15 @@ The filesystem will start as a FUSE layer, most likely written in portable C++ a
 Some of the features that really should be added are listed here
 
 [ ] - Copy on Write
+
 [ ] - Have an algorithm that finds the best-fit for storing the file (if it has a lot of holes, use some type of range header system similar to RLE but not exactly like it)
+
 [ ] - Tree based (INodes should be able to be shifted around, without issue)
+
 [ ] - Journaling, although this can be delayed until the step of it not being a toy OS is reached. 
+
 [ ] - Permissions
+
 [ ] - Symlinks (CoW support probably implies we have the framework forthis implemented)
 
 ##### Better Exception handling
