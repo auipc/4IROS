@@ -2,6 +2,7 @@
 	.extern \x\()_interrupt
 	.global \x\()_interrupt_handler
 	\x\()_interrupt_handler:
+		cli
 		pusha
 		pushl %gs
 		pushl %fs
@@ -14,6 +15,7 @@
 		popl %fs
 		popl %gs
 		popa
+		sti
 		iret
 .endm
 
