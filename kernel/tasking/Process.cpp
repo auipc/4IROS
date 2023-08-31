@@ -55,6 +55,11 @@ Process::~Process() {
 	}
 
 	kfree((void *)(m_stack_base));
+
+	// shouldn't be using the page directory we're about to delete
+	assert(Paging::current_page_directory() != m_page_directory);
+
+	// FIXME deleting page directories
 }
 
 extern "C" void task_switch_shim();

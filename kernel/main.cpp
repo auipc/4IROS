@@ -17,9 +17,8 @@ extern "C" void __cxa_pure_virtual() {
 extern "C" void syscall_interrupt_handler();
 
 extern "C" void syscall_interrupt(InterruptRegisters &regs) {
-	asm volatile("cli");
+	uint32_t return_value = 0;
 	uint32_t syscall_no = regs.eax;
-	bool schedule_away = false;
 
 	printk("Current process PID %d\n", Scheduler::the()->current()->pid());
 
@@ -27,36 +26,23 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	// exit
 	case 1: {
 		Process *current = Scheduler::the()->current();
-		current->prev()->set_next(current->next());
-		current->next()->set_prev(current->prev());
-		// FIXME There's a chance the kernel stack is still used and it's getting deleted.
-		// !High! chance
-		delete current;
-		schedule_away = true;
+		printk("Exit %d\n", current->pid());
+		Scheduler::the()->kill_process(*current);
+		Scheduler::schedule();
 	} break;
+	// dumb exec
 	case 2: {
 		Process *next2 = new Process("init2");
-		next2->set_next(Scheduler::the()->current()->next());
-		next2->next()->set_prev(next2);
-		next2->set_prev(Scheduler::the()->current());
-		Scheduler::the()->current()->set_next(next2);
+		printk("dumb exec %d\n", next2->pid());
+		Scheduler::the()->add_process(*next2);
 	} break;
 	default:
 		printk("Unknown syscall\n");
 		break;
 	}
 
-	printk("EAX: 0x%x\n", regs.eax);
-	printk("ESP: 0x%x\n", regs.esp);
-	printk("DS: 0x%x, ES: 0x%x, FS: 0x%x, GS: 0x%x\n", regs.ds, regs.es,
-		   regs.fs, regs.gs);
-	printk("Syscall interrupt!\n");
-	asm volatile("sti");
-	if (schedule_away) {
-		printk("PID %d exiting\n", Scheduler::the()->current()->pid());
-		Scheduler::schedule_no_save();
-		assert(false);
-	}
+	regs.eax = return_value;
+	//asm volatile("sti");
 }
 
 extern "C" char _multiboot_data;

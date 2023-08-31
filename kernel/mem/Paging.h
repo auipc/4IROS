@@ -70,6 +70,7 @@ union PageDirectoryEntry {
 	}
 } __attribute__((packed));
 
+// FIXME add destructor that will delete all related pages and page tables
 struct PageDirectory {
 	MUST_BE_PAGE_ALIGNED
 	PageDirectory *clone();

@@ -19,6 +19,10 @@ class Process {
 	inline void set_prev(Process *prev) { m_prev = prev; }
 	inline PageDirectory *page_directory() { return m_page_directory; }
 
+	enum States { Dead, Blocked, Active };
+
+	inline void set_state(States state) { m_state = state; }
+	inline States state() { return m_state; }
 	inline uint32_t pid() { return m_pid; }
 
   private:
@@ -32,4 +36,5 @@ class Process {
 	Process *m_prev;
 	uint32_t m_pid;
 	bool m_userspace;
+	States m_state = States::Active;
 };
