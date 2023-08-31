@@ -39,6 +39,8 @@ boot_page_table1:
 	.skip 4096
 # Further page tables may be required if the kernel grows beyond 3 MiB.
 
+.extern _multiboot_data
+
 # The kernel entry point.
 .section .multiboot.text, "a"
 .global _start
@@ -121,6 +123,9 @@ _start:
 	# Set up the stack.
 	mov $stack_top, %esp
 
+	mov $(_multiboot_data + 0xC0000000), %edx
+	/* Push Multiboot header */
+	pushl   %ebx
 	/* Push the magic value. */
 	pushl   %eax
 
