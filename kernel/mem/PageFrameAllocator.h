@@ -2,6 +2,7 @@
 
 #include <kernel/stdint.h>
 #include <kernel/util/Bitmap.h>
+#include <kernel/util/Vec.h>
 
 class Bitmap;
 
@@ -15,5 +16,5 @@ class PageFrameAllocator {
 
   private:
 	uint32_t m_pages;
-	Bitmap *m_bitmap;
+	Vec<Bitmap*> m_buddies;
 };

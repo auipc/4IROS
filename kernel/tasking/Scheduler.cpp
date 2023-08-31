@@ -12,22 +12,9 @@ Scheduler::Scheduler() { s_the = this; }
 
 Scheduler::~Scheduler() { s_the = nullptr; }
 
-void next_process2() {
-	while (1) {
-		printk("proc 2\n");
-	}
-}
-
-void next_process() {
-	while (1) {
-		printk("proc 1\n");
-	}
-}
-
 void kernel_idle() {
-	PIT::setup();
 	printk("idle\n");
-	printk("this works\n");
+	PIT::setup();
 	while (1) {
 	}
 }
@@ -51,8 +38,6 @@ void Scheduler::setup() {
 
 	Process *next2 = new Process("init");
 	Scheduler::the()->add_process(*next2);
-
-	printk("init2\n");
 
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
 
