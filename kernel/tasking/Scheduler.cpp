@@ -163,9 +163,6 @@ void Scheduler::schedule() {
 
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
 
-	// esoteric enough?
-	printk("%d -> %d\n", s_current->prev()->m_pid, s_current->m_pid);
-
 	sched_asm(prev_stack, next_stack,
 			  (uintptr_t)Paging::get_physical_address(
 				  reinterpret_cast<void *>(s_current->page_directory())));
