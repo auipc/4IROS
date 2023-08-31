@@ -72,26 +72,15 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	printk_use_interface(&vga);
 
 	multiboot_info *mb = reinterpret_cast<multiboot_info *>(ptr);
-	printk("MB flags %d\n", mb->flags);
-	printk("MB mem upper %d\n", mb->mem_lower);
-	printk("MB mods count %d\n", mb->mods_count);
-	printk("MB mods addr 0x%x\n", mb->mods_addr);
-
-	for (int i = 0; i < 100; i++) {
-		printk("%x ", *reinterpret_cast<uint8_t*>((ptr + i)));
-	}
-	printk("\n");
+	(void)mb;
 
 	kmalloc_init();
 	GDT::setup();
-	printk("We're running!\n");
 	PIC::setup();
 	InterruptHandler::setup();
-	printk("lol 0x%x\n", &syscall_interrupt_handler);
 	InterruptHandler::the()->setUserHandler(0x80, &syscall_interrupt_handler);
 	Paging::setup();
 
-	printk("We're running!\n");
 	asm volatile("sti");
 	//Scheduler::setup();
 
