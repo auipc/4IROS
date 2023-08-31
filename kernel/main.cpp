@@ -26,15 +26,13 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	switch (syscall_no) {
 	// exit
 	case 1: {
-		/*
 		Process *current = Scheduler::the()->current();
 		current->prev()->set_next(current->next());
 		current->next()->set_prev(current->prev());
-		// FIXME There's a chance the kernel stack is still used
-		// High chance
+		// FIXME There's a chance the kernel stack is still used and it's getting deleted.
+		// !High! chance
 		delete current;
 		schedule_away = true;
-		*/
 	} break;
 	case 2: {
 		Process *next2 = new Process("init2");
@@ -55,6 +53,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	printk("Syscall interrupt!\n");
 	asm volatile("sti");
 	if (schedule_away) {
+		printk("PID %d exiting\n", Scheduler::the()->current()->pid());
 		Scheduler::schedule_no_save();
 		assert(false);
 	}
@@ -82,7 +81,7 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	Paging::setup();
 
 	asm volatile("sti");
-	//Scheduler::setup();
+	Scheduler::setup();
 
 	while (1)
 		;
