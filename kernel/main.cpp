@@ -71,17 +71,19 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	// but maybe they have serial? Better than a black screen I guess.
 	printk_use_interface(&vga);
 
-	MultiBootInfo *mb = reinterpret_cast<MultiBootInfo *>(
-		reinterpret_cast<uintptr_t>(&_multiboot_data) + VIRTUAL_ADDRESS);
-	printk("MB ptr %x\n", ptr);
+	multiboot_info *mb = reinterpret_cast<multiboot_info *>(ptr);
+	printk("MB flags %d\n", mb->flags);
+	printk("MB mem upper %d\n", mb->mem_lower);
 	printk("MB mods count %d\n", mb->mods_count);
 	printk("MB mods addr 0x%x\n", mb->mods_addr);
 
+	for (int i = 0; i < 100; i++) {
+		printk("%x ", *reinterpret_cast<uint8_t*>((ptr + i)));
+	}
+	printk("\n");
+
 	kmalloc_init();
 	GDT::setup();
-	printk("We're running! %d\n", 100);
-	printk("We're running!\n");
-	printk("We're running!\n");
 	printk("We're running!\n");
 	PIC::setup();
 	InterruptHandler::setup();
@@ -91,7 +93,7 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 
 	printk("We're running!\n");
 	asm volatile("sti");
-	Scheduler::setup();
+	//Scheduler::setup();
 
 	while (1)
 		;
