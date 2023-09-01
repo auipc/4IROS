@@ -42,7 +42,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	}
 
 	regs.eax = return_value;
-	//asm volatile("sti");
+	// asm volatile("sti");
 }
 
 extern "C" char _multiboot_data;
@@ -64,7 +64,7 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	PIC::setup();
 	InterruptHandler::setup();
 	InterruptHandler::the()->setUserHandler(0x80, &syscall_interrupt_handler);
-	Paging::setup();
+	Paging::setup(128 * MB);
 
 	asm volatile("sti");
 	Scheduler::setup();

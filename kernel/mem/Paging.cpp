@@ -214,8 +214,8 @@ PageDirectory *PageDirectory::clone() {
 extern "C" char _kernel_start;
 extern "C" char _kernel_end;
 
-Paging::Paging() {
-	m_allocator = new PageFrameAllocator(TOTAL_MEMORY);
+Paging::Paging(size_t total_memory) {
+	m_allocator = new PageFrameAllocator(total_memory);
 
 	// Reserve memory for the kernel
 	m_allocator->mark_range(0, get_physical_address(&_kernel_end));
@@ -223,8 +223,8 @@ Paging::Paging() {
 
 Paging::~Paging() { delete m_allocator; }
 
-void Paging::setup() {
-	s_instance = new Paging();
+void Paging::setup(size_t total_memory) {
+	s_instance = new Paging(total_memory);
 	s_kernel_page_directory = &boot_page_directory;
 	switch_page_directory(s_kernel_page_directory);
 }

@@ -95,9 +95,9 @@ struct PageDirectory {
 
 class Paging {
   public:
-	Paging();
+	Paging(size_t total_memory);
 	~Paging();
-	static void setup();
+	static void setup(size_t total_memory);
 
 	inline static PageDirectory *kernel_page_directory() {
 		// This shouldn't be null

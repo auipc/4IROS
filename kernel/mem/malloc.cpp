@@ -22,6 +22,9 @@ static AllocationBlockHeader *block_headers = nullptr;
 static size_t block_headers_length = 0;
 static const size_t BOOTSTRAP_MEMORY = 0x100000;
 
+// FIXME this is a lie
+#define TOTAL_MEMORY 100 * MB
+
 void kmalloc_init() {
 	// Reserve space for the block headers.
 	size_t block_header_size = sizeof(AllocationBlockHeader) *
