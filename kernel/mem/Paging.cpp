@@ -136,11 +136,17 @@ Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
 		length += PAGE_SIZE - length;
 	}
 
+	size_t number_of_pages = length / PAGE_SIZE;
+	size_t free_pages =
+		Paging::the()->m_allocator->find_free_pages(number_of_pages);
+
 	for (size_t i = 0; i < (length / PAGE_SIZE); i++) {
 		if (!is_mapped(virtual_address + (i * PAGE_SIZE))) {
-			auto free_page = Paging::the()->m_allocator->find_free_page();
-			physical_addresses.push(free_page);
-			map_page(virtual_address + (i * PAGE_SIZE), free_page, flags);
+			for (size_t j = 0; j < number_of_pages; j++) {
+				auto free_page = free_pages + (j * PAGE_SIZE);
+				physical_addresses.push(free_page);
+				map_page(virtual_address + (i * PAGE_SIZE), free_page, flags);
+			}
 		} else {
 			// Just modify the flags
 			bool user_supervisor = (flags & PageFlags::USER) != 0;

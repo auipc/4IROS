@@ -62,6 +62,22 @@ uint32_t Bitmap::scan(uint32_t nr) {
 	assert(false);
 }
 
+uint32_t Bitmap::scan_no_set(uint32_t nr) {
+	uint32_t streak = 0;
+	for (size_t i = 0; i < size; i++) {
+		if (!get(i)) {
+			streak++;
+		} else {
+			streak = 0;
+		}
+
+		if (streak == nr) {
+			return i;
+		}
+	}
+	assert(false);
+}
+
 uint32_t Bitmap::count() {
 	uint32_t c = 0;
 	for (size_t i = 0; i < size; i++)

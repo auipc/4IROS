@@ -12,9 +12,10 @@ class PageFrameAllocator {
 	~PageFrameAllocator();
 	void mark_range(uint32_t start, uint32_t end);
 	size_t find_free_page();
+	size_t find_free_pages(size_t pages);
 	void release_page(size_t page);
 
   private:
 	uint32_t m_pages;
-	Vec<Bitmap*> m_buddies;
+	Vec<Bitmap *> m_buddies;
 };

@@ -16,7 +16,6 @@ template <typename T> class Vec {
 
 	// the hard way
 	T &operator[](size_t idx) {
-		// ASSERT(idx < size);
 		T *t = get(idx);
 		assert(t);
 		return *t;
