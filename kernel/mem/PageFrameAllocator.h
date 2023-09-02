@@ -16,6 +16,7 @@ class PageFrameAllocator {
 	void release_page(size_t page);
 
   private:
+	size_t largest_container(size_t size);
 	uint32_t m_pages;
 	Vec<Bitmap *> m_buddies;
 };

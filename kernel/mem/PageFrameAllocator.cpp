@@ -62,7 +62,7 @@ size_t PageFrameAllocator::find_free_page() {
 // FIXME have a way to requestt non contigous memory
 size_t PageFrameAllocator::find_free_pages(size_t pages) {
 	assert(pages > 0);
-	size_t container = (pages % m_buddies.size());
+	size_t container = largest_container(pages * PAGE_SIZE);
 
 	size_t start = m_buddies[container]->scan_no_set(1);
 
@@ -77,6 +77,25 @@ size_t PageFrameAllocator::find_free_pages(size_t pages) {
 	}
 
 	return (start * PAGE_SIZE);
+}
+
+int abs(int a) {
+	return a > 0 ? a : -a;
+}
+
+size_t PageFrameAllocator::largest_container(size_t size) {
+	int container = 0;
+	int min = abs(size - (pow(2, container) * PAGE_SIZE));
+	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
+		size_t buddy_size = pow(2, buddy) * PAGE_SIZE;
+		int diff = abs(size - buddy_size);
+		if (diff < min) {
+			min = diff;
+			container = buddy;
+		}
+	}
+
+	return container;
 }
 
 void PageFrameAllocator::release_page(size_t page) {
