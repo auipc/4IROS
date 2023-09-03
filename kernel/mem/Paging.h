@@ -85,7 +85,7 @@ struct PageDirectory {
 
 	bool is_mapped(size_t virtual_address);
 	void map_page(size_t virtual_address, size_t physical_address, int flags);
-	[[maybe_unused]] Vec<uintptr_t> map_range(size_t virtual_address,
+	void map_range(size_t virtual_address,
 											  size_t length, int flags);
 
 	void unmap_page(size_t virtual_address);
@@ -123,7 +123,7 @@ class Paging {
 										   flags);
 	}
 
-	[[maybe_unused]] inline Vec<uintptr_t> map_range(size_t virtual_address,
+	inline void map_range(size_t virtual_address,
 													 size_t length, int flags) {
 		return current_page_directory()->map_range(virtual_address, length,
 												   flags);

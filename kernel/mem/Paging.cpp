@@ -127,11 +127,10 @@ bool PageDirectory::is_mapped(size_t virtual_address) {
 	return true;
 }
 
-Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
+void PageDirectory::map_range(size_t virtual_address, size_t length,
 										int flags) {
-	Vec<uintptr_t> physical_addresses;
 	if (!length)
-		return physical_addresses;
+		return;
 	if (length < PAGE_SIZE) {
 		length += PAGE_SIZE - length;
 	}
@@ -144,7 +143,6 @@ Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
 		if (!is_mapped(virtual_address + (i * PAGE_SIZE))) {
 			for (size_t j = 0; j < number_of_pages; j++) {
 				auto free_page = free_pages + (j * PAGE_SIZE);
-				physical_addresses.push(free_page);
 				map_page(virtual_address + (i * PAGE_SIZE), free_page, flags);
 			}
 		} else {
@@ -166,8 +164,6 @@ Vec<uintptr_t> PageDirectory::map_range(size_t virtual_address, size_t length,
 			page_table_entry.present = 1;
 		}
 	}
-
-	return physical_addresses;
 }
 
 void PageDirectory::unmap_page(size_t virtual_address) {
