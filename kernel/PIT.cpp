@@ -11,9 +11,7 @@ extern "C" void pit_interrupt() {
 		Scheduler::the()->schedule();
 	}
 
-	// lol
-	outb(0x20, 0x20);
-	outb(0xA0, 0x20);
+	PIC::eoi(0x20);
 }
 
 void PIT::setup() {
