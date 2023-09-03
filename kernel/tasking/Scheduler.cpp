@@ -121,20 +121,6 @@ asm("pop %esi");
 asm("pop %ebx");
 asm("ret");
 
-extern "C" void sched_asm_no_save(uintptr_t *prev_stack, uintptr_t *next_stack,
-								  uintptr_t cr3);
-asm("sched_asm_no_save:");
-asm("mov %ecx, %esi");
-asm("mov %eax, %ecx");
-asm("mov %esi, %cr3");
-asm("mov (%edx),%eax");
-asm("mov %eax,%esp");
-asm("pop %ebp");
-asm("pop %edi");
-asm("pop %esi");
-asm("pop %ebx");
-asm("ret");
-
 void Scheduler::schedule() {
 	if (s_current == s_current->m_next)
 		return;
@@ -151,21 +137,4 @@ void Scheduler::schedule() {
 	sched_asm(prev_stack, next_stack,
 			  (uintptr_t)Paging::get_physical_address(
 				  reinterpret_cast<void *>(s_current->page_directory())));
-}
-
-void Scheduler::schedule_no_save() {
-	if (s_current == s_current->m_next)
-		return;
-	auto prev_stack = &s_current->m_stack_top;
-	do {
-		s_current = s_current->m_next;
-		// skip over dead or blocked processes
-	} while (s_current->m_state == Process::States::Dead ||
-			 s_current->m_state == Process::States::Blocked);
-	auto next_stack = &s_current->m_stack_top;
-
-	sched_asm_no_save(
-		prev_stack, next_stack,
-		(uintptr_t)Paging::get_physical_address(
-			reinterpret_cast<void *>(s_current->page_directory())));
 }
