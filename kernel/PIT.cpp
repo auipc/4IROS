@@ -18,7 +18,7 @@ extern "C" void pit_interrupt() {
 
 void PIT::setup() {
 	uint16_t freq = 1193181 / 20;
-	printk("Setting up clock with tick frequency %d\n", freq);
+
 	// Channel 0 is connected directly to IRQ0
 	InterruptHandler::the()->setHandler(0x50, pit_interrupt_handler);
 	outb(0x43, 0x36);
