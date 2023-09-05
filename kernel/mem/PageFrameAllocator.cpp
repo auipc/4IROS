@@ -3,22 +3,17 @@
 #include <kernel/mem/PageFrameAllocator.h>
 #include <kernel/util/Bitmap.h>
 
-int pow(int a, int b) {
-	int result = a;
+constexpr int pow(int a, int b) {
+	int result = 1;
 
-	// Wow, such problem solving
-	// Pure genius
-	if (b == 0)
-		return 1;
-	if (b == 1)
-		return a;
-
-	for (int i = 0; i < b - 1; i++) {
+	for (int i = 0; i < b; i++) {
 		result *= a;
 	}
 
 	return result;
 }
+
+static_assert(pow(3,4) == 81);
 
 PageFrameAllocator::PageFrameAllocator(size_t memory_size) {
 	m_pages = memory_size / PAGE_SIZE;
