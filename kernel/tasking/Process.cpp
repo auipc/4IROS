@@ -65,10 +65,11 @@ Process::~Process() {
 extern "C" void task_switch_shim();
 asm("task_switch_shim:");
 asm("sti");
-asm("popw %ds");
-asm("popw %es");
-asm("popw %fs");
-asm("popw %gs");
+asm("mov (%esp), %ds");
+asm("mov (%esp), %es");
+asm("mov (%esp), %fs");
+asm("mov (%esp), %gs");
+asm("addl $2, %esp");
 asm("popa");
 asm("push %eax");
 // This will erronously trigger on our first process.
@@ -123,29 +124,11 @@ void Process::setup(void *entry) {
 	*(uint32_t *)m_stack_top = 0;
 
 	if (m_userspace) {
-		// DS
-		m_stack_top -= sizeof(uint16_t);
-		*(uint16_t *)m_stack_top = 0x23;
-		// ES
-		m_stack_top -= sizeof(uint16_t);
-		*(uint16_t *)m_stack_top = 0x23;
-		// FS
-		m_stack_top -= sizeof(uint16_t);
-		*(uint16_t *)m_stack_top = 0x23;
-		// GS
+		// DS, ES, FS, GS
 		m_stack_top -= sizeof(uint16_t);
 		*(uint16_t *)m_stack_top = 0x23;
 	} else {
-		// DS
-		m_stack_top -= sizeof(uint16_t);
-		*(uint16_t *)m_stack_top = 0x10;
-		// ES
-		m_stack_top -= sizeof(uint16_t);
-		*(uint16_t *)m_stack_top = 0x10;
-		// FS
-		m_stack_top -= sizeof(uint16_t);
-		*(uint16_t *)m_stack_top = 0x10;
-		// GS
+		// DS, ES, FS, GS
 		m_stack_top -= sizeof(uint16_t);
 		*(uint16_t *)m_stack_top = 0x10;
 	}
