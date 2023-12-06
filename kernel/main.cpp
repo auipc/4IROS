@@ -38,9 +38,10 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	} break;
 	// fork
 	case 3: {
-		Process* child = current->fork(regs);
+		Process *child = current->fork(regs);
 		printk("forking to %d\n", child->pid());
 		Scheduler::the()->add_process(*child);
+		Scheduler::schedule();
 	} break;
 	default:
 		printk("Unknown syscall\n");
