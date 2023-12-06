@@ -19,8 +19,7 @@ Paging *Paging::the() { return s_instance; }
 // Instead of new_directory, maybe we could just have a page directory for
 // operating on pages...
 PageTable *PageTable::clone() {
-	PageTable *src = new PageTable();
-	memcpy(src, this, sizeof(PageTable));
+	PageTable *src = this;
 	PageTable *dst = new PageTable();
 
 	// page aligned
@@ -40,14 +39,14 @@ PageTable *PageTable::clone() {
 #endif
 
 		Paging::the()->map_page(free_page + VIRTUAL_ADDRESS, free_page, false);
+		Paging::the()->map_page(src->entries[i].get_page_base() + VIRTUAL_ADDRESS, src->entries[i].get_page_base(), false);
 #ifdef DEBUG_PAGING
 		printk("Copying from %x to %x\n",
 			   src->entries[i].get_page_base() + VIRTUAL_ADDRESS,
 			   free_page + VIRTUAL_ADDRESS);
 #endif
 		memcpy(reinterpret_cast<void *>(free_page + VIRTUAL_ADDRESS),
-			   reinterpret_cast<void *>(src->entries[i].get_page_base() +
-										VIRTUAL_ADDRESS),
+			   reinterpret_cast<void *>(src->entries[i].get_page_base() + VIRTUAL_ADDRESS),
 			   PAGE_SIZE);
 
 		// TODO we need to be able to temporarily identity map this address so

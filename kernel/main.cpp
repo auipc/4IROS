@@ -19,13 +19,13 @@ extern "C" void syscall_interrupt_handler();
 extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	uint32_t return_value = 0;
 	uint32_t syscall_no = regs.eax;
+	Process *current = Scheduler::the()->current();
 
 	printk("Current process PID %d\n", Scheduler::the()->current()->pid());
 
 	switch (syscall_no) {
 	// exit
 	case 1: {
-		Process *current = Scheduler::the()->current();
 		printk("Exit %d\n", current->pid());
 		Scheduler::the()->kill_process(*current);
 		Scheduler::schedule();
@@ -36,13 +36,18 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 		printk("dumb exec %d\n", next2->pid());
 		Scheduler::the()->add_process(*next2);
 	} break;
+	// fork
+	case 3: {
+		Process* child = current->fork(regs);
+		printk("forking to %d\n", child->pid());
+		Scheduler::the()->add_process(*child);
+	} break;
 	default:
 		printk("Unknown syscall\n");
 		break;
 	}
 
 	regs.eax = return_value;
-	// asm volatile("sti");
 }
 
 extern "C" char _multiboot_data;

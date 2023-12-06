@@ -41,7 +41,7 @@ void ELF::load_sections(PageDirectory *pd) {
 }
 
 void ELF::parse() {
-	constexpr char elf_magic[4] = {0x7F, 'E', 'L', 'F'};
+	static constexpr char elf_magic[4] = {0x7F, 'E', 'L', 'F'};
 	memcpy(&m_elf_header, m_buffer, sizeof(ElfHeader));
 	if (strncmp(m_elf_header.magic, elf_magic, 4) != 0) {
 		printk("Bad header\n");

@@ -150,16 +150,17 @@ class Paging {
 		return cr3;
 	}
 
-  private:
-	friend struct PageDirectory;
-	friend struct PageTable;
-	static PageDirectory *s_kernel_page_directory;
-
 	inline static void switch_page_directory(PageDirectory *page_directory) {
 		asm volatile(
 			"mov %%eax, %%cr3" ::"a"(get_physical_address(page_directory)));
 		s_current_page_directory = page_directory;
 	}
+
+
+	static PageDirectory *s_kernel_page_directory;
+  private:
+	friend struct PageDirectory;
+	friend struct PageTable;
 
 	PageFrameAllocator *m_allocator;
 	static Paging *s_instance;

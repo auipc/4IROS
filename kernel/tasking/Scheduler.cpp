@@ -54,12 +54,6 @@ void Scheduler::setup() {
 	asm volatile("pop %esi");
 	asm volatile("pop %ebx");
 	asm volatile("ret");
-	/*asm volatile("pop %ds");
-	asm volatile("pop %es");
-	asm volatile("pop %fs");
-	asm volatile("pop %gs");
-	asm volatile("popa");
-	asm volatile("iret");*/
 }
 
 void Scheduler::reaper() {
