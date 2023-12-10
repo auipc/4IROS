@@ -49,14 +49,14 @@ Process::Process(const char *elf_file) : m_pid(s_pid++), m_userspace(true) {
 	delete elf;
 }
 
-Process::Process(Process& process, InterruptRegisters &regs) 
+Process::Process(Process& parent, InterruptRegisters &regs) 
 	: m_pid(s_pid++), m_userspace(true)
 {
-	m_page_directory = process.m_page_directory->clone();
+	m_page_directory = parent.m_page_directory->clone();
 
 	Paging::switch_page_directory(m_page_directory);
 	//uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
-	m_stack_base = process.m_stack_base;
+	m_stack_base = parent.m_stack_base;
 	m_stack_top = m_stack_base + STACK_SIZE;
 	
 	m_user_stack_base = 0x10000000;
@@ -127,7 +127,7 @@ Process::Process(Process& process, InterruptRegisters &regs)
 	m_stack_top -= sizeof(uint32_t);
 	*(uint32_t *)m_stack_top = 0;
 
-	Paging::switch_page_directory(Paging::s_kernel_page_directory);
+	Paging::switch_page_directory(parent.page_directory());
 }
 
 Process::~Process() {

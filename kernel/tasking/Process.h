@@ -10,7 +10,7 @@ class Process {
   public:
 	Process(void *entry, bool userspace = false);
 	Process(const char *elf_file);
-	Process(Process& process, InterruptRegisters &regs);
+	Process(Process& parent, InterruptRegisters &regs);
 	~Process();
 	void setup(void *entry);
 	Process* fork(InterruptRegisters &regs);

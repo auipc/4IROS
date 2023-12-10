@@ -41,7 +41,6 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 		Process *child = current->fork(regs);
 		return_value = child->pid();
 		printk("forking to %d from %d\n", child->pid(), current->pid());
-		Paging::switch_page_directory(child->page_directory());
 	} break;
 	default:
 		printk("Unknown syscall\n");
