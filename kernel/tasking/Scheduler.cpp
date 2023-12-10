@@ -36,9 +36,6 @@ void Scheduler::setup() {
 	Process *next = new Process("init");
 	Scheduler::the()->add_process(*next);
 
-	Process *next2 = new Process("init");
-	Scheduler::the()->add_process(*next2);
-
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
 
 	asm volatile("mov %%eax, %%esp"

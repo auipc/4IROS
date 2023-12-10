@@ -39,9 +39,9 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	// fork
 	case 3: {
 		Process *child = current->fork(regs);
-		printk("forking to %d\n", child->pid());
-		Scheduler::the()->add_process(*child);
-		Scheduler::schedule();
+		return_value = child->pid();
+		printk("forking to %d from %d\n", child->pid(), current->pid());
+		Paging::switch_page_directory(child->page_directory());
 	} break;
 	default:
 		printk("Unknown syscall\n");
@@ -58,7 +58,7 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	// Just hope the stack isn't touched.
 	auto vga = VGAInterface();
 	// I guess printing might be the most important function for now.
-	// I've seen other kernels defer enable printing until later,
+	// I've seen other kernels defer enabling printing until later,
 	// but maybe they have serial? Better than a black screen I guess.
 	printk_use_interface(&vga);
 

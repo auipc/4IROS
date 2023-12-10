@@ -1,5 +1,7 @@
 #include <kernel/idt.h>
 #include <kernel/printk.h>
+#include <kernel/tasking/Scheduler.h>
+#include <kernel/tasking/Process.h>
 
 static InterruptHandler *s_the;
 
@@ -36,6 +38,8 @@ extern "C" void unhandled_interrupt() {
 extern "C" void interrupt_14(InterruptRegisters regs) {
 	size_t faulting_address;
 	asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
+	Process *current = Scheduler::the()->current();
+	printk("Current PID: %d\n", current->pid());
 	printk("Page fault at %x\n", faulting_address);
 	printk("EIP: %x\n", regs.eip);
 	printk("Error code 0x%x\n", regs.eflags);
