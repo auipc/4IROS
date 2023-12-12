@@ -50,7 +50,7 @@ class ELF {
 	~ELF();
 
 	uintptr_t program_entry();
-	void load_sections(PageDirectory *pd);
+	int load_sections(PageDirectory *pd);
 
   private:
 	enum SegmentFlags { EXEC = 1, WRITE = 2, READ = 4 };

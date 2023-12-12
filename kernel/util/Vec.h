@@ -3,6 +3,11 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/string.h>
 
+enum BranchFlags {
+	Continue = 0,
+	Break = 1
+};
+
 template <typename T> class Vec {
   public:
 	Vec() {}
@@ -65,7 +70,9 @@ template <typename T> class Vec {
 
 	template <typename F> void iterator(F func) {
 		for (size_t i = 0; i < m_size; i++) {
-			func(container[i]);
+			// Isn't this just a for loop with extra steps?
+			BranchFlags flag = func(container[i]);
+			if (flag == BranchFlags::Break) break;
 		}
 	}
 

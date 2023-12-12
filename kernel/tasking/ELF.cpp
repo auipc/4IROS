@@ -12,13 +12,23 @@ ELF::~ELF() {}
 
 uintptr_t ELF::program_entry() { return m_elf_header.entry; }
 
-void ELF::load_sections(PageDirectory *pd) {
+int ELF::load_sections(PageDirectory *pd) {
+	int error = 0;
 	m_headers.iterator([&](ELFSectionHeader header) {
 		if (header.seg != 1)
-			return;
+			return BranchFlags::Continue;
 
 		if (header.filesz <= 0)
-			return;
+			return BranchFlags::Continue;
+
+		// Outright refuse to load executables that have an alignment
+		// where 2 sections will share pages. There should be no condition
+		// where LOADs are split other than having differing 
+		// permissions, so this should be a no-brainer!
+		if (header.alignment < 0x1000) {
+			error = 1;
+			return BranchFlags::Break;
+		}
 
 		bool is_writable = (header.flags & ELF::SegmentFlags::WRITE) != 0;
 
@@ -40,10 +50,15 @@ void ELF::load_sections(PageDirectory *pd) {
 		// Remap with permissions specified by ELF and with the page userspace
 		// accessible
 		int flags = PageFlags::USER;
+
 		if (!is_writable)
 			flags |= PageFlags::READONLY;
+
 		pd->map_range(header.vaddr, header.filesz, flags);
+
+		return BranchFlags::Continue;
 	});
+	return error;
 }
 
 void ELF::parse() {
