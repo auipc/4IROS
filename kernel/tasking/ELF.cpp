@@ -17,15 +17,21 @@ void ELF::load_sections(PageDirectory *pd) {
 		if (header.seg != 1)
 			return;
 
+		if (header.filesz <= 0)
+			return;
+
 		bool is_writable = (header.flags & ELF::SegmentFlags::WRITE) != 0;
 
 		auto current_page_directory = Paging::current_page_directory();
 
-		pd->map_range(header.vaddr, header.filesz, 0);
+		int map_size = (header.memsz > header.filesz) ? header.memsz : header.filesz;
+		pd->map_range(header.vaddr, map_size, 0);
 
+		printk("%x\n", header.vaddr);
 		asm volatile(
 			"mov %%eax, %%cr3" ::"a"(Paging::get_physical_address(pd)));
-		memset(reinterpret_cast<char *>(header.vaddr), 0, header.memsz);
+		if (header.memsz > header.filesz)
+			memset(reinterpret_cast<char *>(header.vaddr+header.filesz), 0, header.memsz);
 		memcpy(reinterpret_cast<void *>(header.vaddr), m_buffer + header.off,
 			   header.filesz);
 		asm volatile("mov %%eax, %%cr3" ::"a"(

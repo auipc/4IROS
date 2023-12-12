@@ -38,8 +38,8 @@ PageTable *PageTable::clone() {
 		printk("physical address: %x\n", free_page);
 #endif
 
-		Paging::the()->map_page(free_page + VIRTUAL_ADDRESS, free_page, false);
-		Paging::the()->map_page(src->entries[i].get_page_base() + VIRTUAL_ADDRESS, src->entries[i].get_page_base(), false);
+		Paging::the()->map_page(free_page + VIRTUAL_ADDRESS, free_page, 0);
+		Paging::the()->map_page(src->entries[i].get_page_base() + VIRTUAL_ADDRESS, src->entries[i].get_page_base(), 0);
 #ifdef DEBUG_PAGING
 		printk("Copying from %x to %x\n",
 			   src->entries[i].get_page_base() + VIRTUAL_ADDRESS,
@@ -75,7 +75,8 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 		entries[page_directory_index].set_page_table(new PageTable());
 		entries[page_directory_index].present = 1;
 		entries[page_directory_index].read_write = 1;
-		entries[page_directory_index].user_supervisor = user_supervisor;
+		if (!entries[page_directory_index].user_supervisor)
+			entries[page_directory_index].user_supervisor = user_supervisor;
 #ifdef DEBUG_PAGING
 		printk("Allocating page table: %x\n",
 			   entries[page_directory_index].get_page_table());
@@ -156,7 +157,12 @@ void PageDirectory::map_range(size_t virtual_address, size_t length,
 										 ->entries[page_table_index];
 			// risky
 			entries[page_directory_index].user_supervisor = user_supervisor;
-			entries[page_directory_index].read_write = !read_only;
+
+			// FIXME Find a smart way to turn the flags of the page table on and off.
+			// A quick way to do this would be storing counters for each flag per page table, which would amount to being 10 bits per flag (up to 1024).
+			// If the counter reaches zero, shut it off. A new flag is +1 a removed flag is -1.
+			if (!entries[page_directory_index].read_write)
+				entries[page_directory_index].read_write = !read_only;
 
 			page_table_entry.user_supervisor = user_supervisor;
 			page_table_entry.read_write = !read_only;
