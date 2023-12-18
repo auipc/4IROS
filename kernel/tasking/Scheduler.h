@@ -16,13 +16,12 @@ class Scheduler {
 
 	static void setup();
 
-	static void schedule();
-	static void schedule_no_save();
+	static void schedule(uint32_t *esp);
+
+	static Process *s_current;
 
   private:
 	static void reaper();
-	static void yield();
 	static Scheduler *s_the;
-	static Process *s_current;
 	Process *m_kreaper_process;
 };

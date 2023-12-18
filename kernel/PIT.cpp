@@ -1,14 +1,21 @@
 #include <kernel/PIC.h>
 #include <kernel/PIT.h>
 #include <kernel/arch/i386/IO.h>
+#include <kernel/gdt.h>
 #include <kernel/idt.h>
+#include <kernel/mem/Paging.h>
 #include <kernel/printk.h>
+#include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
 
+extern "C" void sched_asm(uintptr_t *prev_stack, uintptr_t *next_stack,
+						  uintptr_t cr3);
+
+extern TSS tss_entry;
 extern "C" void pit_interrupt_handler();
-extern "C" void pit_interrupt() {
+extern "C" __attribute__((fastcall)) void pit_interrupt(uint32_t *esp) {
 	if (Scheduler::the()) {
-		Scheduler::the()->schedule();
+		Scheduler::the()->schedule(esp);
 	}
 
 	PIC::eoi(0x20);

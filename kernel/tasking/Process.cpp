@@ -1,10 +1,9 @@
 #include <kernel/arch/i386/i386.h>
-#include <kernel/mem/malloc.h>
 #include <kernel/mem/Paging.h>
+#include <kernel/mem/malloc.h>
 #include <kernel/string.h>
 #include <kernel/tasking/ELF.h>
 #include <kernel/tasking/Process.h>
-#include <kernel/test_program.h>
 #include <kernel/test_program2.h>
 
 static uint32_t s_pid = 0;
@@ -116,17 +115,6 @@ Process::Process(Process& parent, InterruptRegisters &regs)
 		*(uint16_t *)m_stack_top = 0x10;
 	}
 
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = (uint32_t)task_switch_shim;
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = 0;
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = 0;
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = 0;
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = 0;
-
 	Paging::switch_page_directory(parent.page_directory());
 }
 
@@ -142,23 +130,6 @@ Process::~Process() {
 
 	// FIXME deleting page directories
 }
-
-asm("task_switch_shim:");
-asm("sti");
-asm("mov (%esp), %ds");
-asm("mov (%esp), %es");
-asm("mov (%esp), %fs");
-asm("mov (%esp), %gs");
-asm("addl $2, %esp");
-asm("popa");
-asm("push %eax");
-// This will erronously trigger on our first process.
-// Don't really care all that much.
-asm("mov $0x20, %eax");
-asm("out %al, $0x20");
-asm("out %al, $0xA0");
-asm("pop %eax");
-asm("iret");
 
 void Process::setup(void *entry) {
 	uint32_t ebp = m_stack_top;
@@ -189,7 +160,10 @@ void Process::setup(void *entry) {
 	// EBP
 	m_stack_top -= sizeof(uint32_t);
 	*(uint32_t *)m_stack_top = ebp;
+
+	// Increment ESP by 4; (* Skip next 4 bytes of stack *)
 	m_stack_top -= sizeof(uint32_t);
+
 	// EBX
 	m_stack_top -= sizeof(uint32_t);
 	*(uint32_t *)m_stack_top = 0;
@@ -212,21 +186,9 @@ void Process::setup(void *entry) {
 		m_stack_top -= sizeof(uint16_t);
 		*(uint16_t *)m_stack_top = 0x10;
 	}
-
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = (uint32_t)task_switch_shim;
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = 0;
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = 0;
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = 0;
-	m_stack_top -= sizeof(uint32_t);
-	*(uint32_t *)m_stack_top = 0;
-
 	// m_stack_top = reinterpret_cast<uintptr_t>(m_stack_top);
 }
 
-Process* Process::fork(InterruptRegisters &regs) {
+Process *Process::fork(InterruptRegisters &regs) {
 	return new Process(*this, regs);
 }

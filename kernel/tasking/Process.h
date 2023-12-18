@@ -1,19 +1,19 @@
 #pragma once
+#include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/stdint.h>
-#include <kernel/idt.h>
 
-static const size_t STACK_SIZE = 4096;
+static const size_t STACK_SIZE = 4096; // 4096; // 4096;
 static const size_t USER_STACK_SIZE = 8 * 4096;
 
 class Process {
   public:
 	Process(void *entry, bool userspace = false);
 	Process(const char *elf_file);
-	Process(Process& parent, InterruptRegisters &regs);
+	Process(Process &parent, InterruptRegisters &regs);
 	~Process();
 	void setup(void *entry);
-	Process* fork(InterruptRegisters &regs);
+	Process *fork(InterruptRegisters &regs);
 
 	inline uintptr_t stack_top() { return m_stack_top; }
 	inline Process *next() { return m_next; }

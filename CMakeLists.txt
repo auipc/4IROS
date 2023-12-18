@@ -39,7 +39,6 @@ set(SRCS
 		kernel/tasking/ELF.cpp
 		kernel/PIT.h
 		kernel/PIT.cpp
-		kernel/test_program.h
 		kernel/multiboot.h
 )
 

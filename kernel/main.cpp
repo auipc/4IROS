@@ -28,7 +28,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	case 1: {
 		printk("Exit %d\n", current->pid());
 		Scheduler::the()->kill_process(*current);
-		Scheduler::schedule();
+		Scheduler::schedule(0);
 	} break;
 	// dumb exec
 	case 2: {

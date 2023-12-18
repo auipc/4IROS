@@ -38,24 +38,23 @@ void Scheduler::setup() {
 
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
 
-	asm volatile("mov %%eax, %%esp"
-				 :
-				 : "a"(Scheduler::the()->s_current->m_stack_top));
 	asm volatile(
-		"mov %%eax, %%cr3"
-		:
-		: "a"((uintptr_t)Paging::get_physical_address(reinterpret_cast<void *>(
-			Scheduler::the()->s_current->page_directory()))));
-	asm volatile("pop %ebp");
-	asm volatile("pop %edi");
-	asm volatile("pop %esi");
-	asm volatile("pop %ebx");
-	asm volatile("ret");
+		"mov %%eax, %%esp" ::"a"(Scheduler::the()->s_current->m_stack_top));
+	asm volatile("mov %%eax, %%cr3" ::"a"(Paging::get_physical_address(
+		Scheduler::the()->s_current->m_page_directory)));
+	asm volatile("mov (%esp), %ds");
+	asm volatile("mov (%esp), %es");
+	asm volatile("mov (%esp), %fs");
+	asm volatile("mov (%esp), %gs");
+	asm volatile("add $2, %esp");
+	asm volatile("popa");
+	asm volatile("iret");
 }
 
 void Scheduler::reaper() {
 	while (1) {
 		Process *node = s_current;
+		// FIXME I forgot what the function of this even is
 		Process *end = s_current;
 		do {
 			if (node->m_state != Process::States::Dead) {
@@ -70,11 +69,11 @@ void Scheduler::reaper() {
 			delete process;
 		} while (node != end);
 
-		yield();
+		// No more processes to kill.
+		Scheduler::the()->m_kreaper_process->set_state(
+			Process::States::Blocked);
 	}
 }
-
-void Scheduler::yield() { Scheduler::schedule(); }
 
 // We could prevent the reaper from running by blocking it
 void Scheduler::kill_process(Process &p) {
@@ -92,30 +91,28 @@ void Scheduler::add_process(Process &p) {
 	s_current->set_next(&p);
 }
 
-extern "C" void sched_asm(uintptr_t *prev_stack, uintptr_t *next_stack,
-						  uintptr_t cr3);
-asm("sched_asm:");
-asm("mov %ecx, %esi");
-asm("mov %eax, %ecx");
-asm("push %ebx");
-asm("push %esi");
-asm("push %edi");
-asm("push %ebp");
-asm("mov %esp,%eax");
-asm("mov %eax,(%ecx)");
-asm("mov %esi, %cr3");
-asm("mov (%edx),%eax");
-asm("mov %eax,%esp");
-asm("pop %ebp");
-asm("pop %edi");
-asm("pop %esi");
-asm("pop %ebx");
-asm("ret");
+extern "C" void sched_asm(uintptr_t *next_stack, uintptr_t cr3);
 
-void Scheduler::schedule() {
-	if (s_current == s_current->m_next)
-		return;
+asm("sched_asm:");
+asm("mov %edx, %cr3");
+asm("mov (%eax), %esp");
+asm("mov (%esp), %ds");
+asm("mov (%esp), %es");
+asm("mov (%esp), %fs");
+asm("mov (%esp), %gs");
+asm("add $2, %esp");
+asm("popa");
+asm("push %eax");
+asm("mov $0x20, %eax");
+asm("out %al, $0x20");
+asm("out %al, $0xA0");
+asm("pop %eax");
+asm("iret");
+
+int scheds = 0;
+void Scheduler::schedule(uint32_t *esp) {
 	auto prev_stack = &s_current->m_stack_top;
+	// s_current->m_stack_top = s_current->m_stack_base + STACK_SIZE;
 	do {
 		s_current = s_current->m_next;
 		// skip over dead or blocked processes
@@ -123,9 +120,17 @@ void Scheduler::schedule() {
 			 s_current->m_state == Process::States::Blocked);
 	auto next_stack = &s_current->m_stack_top;
 
-	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;
+	if (prev_stack == next_stack)
+		return;
 
-	sched_asm(prev_stack, next_stack,
+	*prev_stack = reinterpret_cast<uintptr_t>(esp);
+
+	// If in userspace, reset the kernel stack every context switch. Otherwise,
+	// a stack overflow WILL occur!
+	if (s_current->m_userspace)
+		tss_entry.esp0 = Scheduler::the()->s_current->m_stack_base + STACK_SIZE;
+
+	sched_asm(next_stack,
 			  (uintptr_t)Paging::get_physical_address(
 				  reinterpret_cast<void *>(s_current->page_directory())));
 }

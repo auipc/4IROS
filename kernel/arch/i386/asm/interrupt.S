@@ -20,4 +20,19 @@
 .endm
 
 DEFINE_HANDLER syscall
-DEFINE_HANDLER pit
+
+.extern pit_interrupt
+.global pit_interrupt_handler
+pit_interrupt_handler:
+	cli
+	pusha
+	pushw %gs
+	mov %esp, %ecx
+	call pit_interrupt
+	mov (%esp), %gs
+	mov (%esp), %fs
+	mov (%esp), %es
+	popw %ds
+	popa
+	sti
+	iret
