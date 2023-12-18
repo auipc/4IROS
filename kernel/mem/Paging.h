@@ -84,8 +84,10 @@ struct PageDirectory {
 	}
 
 	bool is_mapped(size_t virtual_address);
+	bool is_user_page(size_t virtual_address);
 	void map_page(size_t virtual_address, size_t physical_address, int flags);
-	void map_range(size_t virtual_address, size_t length, int flags);
+	void map_range(size_t virtual_address,
+											  size_t length, int flags);
 
 	void unmap_page(size_t virtual_address);
 

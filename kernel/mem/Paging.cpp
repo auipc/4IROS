@@ -127,6 +127,20 @@ bool PageDirectory::is_mapped(size_t virtual_address) {
 	return true;
 }
 
+bool PageDirectory::is_user_page(size_t virtual_address) {
+	auto page_directory_index = get_page_directory_index(virtual_address);
+	auto page_table_index = get_page_table_index(virtual_address);
+	
+	if (!entries[page_directory_index].user_supervisor)
+		return false;
+
+
+	if (!entries[page_directory_index].get_page_table()->entries[page_table_index].user_supervisor)
+		return false;
+
+	return true;
+}
+
 void PageDirectory::map_range(size_t virtual_address, size_t length,
 										int flags) {
 	if (!length)

@@ -20,8 +20,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	uint32_t return_value = 0;
 	uint32_t syscall_no = regs.eax;
 	Process *current = Scheduler::the()->current();
-
-	printk("Current process PID %d\n", Scheduler::the()->current()->pid());
+	auto current_page = current->page_directory();
 
 	switch (syscall_no) {
 	// exit
@@ -33,7 +32,7 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	// dumb exec
 	case 2: {
 		Process *next2 = new Process("init2");
-		printk("dumb exec %d\n", next2->pid());
+		//printk("dumb exec %d\n", next2->pid());
 		Scheduler::the()->add_process(*next2);
 	} break;
 	// fork
@@ -42,6 +41,14 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 		return_value = child->pid();
 		printk("forking to %d from %d\n", child->pid(), current->pid());
 	} break;
+	// write
+    case 4: {
+	   if(current_page->is_mapped(regs.ecx)
+		   && current_page->is_user_page(regs.ecx) && regs.ebx == 1) {
+		   printk("%.*s", reinterpret_cast<char*>(regs.ecx), regs.edx);
+	   }
+   } break;
+
 	default:
 		printk("Unknown syscall\n");
 		break;
