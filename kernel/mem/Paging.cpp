@@ -39,14 +39,17 @@ PageTable *PageTable::clone() {
 #endif
 
 		Paging::the()->map_page(free_page + VIRTUAL_ADDRESS, free_page, 0);
-		Paging::the()->map_page(src->entries[i].get_page_base() + VIRTUAL_ADDRESS, src->entries[i].get_page_base(), 0);
+		Paging::the()->map_page(src->entries[i].get_page_base() +
+									VIRTUAL_ADDRESS,
+								src->entries[i].get_page_base(), 0);
 #ifdef DEBUG_PAGING
 		printk("Copying from %x to %x\n",
 			   src->entries[i].get_page_base() + VIRTUAL_ADDRESS,
 			   free_page + VIRTUAL_ADDRESS);
 #endif
 		memcpy(reinterpret_cast<void *>(free_page + VIRTUAL_ADDRESS),
-			   reinterpret_cast<void *>(src->entries[i].get_page_base() + VIRTUAL_ADDRESS),
+			   reinterpret_cast<void *>(src->entries[i].get_page_base() +
+										VIRTUAL_ADDRESS),
 			   PAGE_SIZE);
 
 		// TODO we need to be able to temporarily identity map this address so
@@ -130,19 +133,21 @@ bool PageDirectory::is_mapped(size_t virtual_address) {
 bool PageDirectory::is_user_page(size_t virtual_address) {
 	auto page_directory_index = get_page_directory_index(virtual_address);
 	auto page_table_index = get_page_table_index(virtual_address);
-	
+
 	if (!entries[page_directory_index].user_supervisor)
 		return false;
 
-
-	if (!entries[page_directory_index].get_page_table()->entries[page_table_index].user_supervisor)
+	if (!entries[page_directory_index]
+			 .get_page_table()
+			 ->entries[page_table_index]
+			 .user_supervisor)
 		return false;
 
 	return true;
 }
 
 void PageDirectory::map_range(size_t virtual_address, size_t length,
-										int flags) {
+							  int flags) {
 	if (!length)
 		return;
 	if (length < PAGE_SIZE) {
@@ -165,11 +170,11 @@ void PageDirectory::map_range(size_t virtual_address, size_t length,
 
 #ifdef DEBUG_PAGING
 			printk("Map range\n");
-			printk("user_supervisor %d read_only %d\n", user_supervisor, read_only);
+			printk("user_supervisor %d read_only %d\n", user_supervisor,
+				   read_only);
 #endif
 
-			auto page_directory_index =
-				get_page_directory_index(address);
+			auto page_directory_index = get_page_directory_index(address);
 			auto page_table_index = get_page_table_index(address);
 			auto &page_table_entry = entries[page_directory_index]
 										 .get_page_table()
@@ -178,9 +183,11 @@ void PageDirectory::map_range(size_t virtual_address, size_t length,
 			entries[page_directory_index].user_supervisor = user_supervisor;
 			entries[page_directory_index].present = 1;
 
-			// FIXME Find a smart way to turn the flags of the page table on and off.
-			// A quick way to do this would be storing counters for each flag per page table, which would amount to being 10 bits per flag (up to 1024).
-			// If the counter reaches zero, shut it off. A new flag is +1 a removed flag is -1.
+			// FIXME Find a smart way to turn the flags of the page table on and
+			// off. A quick way to do this would be storing counters for each
+			// flag per page table, which would amount to being 10 bits per flag
+			// (up to 1024). If the counter reaches zero, shut it off. A new
+			// flag is +1 a removed flag is -1.
 			if (!entries[page_directory_index].read_write)
 				entries[page_directory_index].read_write = !read_only;
 
@@ -238,14 +245,26 @@ extern "C" char _kernel_end;
 Paging::Paging(size_t total_memory) {
 	m_allocator = new PageFrameAllocator(total_memory);
 
-	// Reserve memory for the kernel
-	m_allocator->mark_range(0, get_physical_address(&_kernel_end));
+	PageDirectory *pd = s_kernel_page_directory;
+	for (int i = 0; i < 1024; i++) {
+		if (!pd->entries[i].present)
+			continue;
+
+		auto pt = pd->entries[i].get_page_table();
+		for (int j = 0; j < 1024; j++) {
+			if (!pt->entries[j].present)
+				continue;
+
+			auto base = pt->entries[j].get_page_base();
+			m_allocator->mark_range(base, base + PAGE_SIZE);
+		}
+	}
 }
 
 Paging::~Paging() { delete m_allocator; }
 
 void Paging::setup(size_t total_memory) {
-	s_instance = new Paging(total_memory);
 	s_kernel_page_directory = &boot_page_directory;
+	s_instance = new Paging(total_memory);
 	switch_page_directory(s_kernel_page_directory);
 }

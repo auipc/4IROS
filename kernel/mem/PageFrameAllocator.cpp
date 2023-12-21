@@ -13,7 +13,7 @@ constexpr int pow(int a, int b) {
 	return result;
 }
 
-static_assert(pow(3,4) == 81);
+static_assert(pow(3, 4) == 81);
 
 PageFrameAllocator::PageFrameAllocator(size_t memory_size) {
 	m_pages = memory_size / PAGE_SIZE;
@@ -29,6 +29,9 @@ PageFrameAllocator::~PageFrameAllocator() {
 }
 
 void PageFrameAllocator::mark_range(uint32_t start, uint32_t end) {
+	if ((end / PAGE_SIZE) > m_pages)
+		return;
+
 	for (uint32_t i = start; i < end; i += PAGE_SIZE) {
 		m_buddies[0]->set(i / PAGE_SIZE);
 		for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
@@ -74,9 +77,7 @@ size_t PageFrameAllocator::find_free_pages(size_t pages) {
 	return (start * PAGE_SIZE);
 }
 
-int abs(int a) {
-	return a > 0 ? a : -a;
-}
+int abs(int a) { return a > 0 ? a : -a; }
 
 size_t PageFrameAllocator::largest_container(size_t size) {
 	int container = 0;
