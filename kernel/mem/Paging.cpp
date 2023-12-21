@@ -149,28 +149,34 @@ void PageDirectory::map_range(size_t virtual_address, size_t length,
 		length += PAGE_SIZE - length;
 	}
 
-	size_t number_of_pages = length / PAGE_SIZE;
+	size_t number_of_pages = (length + PAGE_SIZE - 1) / PAGE_SIZE;
 	size_t free_pages =
 		Paging::the()->m_allocator->find_free_pages(number_of_pages);
 
-	for (size_t i = 0; i < (length / PAGE_SIZE); i++) {
-		if (!is_mapped(virtual_address + (i * PAGE_SIZE))) {
-			for (size_t j = 0; j < number_of_pages; j++) {
-				auto free_page = free_pages + (j * PAGE_SIZE);
-				map_page(virtual_address + (i * PAGE_SIZE), free_page, flags);
-			}
+	for (size_t i = 0; i < number_of_pages; i++) {
+		auto address = virtual_address + (i * PAGE_SIZE);
+		if (!is_mapped(address)) {
+			auto free_page = free_pages + (i * PAGE_SIZE);
+			map_page(address, free_page, flags);
 		} else {
 			// Just modify the flags
 			bool user_supervisor = (flags & PageFlags::USER) != 0;
 			bool read_only = (flags & PageFlags::READONLY) != 0;
+
+#ifdef DEBUG_PAGING
+			printk("Map range\n");
+			printk("user_supervisor %d read_only %d\n", user_supervisor, read_only);
+#endif
+
 			auto page_directory_index =
-				get_page_directory_index(virtual_address);
-			auto page_table_index = get_page_table_index(virtual_address);
+				get_page_directory_index(address);
+			auto page_table_index = get_page_table_index(address);
 			auto &page_table_entry = entries[page_directory_index]
 										 .get_page_table()
 										 ->entries[page_table_index];
 			// risky
 			entries[page_directory_index].user_supervisor = user_supervisor;
+			entries[page_directory_index].present = 1;
 
 			// FIXME Find a smart way to turn the flags of the page table on and off.
 			// A quick way to do this would be storing counters for each flag per page table, which would amount to being 10 bits per flag (up to 1024).
