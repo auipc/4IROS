@@ -5,6 +5,6 @@
 
 int fork();
 int write(int fd, void* buffer, size_t len);
-void exit(int status);
+_Noreturn void exit(int status);
 
 #endif

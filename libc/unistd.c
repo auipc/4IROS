@@ -13,7 +13,7 @@ int write(int fd, void* buffer, size_t len) {
 	return r;
 }
 
-void exit(int status) {
+_Noreturn void exit(int status) {
 	while (1)
 		asm volatile("int $0x80":: "a"(0x01), "b"(status));
 }
