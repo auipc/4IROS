@@ -4,6 +4,8 @@ set(LIBC_CRT0_SRCS
 
 set(LIBC_SRCS
 	unistd.c
+	stdio.c
+	string.c
 )
 
 add_library(crt0 STATIC ${LIBC_CRT0_SRCS})
