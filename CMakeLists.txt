@@ -42,7 +42,7 @@ set(SRCS
 		kernel/multiboot.h
 )
 
-set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O3 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -nostdinc -mregparm=3 -I.")
+set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O0 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -nostdinc -mregparm=3 -I.")
 add_executable(4IROS ${SRCS})
 add_subdirectory(libc)
 

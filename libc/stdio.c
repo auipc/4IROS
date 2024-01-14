@@ -6,7 +6,7 @@
 int printf(const char *format, ...) {
 	__builtin_va_list list;
 	__builtin_va_start(list, format);
-	for (size_t j = 0; j < strlen(format); j++) {
+	for (size_t j = 0; j < (size_t)strlen(format); j++) {
 		char c = format[j];
 		switch (c) {
 		case '%': {

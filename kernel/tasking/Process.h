@@ -4,7 +4,7 @@
 #include <kernel/stdint.h>
 
 static const size_t STACK_SIZE = 4096;
-static const size_t USER_STACK_SIZE = 8 * 4096;
+static const size_t USER_STACK_SIZE = 2*4096;
 
 class Process {
   public:

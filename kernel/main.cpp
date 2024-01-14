@@ -16,11 +16,13 @@ extern "C" void __cxa_pure_virtual() {
 
 extern "C" void syscall_interrupt_handler();
 
+static VGAInterface* vga;
+
 extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	uint32_t return_value = 0;
 	uint32_t syscall_no = regs.eax;
 	Process *current = Scheduler::the()->current();
-	auto current_page = current->page_directory();
+	auto current_pd = current->page_directory();
 
 	switch (syscall_no) {
 	// exit
@@ -43,9 +45,12 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	} break;
 	// write
     case 4: {
-	   if(current_page->is_mapped(regs.ecx)
-		   && current_page->is_user_page(regs.ecx) && regs.ebx == 1) {
-		   printk("%.*s", reinterpret_cast<char*>(regs.ecx), regs.edx);
+	   for (uint32_t i = 0; i < regs.edx; i++) {
+		   // FIXME don't check the page constantly 
+		   if(current_pd->is_mapped(regs.ecx+i)
+			   && current_pd->is_user_page(regs.ecx+i) && regs.ebx == 1) {
+			   vga->write_character(*((char*)regs.ecx+i));
+		   }
 	   }
    } break;
 
@@ -62,11 +67,12 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	assert(magic == 0x2BADB002);
 	// Kinda hacky, but kernel_main never exits.
 	// Just hope the stack isn't touched.
-	auto vga = VGAInterface();
+	auto v = VGAInterface();
+	vga = &v;
 	// I guess printing might be the most important function for now.
 	// I've seen other kernels defer enabling printing until later,
 	// but maybe they have serial? Better than a black screen I guess.
-	printk_use_interface(&vga);
+	printk_use_interface(vga);
 
 	multiboot_info *mb = reinterpret_cast<multiboot_info *>(ptr);
 	(void)mb;
