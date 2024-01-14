@@ -1,6 +1,6 @@
 #include <string.h>
 
-void itoa(char *buf, unsigned long int n, int base) {
+void itoa(unsigned long int n, char *buf, int base) {
 	unsigned long int tmp;
 	int i, j;
 
@@ -19,7 +19,7 @@ void itoa(char *buf, unsigned long int n, int base) {
 	}
 }
 
-void ftoa(char *buf, double f, int precision) {
+void ftoa(double f, char *buf, int precision) {
 	int pos = 0;
 	if (f < 0) {
 		buf[pos++] = '-';
@@ -29,7 +29,7 @@ void ftoa(char *buf, double f, int precision) {
 	int intPart = (int)f;
 	double remainder = f - (double)intPart;
 
-	itoa(buf + pos, intPart, 10);
+	itoa(intPart, buf + pos, 10);
 	pos += strlen(buf + pos);
 
 	buf[pos++] = '.';

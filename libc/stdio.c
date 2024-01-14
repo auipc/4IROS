@@ -26,15 +26,15 @@ int printf(const char *format, ...) {
 			switch (c2) {
 			case 'd': {
 				int value = __builtin_va_arg(list, int);
-				char buffer[32];
-				itoa(buffer, value, 10);
+				char buffer[33];
+				itoa(value, buffer, 10);
 				write(1, buffer, strlen(buffer));
 				break;
 			}
 			case 'x': {
 				int value = __builtin_va_arg(list, int);
 				char buffer[32];
-				itoa(buffer, value, 16);
+				itoa(value, buffer, 16);
 				write(1, buffer, strlen(buffer));
 				break;
 			}
@@ -82,4 +82,5 @@ int printf(const char *format, ...) {
 		}
 	}*/
 	__builtin_va_end(list);
+	return 0;
 }

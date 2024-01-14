@@ -1,9 +1,10 @@
 #ifndef _LIBC_STRING_H
 #define _LIBC_STRING_H
 #pragma once
+#include <stdint.h>
 
-void itoa(char *buf, unsigned long int n, int base);
-void ftoa(char *buf, double f, int precision);
+void itoa(unsigned long int n, char *buf, int base);
+void ftoa(double f, char *buf, int precision);
 
 int strlen(const char* str);
 #endif
