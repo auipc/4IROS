@@ -122,6 +122,7 @@ void *kmalloc(size_t size) {
 			;
 	}
 
+	memset((char*)block, 0, blocks_needed*k_allocation_block_size);
 	return block;
 }
 
@@ -150,6 +151,7 @@ void *kmalloc_aligned(size_t size, size_t alignment) {
 		block += alignment - misalignment;
 	}
 
+	memset((char*)block, 0, blocks_needed*k_allocation_block_size);
 	return reinterpret_cast<void *>(block);
 }
 
