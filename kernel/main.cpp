@@ -9,6 +9,18 @@
 #include <kernel/printk.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/util/Spinlock.h>
+
+Spinlock cxa_spinlock;
+
+extern "C" int __cxa_guard_acquire(long long int*) {
+	cxa_spinlock.acquire();
+	return 1;
+}
+
+extern "C" void __cxa_guard_release(long long int*) {
+	cxa_spinlock.release();
+}
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
