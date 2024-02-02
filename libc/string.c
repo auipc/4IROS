@@ -44,12 +44,11 @@ void ftoa(double f, char *buf, int precision) {
 	buf[pos] = '\0';
 }
 
-size_t strlen(const char *str) {
-	size_t length = 0;
-	while (*str != '\0') {
-		length++;
-		str++;
-	}
+size_t strlen(const char* str)
+{
+	const char *start = str;
 
-	return length;
+	while (*str)
+		str++;
+	return str - start;
 }
