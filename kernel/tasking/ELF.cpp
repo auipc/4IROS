@@ -27,7 +27,7 @@ int ELF::load_sections(PageDirectory *pd) {
 			return BranchFlags::Break;
 		}
 
-		//bool is_writable = (header.flags & ELF::SegmentFlags::WRITE) != 0;
+		bool is_writable = (header.flags & ELF::SegmentFlags::WRITE) != 0;
 
 		auto current_page_directory = Paging::current_page_directory();
 
@@ -46,12 +46,12 @@ int ELF::load_sections(PageDirectory *pd) {
 
 		// Remap with permissions specified by ELF and with the page userspace
 		// accessible
-		//int flags = PageFlags::USER;
+		int flags = PageFlags::USER;
 
-		//if (!is_writable)
-		//	flags |= PageFlags::READONLY;
+		if (!is_writable)
+			flags |= PageFlags::READONLY;
 
-		//pd->map_range(header.vaddr, header.filesz, flags);
+		pd->map_range(header.vaddr, header.filesz, flags);
 
 		return BranchFlags::Continue;
 	});

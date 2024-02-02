@@ -165,8 +165,30 @@ void PageDirectory::map_range(size_t virtual_address, size_t length,
 		if (!is_mapped(address)) {
 			map_page(address, free_pages + (i * PAGE_SIZE), flags);
 		} else {
-			printk("Error\n");
-			while(1);
+			bool user_supervisor = (flags & PageFlags::USER) != 0;
+			bool read_only = (flags & PageFlags::READONLY) != 0;
+
+			auto page_directory_index = get_page_directory_index(address);
+			auto page_table_index = get_page_table_index(address);
+
+			if (!entries[page_directory_index].present) {
+				return;
+			}
+
+			entries[page_directory_index].user_supervisor = 1;
+			entries[page_directory_index].read_write = 1;
+
+			auto &page_table_entry = entries[page_directory_index]
+										 .get_page_table()
+										 ->entries[page_table_index];
+
+			page_table_entry.user_supervisor = user_supervisor;
+			page_table_entry.read_write = !read_only;
+			page_table_entry.present = 1;
+
+			if (this == Paging::the()->current_page_directory()) {
+				asm volatile("invlpg (%0)" ::"r"(virtual_address) : "memory");
+			}
 		}
 	}
 }
