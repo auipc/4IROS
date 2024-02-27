@@ -19,6 +19,12 @@ template <typename T> class Vec {
 		m_size = 0;
 	}
 
+	Vec(Vec& c) {
+		c.m_size = m_size;
+		c.container = reinterpret_cast<T *>(kmalloc(sizeof(T) * m_size));
+		memcpy(c.container, container, sizeof(T)*m_size);
+	}
+
 	// the hard way
 	T &operator[](size_t idx) {
 		T *t = get(idx);
@@ -53,7 +59,8 @@ template <typename T> class Vec {
 
 	void remove(size_t pos) {
 		assert(container);
-		T *tmp;
+
+		T *tmp = nullptr;
 
 		if (m_size-1 != 0) {
 			tmp = reinterpret_cast<T *>(kmalloc(sizeof(T) * m_size - 1));
@@ -64,13 +71,13 @@ template <typename T> class Vec {
 					memcpy(&tmp[new_pos++], &container[i], sizeof(T));
 				}
 			}
-		} else {
-			tmp = nullptr;
 		}
 
 		if (container)
 			kfree(container);
-		container = tmp;
+
+		if (m_size-1 != 0)
+			container = tmp;
 
 		m_size--;
 	}
