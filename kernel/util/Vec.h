@@ -20,9 +20,9 @@ template <typename T> class Vec {
 	}
 
 	Vec(Vec& c) {
-		c.m_size = m_size;
-		c.container = reinterpret_cast<T *>(kmalloc(sizeof(T) * m_size));
-		memcpy(c.container, container, sizeof(T)*m_size);
+		m_size = c.m_size;
+		container = reinterpret_cast<T *>(kmalloc(sizeof(T) * c.m_size));
+		memcpy(container, c.container, sizeof(T)*c.m_size);
 	}
 
 	// the hard way
