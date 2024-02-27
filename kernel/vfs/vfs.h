@@ -14,7 +14,7 @@ public:
 		return true;
 	}
 
-	virtual VFSNode* traverse(Vec<const char*> path, size_t path_index=0);
+	virtual VFSNode* traverse(Vec<const char*>& path, size_t path_index=0);
 
 	void set_name(const char* name) {
 		m_name = name;
@@ -62,8 +62,8 @@ protected:
 	Vec<VFSNode*> m_nodes;
 	const char* m_name;
 	// FIXME: On second thought, it's probably not good to have a global position that every reader uses.
-	size_t m_position;
-	VFSNode* m_mounted_filesystem;
+	size_t m_position = 0;
+	VFSNode* m_mounted_filesystem = nullptr;
 };
 
 enum SeekMode {
@@ -79,13 +79,13 @@ public:
 	int seek(size_t offset,	SeekMode origin);
 	size_t tell();
 private:
-	size_t m_position;
-	VFSNode* m_node;
+	size_t m_position = 0;
+	VFSNode* m_node = nullptr;
 };
 
-class NullNode : public VFSNode {
+class ZeroNode : public VFSNode {
 public:
-	NullNode(const char* name);
+	ZeroNode(const char* name);
 
 	virtual inline bool is_directory() override {
 		return false;
@@ -102,8 +102,8 @@ SINGLETON(VFS)
 public:
 	VFS();
 	~VFS();
-	VFSNode* open(Vec<const char*> name);
-	FileHandle* open_fh(Vec<const char*> name);
+	VFSNode* open(Vec<const char*>& name);
+	FileHandle* open_fh(Vec<const char*>& name);
 
 	void print_fs(VFSNode* root, int depth = 0);
 

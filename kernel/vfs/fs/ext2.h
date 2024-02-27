@@ -106,9 +106,9 @@ public:
 	Ext2FileSystem(VFSNode* block_dev);
 	~Ext2FileSystem();
 	void init();
-	virtual VFSNode* traverse(Vec<const char*> path, size_t path_index=0);
+	virtual VFSNode* traverse(Vec<const char*>& path, size_t path_index=0);
 private:
-	VFSNode* traverse_internal(INode* cur_inode, Vec<const char*> path, size_t path_index=0);
+	VFSNode* traverse_internal(INode* cur_inode, Vec<const char*>& path, size_t path_index=0);
 	INode* read_inode(size_t index);
 	void seek_block(size_t block_addr);
 	Vec<Directory> scan_dir_entries(INode& inode);

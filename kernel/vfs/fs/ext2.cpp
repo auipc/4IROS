@@ -29,29 +29,18 @@ Ext2FileSystem::~Ext2FileSystem() {
 }
 
 INode* Ext2FileSystem::read_inode(size_t index) {
-	printk("index: %d\n", index);
 	uint32_t block_group_no = (index - 1) / block.inodes_per_group;
 	uint32_t block_group_inode_idx = (index - 1) % block.inodes_per_group;
 
-	printk("%x\n", block_size);
-	printk("pos 2: %x\n", m_block_dev->position());
 	m_block_dev->seek(2*block_size);
 	m_block_dev->seek_cur((block_group_no) * block_size);
-	printk("pos 3: %x\n", m_block_dev->position());
 	BlockGroupDescriptor bgd;
 	m_block_dev->read((char*)&bgd, sizeof(BlockGroupDescriptor));
-	printk("start_block_inode: %x\n", bgd.start_block_inode);
-	printk("block_group_no: %x\n", block_group_no);
-	printk("block_group_inode_idx: %x\n", block_group_inode_idx);
-	printk("pos 4: %x\n", m_block_dev->position());
 
 	m_block_dev->seek((bgd.start_block_inode) * block_size);
 	m_block_dev->seek_cur(block_group_inode_idx * 128);
-	printk("pos 5: %x\n", m_block_dev->position());
 	INode* node = new INode();
 	m_block_dev->read((char*)node, sizeof(INode));
-	printk("Inode:\n");
-	printk("type: %x\n", node->type);
 	//assert(node->type == 0x41ed);
 	return node;
 }
@@ -68,7 +57,6 @@ uint32_t Ext2FileSystem::read_from_inode(INode& inode, void* out, size_t size) {
 
 
 	for (size_t i = 0; i < size_to_read; i+=block_size) {
-		printk("Seeking to %x\n", inode.dbp[i]);
 		seek_block(inode.dbp[i]);
 		m_block_dev->read(((char*)out)+i, size_to_read % block_size);
 	}
@@ -97,22 +85,17 @@ Vec<Directory> Ext2FileSystem::scan_dir_entries(INode& inode) {
 void Ext2FileSystem::init() {
 	m_block_dev->seek(1024);
 	m_block_dev->read((char*)&block, sizeof(Ext2SuperBlock));
-	printk("EXT2 SIG: %x\n", block.ext2_sig);
-	printk("mount time: %d\n", block.mount_time);
-	printk("%d\n", block.log2_block_size);
 	m_root_inode = read_inode(2);
-	//block_size = ((uint32_t)block.log2_block_size) << 10;
+	block_size = block.log2_block_size > 0 ? ((uint32_t)block.log2_block_size) << 10 : block_size;
 }
 
-VFSNode* Ext2FileSystem::traverse_internal(INode* cur_inode, Vec<const char*> path, size_t path_index) {
+VFSNode* Ext2FileSystem::traverse_internal(INode* cur_inode, Vec<const char*>& path, size_t path_index) {
 	auto nodes = m_nodes;
 
 	if (path_index >= path.size()) return nullptr;
 	auto dir_entries = scan_dir_entries(*cur_inode);
 
 	for (size_t i = 0; i < dir_entries.size(); i++) {
-		printk("f %s\n", dir_entries[i].name);
-		printk("e %s\n", path[path_index]);
 		if (!strcmp(dir_entries[i].name, path[path_index])) {
 			printk("found\n");
 			printk("inode index %d\n", dir_entries[i].entry.inode);
@@ -124,7 +107,7 @@ VFSNode* Ext2FileSystem::traverse_internal(INode* cur_inode, Vec<const char*> pa
 	return nullptr;
 }
 
-VFSNode* Ext2FileSystem::traverse(Vec<const char*> path, size_t path_index) {
+VFSNode* Ext2FileSystem::traverse(Vec<const char*>& path, size_t path_index) {
 	auto nodes = m_nodes;
 
 	if (path_index >= path.size()) return nullptr;

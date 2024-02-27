@@ -76,14 +76,14 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 }
 
 void test_fs() {
-	Vec<const char*> null_path;
-	null_path.push("dev");
-	null_path.push("null");
-	VFSNode* null_file = VFS::the().open(null_path);
-	assert(null_file);
-	uint8_t null_value = 0xFF;
-	null_file->read(&null_value, sizeof(uint8_t)*1);
-	assert(null_file == 0);
+	Vec<const char*> zero_path;
+	zero_path.push("dev");
+	zero_path.push("zero");
+	VFSNode* zero_file = VFS::the().open(zero_path);
+	assert(zero_file);
+	uint8_t zero_value = 0xFF;
+	zero_file->read(&zero_value, sizeof(uint8_t)*1);
+	assert(zero_file == 0);
 
 }
 
@@ -113,15 +113,19 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	//Scheduler::setup();
 
 	Vec<const char*> vp;
-	vp.push("hi");
+	vp.push("lol");
 	FileHandle* node = VFS::the().open_fh(vp);
-	node->seek(0, SeekMode::SEEK_END);
-	size_t node_size = node->tell();
-	node->seek(0, SeekMode::SEEK_SET);
+	//VFSNode* node = VFS::the().open(vp);
+	if (node) {
+		node->seek(0, SeekMode::SEEK_END);
+		size_t node_size = node->tell();
+		node->seek(0, SeekMode::SEEK_SET);
+		//size_t node_size = node->size();
 
-	char* lol = new char[node_size];
-	node->read(lol, sizeof(char)*node_size);
-	printk("null %s\n", lol);
+		char* lol = new char[node_size];
+		node->read(lol, sizeof(char)*node_size);
+		printk("%s\n", lol);
+	}
 	
 
 	while (1)

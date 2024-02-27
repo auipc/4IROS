@@ -17,7 +17,7 @@ VFSNode::~VFSNode() {
 
 
 // FIXME: a deep enough filesystem will cause a stack overflow.
-VFSNode* VFSNode::traverse(Vec<const char*> path, size_t path_index) {
+VFSNode* VFSNode::traverse(Vec<const char*>& path, size_t path_index) {
 	auto nodes = m_nodes;
 
 	if (path_index >= path.size()) return nullptr;
@@ -37,7 +37,7 @@ VFSNode* VFSNode::traverse(Vec<const char*> path, size_t path_index) {
 	return nullptr;
 }
 
-NullNode::NullNode(const char* name)
+ZeroNode::ZeroNode(const char* name)
 	: VFSNode(name)
 {
 }
@@ -48,12 +48,14 @@ FileHandle::FileHandle(VFSNode* node)
 }
 
 int FileHandle::read(void* buffer, size_t size) {
+	assert(m_node);
 	// FIXME: This is a race condition waiting to happen!
 	m_node->seek(m_position);
 	return m_node->read(buffer, size);
 }
 
 int FileHandle::seek(size_t offset,	SeekMode origin) {
+	assert(m_node);
 	switch(origin) {
 		case SeekMode::SEEK_SET:
 			m_position = offset;
@@ -72,6 +74,7 @@ int FileHandle::seek(size_t offset,	SeekMode origin) {
 }
 
 size_t FileHandle::tell() {
+	assert(m_node);
 	return m_position;
 }
 
@@ -79,7 +82,7 @@ VFS::VFS() {
 	m_root_vfs_node = new VFSNode("");
 	m_dev_fs = new VFSNode("dev");
 	m_root_vfs_node->m_nodes.push(m_dev_fs);
-	m_root_vfs_node->m_nodes[0]->m_nodes.push(new NullNode("null"));
+	m_root_vfs_node->m_nodes[0]->m_nodes.push(new ZeroNode("zero"));
 	ATAManager::setup(m_dev_fs);
 	Vec<const char*> path;
 	path.push("hd0");
@@ -107,12 +110,14 @@ void VFS::print_fs(VFSNode* fs, int depth) {
 	}
 }
 
-VFSNode* VFS::open(Vec<const char*> name) {
+VFSNode* VFS::open(Vec<const char*>& name) {
 	VFSNode* node = m_root_vfs_node->traverse(name);
 	if (!node) return nullptr;
 	return node;
 }
 
-FileHandle* VFS::open_fh(Vec<const char*> name) {
-	return new FileHandle(open(name));
+FileHandle* VFS::open_fh(Vec<const char*>& name) {
+	VFSNode* node = open(name);
+	if (!node) return nullptr;
+	return new FileHandle(node);
 }

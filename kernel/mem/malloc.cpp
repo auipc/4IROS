@@ -51,7 +51,7 @@ int count_used_memory() {
 	int available = 0;
 	for (size_t i = 0; i < block_headers_length; i++) {
 		if (block_headers[i].used)
-			available += k_allocation_block_size;
+			available += block_headers[i].span_in_blocks*k_allocation_block_size;
 	}
 
 	return available;
@@ -103,10 +103,17 @@ void free_blocks(void *block) {
 	for (size_t i = 0; i < block_headers_length; i++) {
 		if (reinterpret_cast<size_t>(block) ==
 			s_mem_pointer + (i * k_allocation_block_size)) {
-			block_headers[i].used = false;
-			block_headers[i].span_in_blocks = 0;
+			size_t span = block_headers[i].span_in_blocks;
+			memset((char*)block, 0, span*k_allocation_block_size);
+			for (size_t j = 0; j < span; j++) {
+				block_headers[i+j].used = false;
+				block_headers[i+j].span_in_blocks = 0;
+			}
+
+			i += span;
 		}
 	}
+	printk("[FREE %x]\n", block);
 }
 
 void *kmalloc(size_t size) {

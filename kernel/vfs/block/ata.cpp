@@ -21,8 +21,6 @@ int ATABlockNode::open(Vec<const char*> path) {
 int ATABlockNode::read(void* buffer, size_t size) {
 	size_t lba_sector_count = (size + 512-1)/512;
 	size_t lba_pos = m_position/512;
-	printk("lba_sector_count %d\n", lba_sector_count);
-	printk("lba_pos %d\n", lba_pos);
 	outb(DRIVE_SELECT_PORT, m_config);
 	outb(0x1F2, lba_sector_count>>8);
 	outb(0x1F3, (lba_pos>>24)&0xFF);
