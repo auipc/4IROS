@@ -9,6 +9,7 @@
 #include <kernel/printk.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/vfs/vfs.h>
 #include <kernel/util/Spinlock.h>
 
 Spinlock cxa_spinlock;
@@ -74,6 +75,18 @@ extern "C" void syscall_interrupt(InterruptRegisters &regs) {
 	regs.eax = return_value;
 }
 
+void test_fs() {
+	Vec<const char*> null_path;
+	null_path.push("dev");
+	null_path.push("null");
+	VFSNode* null_file = VFS::the().open(null_path);
+	assert(null_file);
+	uint8_t null_value = 0xFF;
+	null_file->read(&null_value, sizeof(uint8_t)*1);
+	assert(null_file == 0);
+
+}
+
 extern "C" char _multiboot_data;
 extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	assert(magic == 0x2BADB002);
@@ -97,7 +110,19 @@ extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
 	Paging::setup(128 * MB);
 
 	asm volatile("sti");
-	Scheduler::setup();
+	//Scheduler::setup();
+
+	Vec<const char*> vp;
+	vp.push("hi");
+	FileHandle* node = VFS::the().open_fh(vp);
+	node->seek(0, SeekMode::SEEK_END);
+	size_t node_size = node->tell();
+	node->seek(0, SeekMode::SEEK_SET);
+
+	char* lol = new char[node_size];
+	node->read(lol, sizeof(char)*node_size);
+	printk("null %s\n", lol);
+	
 
 	while (1)
 		;

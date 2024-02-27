@@ -42,6 +42,10 @@ set(SRCS
 		kernel/multiboot.h
 		kernel/vfs/vfs.cpp
 		kernel/vfs/vfs.h
+		kernel/vfs/block/ata.cpp
+		kernel/vfs/block/ata.h
+		kernel/vfs/fs/ext2.h
+		kernel/vfs/fs/ext2.cpp
 )
 
 set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O0 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -nostdinc -mregparm=3 -I.")

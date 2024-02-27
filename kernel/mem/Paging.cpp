@@ -254,6 +254,8 @@ Paging::Paging(size_t total_memory) {
 			m_allocator->mark_range(base, base + PAGE_SIZE);
 		}
 	}
+
+	m_allocator->mark_range((size_t)&_kernel_start, (size_t)&_kernel_end - (size_t)&_kernel_start);
 }
 
 Paging::~Paging() { delete m_allocator; }

@@ -11,3 +11,15 @@ class Spinlock {
   private:
 	bool m_locked;
 };
+
+class SpinlockRAII {
+public:
+	SpinlockRAII() {
+		lock.acquire();
+	}
+	~SpinlockRAII() {
+		lock.release();
+	}
+private:
+	Spinlock lock;
+};
