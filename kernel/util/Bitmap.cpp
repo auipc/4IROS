@@ -1,6 +1,6 @@
 #include <kernel/assert.h>
-#include <kernel/string.h>
 #include <kernel/util/Bitmap.h>
+#include <string.h>
 
 Bitmap::Bitmap(size_t elems) {
 	// FIXME: uint32_t containers WILL be better

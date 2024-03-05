@@ -1,6 +1,6 @@
 #pragma once
 
-#include <kernel/stdint.h>
+#include <stdint.h>
 
 class PIC {
   public:

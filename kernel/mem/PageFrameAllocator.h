@@ -1,8 +1,8 @@
 #pragma once
 
-#include <kernel/stdint.h>
 #include <kernel/util/Bitmap.h>
 #include <kernel/util/Vec.h>
+#include <stdint.h>
 
 class PageFrameAllocator {
   public:

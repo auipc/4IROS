@@ -1,7 +1,7 @@
 #pragma once
 #include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
-#include <kernel/stdint.h>
+#include <stdint.h>
 
 static const size_t STACK_SIZE = 4096;
 static const size_t USER_STACK_SIZE = 512 * KB;

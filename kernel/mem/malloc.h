@@ -1,7 +1,7 @@
 #pragma once
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
-#include <kernel/stdint.h>
+#include <stdint.h>
 
 extern bool g_use_halfway_allocator;
 // TODO Specify the amount of memory available to us

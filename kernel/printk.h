@@ -1,6 +1,6 @@
 #pragma once
-#include <kernel/stdint.h>
 #include <kernel/util/Singleton.h>
+#include <stdint.h>
 
 class PrintInterface {
   public:

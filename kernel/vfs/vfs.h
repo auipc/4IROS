@@ -1,8 +1,8 @@
 #pragma once
-#include <kernel/limits.h>
-#include <kernel/string.h>
 #include <kernel/util/Singleton.h>
 #include <kernel/util/Vec.h>
+#include <limits.h>
+#include <string.h>
 
 class VFSNode {
   public:

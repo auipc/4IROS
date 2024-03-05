@@ -1,10 +1,10 @@
 #include <kernel/arch/i386/i386.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
-#include <kernel/string.h>
 #include <kernel/tasking/ELF.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/vfs/vfs.h>
+#include <string.h>
 
 static uint32_t s_pid = 0;
 extern "C" void task_switch_shim();

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <kernel/mem/malloc.h>
-#include <kernel/stdint.h>
+#include <stdint.h>
 
 typedef uint8_t bitmap_container_t;
 

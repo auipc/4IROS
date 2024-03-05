@@ -1,10 +1,10 @@
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
-#include <kernel/limits.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
-#include <kernel/string.h>
+#include <limits.h>
+#include <string.h>
 
 extern "C" char _heap_start;
 extern "C" char _kernel_end;

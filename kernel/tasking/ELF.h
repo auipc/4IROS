@@ -1,8 +1,8 @@
 #pragma once
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/mem/Paging.h>
-#include <kernel/stdint.h>
 #include <kernel/util/Vec.h>
+#include <stdint.h>
 
 struct ELFHeader32 {
 	char magic[4];

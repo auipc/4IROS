@@ -1,7 +1,7 @@
 #pragma once
 
-#include <kernel/stdint.h>
 #include <kernel/vfs/vfs.h>
+#include <stdint.h>
 
 #define EXT2_DIR 0x4000
 

@@ -2,12 +2,15 @@
 #define _LIBC_STDINT_H
 #pragma once
 
-typedef unsigned int uint32_t;
+typedef signed char int8_t;
+typedef unsigned char uint8_t;
+typedef signed short int16_t;
 typedef unsigned short uint16_t;
-typedef short int16_t;
-typedef int int32_t;
+typedef signed int int32_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
 
-typedef uint32_t size_t;
-typedef int32_t ssize_t;
+typedef __SIZE_TYPE__ size_t;
+typedef __UINTPTR_TYPE__ uintptr_t;
 
 #endif

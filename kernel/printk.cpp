@@ -1,8 +1,8 @@
 #include <kernel/arch/i386/IO.h>
 #include <kernel/printk.h>
 #include <kernel/stdarg.h>
-#include <kernel/string.h>
 #include <kernel/util/Spinlock.h>
+#include <string.h>
 
 #define PORT 0x3f8
 
@@ -113,7 +113,7 @@ void printk(const char *str, ...) {
 			case 'd': {
 				int value = va_arg(ap, int);
 				char buffer[32];
-				itoa(buffer, value, 10);
+				itoa(value, buffer, 10);
 				for (size_t i = 0; i < strlen(buffer); i++) {
 					s_interface->write_character(buffer[i]);
 				}
@@ -122,7 +122,7 @@ void printk(const char *str, ...) {
 			case 'x': {
 				int value = va_arg(ap, int);
 				char buffer[32];
-				itoa(buffer, value, 16);
+				itoa(value, buffer, 16);
 				for (size_t i = 0; i < strlen(buffer); i++) {
 					s_interface->write_character(buffer[i]);
 				}
@@ -143,7 +143,7 @@ void printk(const char *str, ...) {
 			case 'f': {
 				float value = va_arg(ap, double);
 				char buffer[32];
-				ftoa(buffer, value, precision);
+				ftoa(value, buffer, precision);
 				for (size_t i = 0; i < strlen(buffer); i++) {
 					s_interface->write_character(buffer[i]);
 				}

@@ -1,7 +1,7 @@
 #pragma once
 #include <kernel/assert.h>
 #include <kernel/mem/malloc.h>
-#include <kernel/string.h>
+#include <string.h>
 
 enum BranchFlags { Continue = 0, Break = 1 };
 

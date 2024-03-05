@@ -1,7 +1,7 @@
 #include <kernel/Debug.h>
 #include <kernel/printk.h>
-#include <kernel/stdint.h>
 #include <kernel/util/ism.h>
+#include <stdint.h>
 
 void Debug::stack_trace() {
 	uint32_t *ebp = 0;

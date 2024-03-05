@@ -1,10 +1,10 @@
-#include "kernel/arch/i386/kernel.h"
-#include "kernel/mem/PageFrameAllocator.h"
+#include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
+#include <kernel/mem/PageFrameAllocator.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
-#include <kernel/string.h>
+#include <string.h>
 
 // #define DEBUG_PAGING
 

@@ -1,6 +1,6 @@
 #pragma once
 #include <kernel/arch/i386/kernel.h>
-#include <kernel/stdint.h>
+#include <stdint.h>
 
 // https://wiki.osdev.org/Getting_to_Ring_3#The_TSS
 struct TSS {

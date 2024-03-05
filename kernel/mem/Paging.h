@@ -4,8 +4,8 @@
 #include <kernel/mem/PageFrameAllocator.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
-#include <kernel/stdint.h>
 #include <kernel/util/Vec.h>
+#include <stdint.h>
 
 struct PageDirectory;
 

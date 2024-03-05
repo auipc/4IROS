@@ -90,4 +90,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: 4IROS
-          path: ${{ github.workspace }}/build/4IROS
+          path: ${{ github.workspace }}/build/kernel/4IROS

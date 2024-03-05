@@ -1,5 +1,5 @@
 #include <kernel/gdt.h>
-#include <kernel/string.h>
+#include <string.h>
 
 static GDTEntry gdt[6];
 static GDTPointer gdt_ptr;

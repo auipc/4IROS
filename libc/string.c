@@ -1,5 +1,40 @@
 #include <string.h>
 
+int strncmp(const char *s1, const char *s2, size_t n) {
+
+	if (n == 0)
+		return (0);
+	do {
+		if (*s1 != *s2++)
+			return (*(unsigned char *)s1 - *(unsigned char *)--s2);
+		if (*s1++ == 0)
+			break;
+	} while (--n != 0);
+	return (0);
+}
+
+int strcmp(const char *s1, const char *s2) {
+	while (*s1 == *s2++)
+		if (*s1++ == 0)
+			return (0);
+	return (*(unsigned char *)s1 - *(unsigned char *)--s2);
+}
+
+void memset(char *buffer, char value, size_t size) {
+	for (size_t i = 0; i < size; i++) {
+		buffer[i] = value;
+	}
+}
+
+void *memcpy(void *s1, const void *s2, size_t n) {
+	const char *f = (const char *)s2;
+	char *t = (char *)s1;
+
+	while (n-- > 0)
+		*t++ = *f++;
+	return s1;
+}
+
 void itoa(unsigned long int n, char *buf, int base) {
 	unsigned long int tmp;
 	int i, j;
@@ -44,8 +79,7 @@ void ftoa(double f, char *buf, int precision) {
 	buf[pos] = '\0';
 }
 
-size_t strlen(const char* str)
-{
+size_t strlen(const char *str) {
 	const char *start = str;
 
 	while (*str)

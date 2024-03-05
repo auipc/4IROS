@@ -1,5 +1,5 @@
 #pragma once
-#include <kernel/stdint.h>
+#include <stdint.h>
 
 struct InterruptRegisters {
 	uint32_t ds, es, fs, gs;

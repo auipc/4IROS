@@ -1,7 +1,7 @@
-#include "kernel/arch/i386/kernel.h"
+#include <kernel/arch/i386/kernel.h>
 #include <kernel/printk.h>
-#include <kernel/string.h>
 #include <kernel/tasking/ELF.h>
+#include <string.h>
 
 ELF::ELF(char *buffer, size_t buffer_length)
 	: m_buffer(buffer), m_buffer_length(buffer_length) {
