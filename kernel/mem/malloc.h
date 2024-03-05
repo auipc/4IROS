@@ -3,7 +3,9 @@
 #include <kernel/assert.h>
 #include <kernel/stdint.h>
 
+extern bool g_use_halfway_allocator;
 // TODO Specify the amount of memory available to us
+void kmalloc_temp_init();
 void kmalloc_init();
 
 void *kmalloc(size_t size);

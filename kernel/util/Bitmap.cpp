@@ -3,17 +3,22 @@
 #include <kernel/util/Bitmap.h>
 
 Bitmap::Bitmap(size_t elems) {
-	// uint32_t containers might be better
-	data = new uint8_t[elems];
+	// FIXME: uint32_t containers WILL be better
+	data = new bitmap_container_t[elems];
 	memset(reinterpret_cast<char *>(data), 0, elems);
-	size = elems / 8;
+	size = elems / (8 * sizeof(bitmap_container_t));
 }
 
 Bitmap::~Bitmap() { delete[] data; }
 
+size_t Bitmap::alloc_size(size_t elems) {
+	size_t a = sizeof(Bitmap);
+	a += sizeof(bitmap_container_t) * elems;
+	return a;
+}
+
 void Bitmap::set(size_t i) {
 	if (i >= size) {
-		assert(false);
 		return;
 	}
 	int byteIndex = i / 8;
@@ -24,7 +29,6 @@ void Bitmap::set(size_t i) {
 
 void Bitmap::unset(size_t i) {
 	if (i >= size) {
-		assert(false);
 		return;
 	}
 	int byteIndex = i / 8;
@@ -52,9 +56,8 @@ uint32_t Bitmap::scan(uint32_t nr) {
 		}
 
 		if (streak == nr) {
-			// FIXME does this work?
-			for (size_t j = i; j > i - streak; j--)
-				set(j);
+			for (size_t j = 0; j < streak; j++)
+				set(i + j);
 
 			return i;
 		}

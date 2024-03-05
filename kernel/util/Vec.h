@@ -3,10 +3,7 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/string.h>
 
-enum BranchFlags {
-	Continue = 0,
-	Break = 1
-};
+enum BranchFlags { Continue = 0, Break = 1 };
 
 template <typename T> class Vec {
   public:
@@ -16,13 +13,16 @@ template <typename T> class Vec {
 		if (container)
 			kfree(container);
 
+		container = nullptr;
 		m_size = 0;
 	}
 
-	Vec(Vec& c) {
+	Vec(Vec &c) {
 		m_size = c.m_size;
-		container = reinterpret_cast<T *>(kmalloc(sizeof(T) * c.m_size));
-		memcpy(container, c.container, sizeof(T)*c.m_size);
+		if (m_size > 0) {
+			container = reinterpret_cast<T *>(kmalloc(sizeof(T) * c.m_size));
+			memcpy(container, c.container, sizeof(T) * c.m_size);
+		}
 	}
 
 	// the hard way
@@ -62,7 +62,7 @@ template <typename T> class Vec {
 
 		T *tmp = nullptr;
 
-		if (m_size-1 != 0) {
+		if (m_size - 1 != 0) {
 			tmp = reinterpret_cast<T *>(kmalloc(sizeof(T) * m_size - 1));
 
 			uint32_t new_pos = 0;
@@ -76,7 +76,7 @@ template <typename T> class Vec {
 		if (container)
 			kfree(container);
 
-		if (m_size-1 != 0)
+		if (m_size - 1 != 0)
 			container = tmp;
 
 		m_size--;
@@ -86,7 +86,8 @@ template <typename T> class Vec {
 		for (size_t i = 0; i < m_size; i++) {
 			// Isn't this just a for loop with extra steps?
 			BranchFlags flag = func(container[i]);
-			if (flag == BranchFlags::Break) break;
+			if (flag == BranchFlags::Break)
+				break;
 		}
 	}
 

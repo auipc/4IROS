@@ -1,8 +1,8 @@
 # Declare constants for the multiboot header.
-.set ALIGN,    1<<0             # align loaded modules on page boundaries
-.set MEMINFO,  1<<1             # provide memory map
-.set FLAGS,    ALIGN | MEMINFO  # this is the Multiboot 'flag' field
-.set MAGIC,    0x1BADB002       # 'magic number' lets bootloader find the header
+.set ALIGN,    1<<0				# align loaded modules on page boundaries
+.set MEMINFO,  1<<1				# provide memory map
+.set FLAGS,    ALIGN | MEMINFO	# this is the Multiboot 'flag' field
+.set MAGIC,    0x1BADB002		# 'magic number' lets bootloader find the header
 .set CHECKSUM, -(MAGIC + FLAGS) # checksum of above, to prove we are multiboot
 
 # Declare a multiboot header that marks the program as a kernel.
@@ -39,8 +39,6 @@ boot_page_table1:
 	.skip 4096
 # Further page tables may be required if the kernel grows beyond 3 MiB.
 
-.extern _multiboot_data
-
 # The kernel entry point.
 .section .multiboot.text, "a"
 .global _start
@@ -56,8 +54,8 @@ _start:
 	#       1 MiB as it can be generally useful, and there's no need to
 	#       specially map the VGA buffer.
 	movl $0, %esi
-	# Map 1023 pages. The 1024th will be the VGA text buffer.
-	movl $1023, %ecx
+
+	movl $1022, %ecx
 
 1:
 	# Only map the kernel.
@@ -81,6 +79,17 @@ _start:
 	loop 1b
 
 3:
+
+
+	# Map Multiboot header as "present".
+	mov %ebx, %edx
+	mov %edx, %ecx
+	andl $4095, %ecx
+	subl %ecx, %edx
+
+	orl $0x001, %edx
+	movl %edx, boot_page_table1 - 0xC0000000 + 1022 * 4
+
 	# Map VGA video memory to 0xC03FF000 as "present, writable".
 	movl $(0x000B8000 | 0x003), boot_page_table1 - 0xC0000000 + 1023 * 4
 
@@ -123,11 +132,7 @@ _start:
 	# Set up the stack.
 	mov $stack_top, %esp
 
-	mov $(_multiboot_data + 0xC0000000), %edx
-	/* Push Multiboot header */
-	pushl   %ebx
-	/* Push the magic value. */
-	pushl   %eax
+	mov %ebx, %edx
 
 	# Enter the high-level kernel.
 	call kernel_main

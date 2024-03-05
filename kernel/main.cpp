@@ -1,4 +1,6 @@
+#include <kernel/Debug.h>
 #include <kernel/PIC.h>
+#include <kernel/Syscall.h>
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
 #include <kernel/gdt.h>
@@ -9,19 +11,17 @@
 #include <kernel/printk.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
-#include <kernel/vfs/vfs.h>
 #include <kernel/util/Spinlock.h>
+#include <kernel/vfs/vfs.h>
 
 Spinlock cxa_spinlock;
 
-extern "C" int __cxa_guard_acquire(long long int*) {
+extern "C" int __cxa_guard_acquire(long long int *) {
 	cxa_spinlock.acquire();
 	return 1;
 }
 
-extern "C" void __cxa_guard_release(long long int*) {
-	cxa_spinlock.release();
-}
+extern "C" void __cxa_guard_release(long long int *) { cxa_spinlock.release(); }
 
 extern "C" void __cxa_pure_virtual() {
 	// Do nothing or print an error message.
@@ -29,104 +29,43 @@ extern "C" void __cxa_pure_virtual() {
 
 extern "C" void syscall_interrupt_handler();
 
-static VGAInterface* vga;
-
 extern "C" void syscall_interrupt(InterruptRegisters &regs) {
-	uint32_t return_value = 0;
-	uint32_t syscall_no = regs.eax;
-	Process *current = Scheduler::the()->current();
-	auto current_pd = current->page_directory();
-
-	switch (syscall_no) {
-	// exit
-	case 1: {
-		printk("Exit %d\n", current->pid());
-		Scheduler::the()->kill_process(*current);
-		Scheduler::schedule(0);
-	} break;
-	// dumb exec
-	case 2: {
-		Process *next2 = new Process("init2");
-		//printk("dumb exec %d\n", next2->pid());
-		Scheduler::the()->add_process(*next2);
-	} break;
-	// fork
-	case 3: {
-		Process *child = current->fork(regs);
-		return_value = child->pid();
-		printk("forking to %d from %d\n", child->pid(), current->pid());
-	} break;
-	// write
-    case 4: {
-	   for (uint32_t i = 0; i < regs.edx; i++) {
-		   // FIXME don't check the page constantly 
-		   if(current_pd->is_mapped(regs.ecx+i)
-			   && current_pd->is_user_page(regs.ecx+i) && regs.ebx == 1) {
-			   vga->write_character(*((char*)regs.ecx+i));
-		   }
-	   }
-   } break;
-
-	default:
-		printk("Unknown syscall\n");
-		break;
-	}
-
-	regs.eax = return_value;
+	Syscall::handler(regs);
 }
 
 void test_fs() {
-	Vec<const char*> zero_path;
+	Vec<const char *> zero_path;
 	zero_path.push("dev");
 	zero_path.push("zero");
-	VFSNode* zero_file = VFS::the().open(zero_path);
+	VFSNode *zero_file = VFS::the().open(zero_path);
 	assert(zero_file);
 	uint8_t zero_value = 0xFF;
-	zero_file->read(&zero_value, sizeof(uint8_t)*1);
+	zero_file->read(&zero_value, sizeof(uint8_t) * 1);
 	assert(zero_file == 0);
-
 }
 
-extern "C" char _multiboot_data;
-extern "C" void kernel_main(uint32_t magic, uint32_t ptr) {
+extern "C" void kernel_main(uint32_t magic, uint32_t mb_ptr_phys) {
 	assert(magic == 0x2BADB002);
-	// Kinda hacky, but kernel_main never exits.
-	// Just hope the stack isn't touched.
-	auto v = VGAInterface();
-	vga = &v;
-	// I guess printing might be the most important function for now.
-	// I've seen other kernels defer enabling printing until later,
-	// but maybe they have serial? Better than a black screen I guess.
-	printk_use_interface(vga);
 
-	multiboot_info *mb = reinterpret_cast<multiboot_info *>(ptr);
-	(void)mb;
+	multiboot_info_t *mb = reinterpret_cast<multiboot_info_t *>(
+		0xc03fe000 + (mb_ptr_phys % PAGE_SIZE));
 
+	kmalloc_temp_init();
+	Paging::setup((mb->mem_lower + mb->mem_upper) * 1024);
 	kmalloc_init();
+
+	printk_use_interface(new VGAInterface());
+
+	printk("%d\n", (mb->mem_lower + mb->mem_upper));
+
 	GDT::setup();
 	PIC::setup();
 	InterruptHandler::setup();
 	InterruptHandler::the()->setUserHandler(0x80, &syscall_interrupt_handler);
-	Paging::setup(128 * MB);
 
 	asm volatile("sti");
-	//Scheduler::setup();
-
-	Vec<const char*> vp;
-	vp.push("lol");
-	FileHandle* node = VFS::the().open_fh(vp);
-	//VFSNode* node = VFS::the().open(vp);
-	if (node) {
-		node->seek(0, SeekMode::SEEK_END);
-		size_t node_size = node->tell();
-		node->seek(0, SeekMode::SEEK_SET);
-		//size_t node_size = node->size();
-
-		char* lol = new char[node_size];
-		node->read(lol, sizeof(char)*node_size);
-		printk("%s\n", lol);
-	}
-	
+	printk("fbaddr %x\n", mb->framebuffer_addr);
+	Scheduler::setup();
 
 	while (1)
 		;

@@ -1,6 +1,7 @@
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
 #include <kernel/mem/PageFrameAllocator.h>
+#include <kernel/mem/Paging.h>
 #include <kernel/util/Bitmap.h>
 
 constexpr int pow(int a, int b) {
@@ -26,6 +27,16 @@ PageFrameAllocator::~PageFrameAllocator() {
 	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
 		delete m_buddies[buddy];
 	}
+}
+
+size_t PageFrameAllocator::alloc_size(size_t memory_size) {
+	size_t a = sizeof(PageFrameAllocator);
+	a += sizeof(Vec<Bitmap>) * 4;
+	for (int i = 0; i < 4; i++) {
+		a += Bitmap::alloc_size(memory_size / (pow(2, i) * PAGE_SIZE));
+	}
+
+	return a;
 }
 
 void PageFrameAllocator::mark_range(uint32_t start, uint32_t end) {
@@ -57,7 +68,7 @@ size_t PageFrameAllocator::find_free_page() {
 	return address;
 }
 
-// FIXME have a way to requestt non contigous memory
+// FIXME have a way to request non contigous memory
 size_t PageFrameAllocator::find_free_pages(size_t pages) {
 	assert(pages > 0);
 	size_t container = largest_container(pages * PAGE_SIZE);

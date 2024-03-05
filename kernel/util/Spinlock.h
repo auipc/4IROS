@@ -13,13 +13,10 @@ class Spinlock {
 };
 
 class SpinlockRAII {
-public:
-	SpinlockRAII() {
-		lock.acquire();
-	}
-	~SpinlockRAII() {
-		lock.release();
-	}
-private:
+  public:
+	SpinlockRAII() { lock.acquire(); }
+	~SpinlockRAII() { lock.release(); }
+
+  private:
 	Spinlock lock;
 };

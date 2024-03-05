@@ -49,7 +49,7 @@ class ELF {
 	ELF(char *buffer, size_t buffer_length);
 	~ELF();
 
-	uintptr_t program_entry();
+	inline uintptr_t program_entry() { return m_elf_header.entry; }
 	int load_sections(PageDirectory *pd);
 
   private:

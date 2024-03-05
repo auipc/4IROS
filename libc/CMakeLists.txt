@@ -8,7 +8,6 @@ set(LIBC_SRCS
 	string.c
 )
 
-set(CMAKE_C_FLAGS "-ggdb -O0 -nostdlib -nostdinc -fno-builtin")
 add_library(crt0 STATIC ${LIBC_CRT0_SRCS})
 set_target_properties(crt0 PROPERTIES PREFIX "" SUFFIX ".o")
 add_library(c STATIC ${LIBC_SRCS})

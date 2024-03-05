@@ -4,7 +4,7 @@
 #include <kernel/string.h>
 #include <kernel/tasking/ELF.h>
 #include <kernel/tasking/Process.h>
-#include <kernel/test_program2.h>
+#include <kernel/vfs/vfs.h>
 
 static uint32_t s_pid = 0;
 extern "C" void task_switch_shim();
@@ -27,9 +27,19 @@ Process::Process(void *entry, bool userspace)
 }
 
 Process::Process(const char *elf_file) : m_pid(s_pid++), m_userspace(true) {
-	(void)elf_file;
+	Vec<const char *> vp;
+
+	vp.push(elf_file);
+	VFSNode *node = VFS::the().open(vp);
+	size_t node_size = node->size();
+
+	printk("sdfjklsdolfjwioer\n");
+	char *prog = new char[node_size];
+	printk("sdfjklsdolfjwioer\n");
+	node->read(prog, sizeof(char) * node_size);
+
 	ELF *elf;
-	elf = new ELF((char *)test_program2, test_program2_len);
+	elf = new ELF((char *)prog, node_size);
 
 	uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
 	m_page_directory = Paging::the()->kernel_page_directory()->clone();
@@ -48,16 +58,15 @@ Process::Process(const char *elf_file) : m_pid(s_pid++), m_userspace(true) {
 	delete elf;
 }
 
-Process::Process(Process& parent, InterruptRegisters &regs) 
-	: m_pid(s_pid++), m_userspace(true)
-{
+Process::Process(Process &parent, InterruptRegisters &regs)
+	: m_pid(s_pid++), m_userspace(true) {
 	m_page_directory = parent.m_page_directory->clone();
 
 	Paging::switch_page_directory(m_page_directory);
-	//uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
+	// uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
 	m_stack_base = parent.m_stack_base;
 	m_stack_top = m_stack_base + STACK_SIZE;
-	
+
 	m_user_stack_base = 0x10000000;
 	m_page_directory->map_range(m_user_stack_base, USER_STACK_SIZE,
 								PageFlags::USER);

@@ -39,7 +39,7 @@ union PageTableEntry {
 
 struct PageTable {
 	MUST_BE_PAGE_ALIGNED
-	PageTable *clone();
+	PageTable *clone(size_t idx);
 	PageTableEntry entries[1024];
 } __attribute__((packed)) __attribute__((aligned(PAGE_SIZE)));
 
@@ -86,8 +86,7 @@ struct PageDirectory {
 	bool is_mapped(size_t virtual_address);
 	bool is_user_page(size_t virtual_address);
 	void map_page(size_t virtual_address, size_t physical_address, int flags);
-	void map_range(size_t virtual_address,
-											  size_t length, int flags);
+	void map_range(size_t virtual_address, size_t length, int flags);
 
 	void unmap_page(size_t virtual_address);
 
@@ -118,6 +117,10 @@ class Paging {
 			reinterpret_cast<void *>(current_page_directory())));
 	}
 
+	bool is_mapped(size_t virtual_address) {
+		return current_page_directory()->is_mapped(virtual_address);
+	}
+
 	inline void map_page(size_t virtual_address, size_t physical_address,
 						 int flags) {
 		current_page_directory()->map_page(virtual_address, physical_address,
@@ -138,6 +141,7 @@ class Paging {
 	}
 
 	static Paging *the();
+	static void *pf_allocator(size_t size);
 
 	inline static size_t get_physical_address(void *virtual_address) {
 		return reinterpret_cast<size_t>(virtual_address) - VIRTUAL_ADDRESS;
@@ -156,13 +160,16 @@ class Paging {
 		s_current_page_directory = page_directory;
 	}
 
-
 	static PageDirectory *s_kernel_page_directory;
+
+	static size_t s_pf_allocator_end;
+	static size_t s_pf_allocator_base;
+
   private:
 	friend struct PageDirectory;
 	friend struct PageTable;
 
 	PageFrameAllocator *m_allocator;
-	static Paging *s_instance;
 	static PageDirectory *s_current_page_directory;
+	static Paging *s_instance;
 };

@@ -46,9 +46,15 @@ set(SRCS
 		kernel/vfs/block/ata.h
 		kernel/vfs/fs/ext2.h
 		kernel/vfs/fs/ext2.cpp
+		kernel/Debug.h
+		kernel/Debug.cpp
+		kernel/Syscall.h
+		kernel/Syscall.cpp
 )
 
-set(CMAKE_CXX_FLAGS "-ffreestanding -ggdb -O0 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -nostdinc -mregparm=3 -I.")
+set(CMAKE_C_FLAGS "-O0 -ggdb -nostdlib -nostdinc -fno-builtin")
+set(CMAKE_ASM_FLAGS "-O0 -ggdb")
+set(CMAKE_CXX_FLAGS "-ffreestanding -O0 -ggdb -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -nostdinc -mregparm=3 -I.")
 add_executable(4IROS ${SRCS})
 add_subdirectory(libc)
 

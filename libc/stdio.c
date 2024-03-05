@@ -25,16 +25,16 @@ int printf(const char *str, ...) {
 
 			switch (c2) {
 			case 'd': {
-				int value = __builtin_va_arg(ap, int);
-				char buffer[32];
-				itoa(buffer, value, 10);
+				unsigned int value = __builtin_va_arg(ap, unsigned int);
+				char buffer[10];
+				itoa(value, buffer, 10);
 				write(1, buffer, strlen(buffer));
 				break;
 			}
 			case 'x': {
-				int value = __builtin_va_arg(ap, int);
-				char buffer[32];
-				itoa(buffer, value, 16);
+				unsigned int value = __builtin_va_arg(ap, unsigned int);
+				char buffer[8];
+				itoa(value, buffer, 16);
 				write(1, buffer, strlen(buffer));
 				break;
 			}
@@ -45,18 +45,18 @@ int printf(const char *str, ...) {
 			}
 			case 'c': {
 				char value = __builtin_va_arg(ap, int);
-				write(1, value, 1);
+				write(1, &value, 1);
 				break;
 			}
 			default:
-				write(1, c, 1);
-				write(1, c2, 1);
+				write(1, &c, 1);
+				write(1, &c2, 1);
 				break;
 			}
 			break;
 		}
 		default:
-			write(1, c, 1);
+			write(1, &c, 1);
 			break;
 		}
 	}

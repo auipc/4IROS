@@ -1,5 +1,6 @@
 #pragma once
 #include <kernel/stdint.h>
+#include <kernel/util/Singleton.h>
 
 class PrintInterface {
   public:
@@ -20,5 +21,6 @@ class VGAInterface : public PrintInterface {
 	uint16_t *m_screen;
 };
 
+PrintInterface *printk_get_interface();
 void printk_use_interface(PrintInterface *interface);
 void printk(const char *str, ...);

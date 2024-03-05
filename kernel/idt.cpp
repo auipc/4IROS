@@ -1,7 +1,8 @@
+#include <kernel/Debug.h>
 #include <kernel/idt.h>
 #include <kernel/printk.h>
-#include <kernel/tasking/Scheduler.h>
 #include <kernel/tasking/Process.h>
+#include <kernel/tasking/Scheduler.h>
 
 static InterruptHandler *s_the;
 
@@ -36,6 +37,7 @@ extern "C" void unhandled_interrupt() {
 }
 
 extern "C" void interrupt_14(InterruptRegisters regs) {
+	Debug::stack_trace();
 	size_t faulting_address;
 	asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
 	Process *current = Scheduler::the()->current();

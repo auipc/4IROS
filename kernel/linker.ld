@@ -6,7 +6,6 @@ SECTIONS
 
 	_kernel_start = .;
 	.multiboot.data : {
-		_multiboot_data = .;
 		*(.multiboot.data)
 	}
 
@@ -39,9 +38,9 @@ SECTIONS
 	}
 
     /* reserve 1MB for the heap on boot */
-    _heap_start = .;
-    . += 0x100000;
-    _heap_end = .;
+	_heap_start = .;
+	. += 0x100000;
+	_heap_end = .;
 
 	_kernel_end = .;
 }

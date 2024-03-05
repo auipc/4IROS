@@ -79,6 +79,8 @@ void VGAInterface::write_character(char c) {
 	write_serial(c);
 }
 
+PrintInterface *printk_get_interface() { return s_interface; }
+
 void printk_use_interface(PrintInterface *interface) {
 	s_interface = interface;
 }
@@ -155,7 +157,8 @@ void printk(const char *str, ...) {
 			break;
 		}
 		default:
-			s_interface->write_character(c);
+			if (s_interface)
+				s_interface->write_character(c);
 			break;
 		}
 	}

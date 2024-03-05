@@ -4,8 +4,6 @@
 #include <kernel/util/Bitmap.h>
 #include <kernel/util/Vec.h>
 
-class Bitmap;
-
 class PageFrameAllocator {
   public:
 	PageFrameAllocator(size_t memory_size);
@@ -14,6 +12,7 @@ class PageFrameAllocator {
 	size_t find_free_page();
 	size_t find_free_pages(size_t pages);
 	void release_page(size_t page);
+	static size_t alloc_size(size_t memory_size);
 
   private:
 	size_t largest_container(size_t size);

@@ -1,3 +1,5 @@
+#include "kernel/arch/i386/kernel.h"
+#include "kernel/mem/PageFrameAllocator.h"
 #include <kernel/assert.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
@@ -6,10 +8,8 @@
 
 // #define DEBUG_PAGING
 
-// FIXME What should we do with boot_page_directory? Since it's wasted memory
-// after we switch to our own page directory.
-// Maybe move it to a different section that we can discard for extra memory?
 extern "C" PageDirectory boot_page_directory;
+
 Paging *Paging::s_instance = nullptr;
 PageDirectory *Paging::s_kernel_page_directory = nullptr;
 PageDirectory *Paging::s_current_page_directory = &boot_page_directory;
@@ -18,7 +18,7 @@ Paging *Paging::the() { return s_instance; }
 
 // Instead of new_directory, maybe we could just have a page directory for
 // operating on pages...
-PageTable *PageTable::clone() {
+PageTable *PageTable::clone(size_t idx) {
 	PageTable *src = this;
 	PageTable *dst = new PageTable();
 
@@ -31,6 +31,17 @@ PageTable *PageTable::clone() {
 
 		// just copy all values, what could go wrong.
 		dst->entries[i].value = src->entries[i].value;
+		if (Paging::the()
+				->s_kernel_page_directory->entries[idx]
+				.get_page_table()
+				->entries[i]
+				.present) {
+#ifdef DEBUG_PAGING
+			printk("Skipping full clone of kernel page table entry\n");
+#endif
+			continue;
+		}
+
 		auto free_page = Paging::the()->m_allocator->find_free_page();
 
 #ifdef DEBUG_PAGING
@@ -211,7 +222,7 @@ PageDirectory *PageDirectory::clone() {
 	for (int i = 0; i < 1024; i++) {
 		if (!src->entries[i].present)
 			continue;
-		// just copy all values, what could go wrong.
+		// just copy all values.
 		dst->entries[i].value = src->entries[i].value;
 
 		if (Paging::the()->s_kernel_page_directory->entries[i].present) {
@@ -225,7 +236,7 @@ PageDirectory *PageDirectory::clone() {
 		printk("Cloning page table: %d\n", i);
 #endif
 		dst->entries[i].set_page_table(
-			src->entries[i].get_page_table()->clone());
+			src->entries[i].get_page_table()->clone(i));
 #ifdef DEBUG_PAGING
 		printk("src->entries[%d].value: %x\n", i, src->entries[i].value);
 #endif
@@ -234,13 +245,43 @@ PageDirectory *PageDirectory::clone() {
 	return dst;
 }
 
+size_t Paging::s_pf_allocator_base;
+size_t Paging::s_pf_allocator_end;
+
+// A tiny allocator for allocating the space we need to keep track of all
+// memory. This is static and will never change.
+void *Paging::pf_allocator(size_t size) {
+	void *addr = reinterpret_cast<void *>(s_pf_allocator_base);
+	s_pf_allocator_base += size;
+	assert(s_pf_allocator_end >= s_pf_allocator_base);
+	return addr;
+}
+
 extern "C" char _kernel_start;
 extern "C" char _kernel_end;
-
 Paging::Paging(size_t total_memory) {
-	m_allocator = new PageFrameAllocator(total_memory);
+	static const size_t kstart = reinterpret_cast<size_t>(&_kernel_start);
+	static const size_t kend = reinterpret_cast<size_t>(&_kernel_end);
+	printk("kend: %x\n", kend);
 
 	PageDirectory *pd = s_kernel_page_directory;
+
+	s_pf_allocator_base = page_align(kend + PAGE_SIZE);
+	s_pf_allocator_end =
+		page_align(s_pf_allocator_base +
+				   PageFrameAllocator::alloc_size(total_memory) + PAGE_SIZE);
+
+	for (size_t ptr = s_pf_allocator_base; ptr < s_pf_allocator_end;
+		 ptr += PAGE_SIZE) {
+		PageDirectory *pd = s_kernel_page_directory;
+		pd->map_page(ptr, ptr - VIRTUAL_ADDRESS, 0);
+	}
+
+	g_use_halfway_allocator = true;
+	// PageFrameAllocator structures
+	m_allocator = new PageFrameAllocator(total_memory);
+	g_use_halfway_allocator = false;
+
 	for (int i = 0; i < 1024; i++) {
 		if (!pd->entries[i].present)
 			continue;
@@ -255,7 +296,10 @@ Paging::Paging(size_t total_memory) {
 		}
 	}
 
-	m_allocator->mark_range((size_t)&_kernel_start, (size_t)&_kernel_end - (size_t)&_kernel_start);
+	m_allocator->mark_range(s_pf_allocator_base - VIRTUAL_ADDRESS,
+							s_pf_allocator_end - s_pf_allocator_base);
+
+	m_allocator->mark_range(kstart, kend - kstart);
 }
 
 Paging::~Paging() { delete m_allocator; }
@@ -263,5 +307,6 @@ Paging::~Paging() { delete m_allocator; }
 void Paging::setup(size_t total_memory) {
 	s_kernel_page_directory = &boot_page_directory;
 	s_instance = new Paging(total_memory);
+	s_kernel_page_directory = s_kernel_page_directory->clone();
 	switch_page_directory(s_kernel_page_directory);
 }

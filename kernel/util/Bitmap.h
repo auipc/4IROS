@@ -3,6 +3,8 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/stdint.h>
 
+typedef uint8_t bitmap_container_t;
+
 class Bitmap {
   public:
 	Bitmap(size_t elems);
@@ -14,7 +16,9 @@ class Bitmap {
 	uint32_t scan_no_set(uint32_t nr);
 	uint32_t count();
 
+	static size_t alloc_size(size_t elems);
+
   private:
-	uint8_t *data;
+	bitmap_container_t *data;
 	size_t size;
 };

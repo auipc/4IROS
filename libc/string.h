@@ -6,5 +6,5 @@
 void itoa(unsigned long int n, char *buf, int base);
 void ftoa(double f, char *buf, int precision);
 
-size_t strlen(const char* str);
+size_t strlen(const char *str);
 #endif

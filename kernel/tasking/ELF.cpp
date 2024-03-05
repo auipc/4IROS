@@ -10,8 +10,6 @@ ELF::ELF(char *buffer, size_t buffer_length)
 
 ELF::~ELF() {}
 
-uintptr_t ELF::program_entry() { return m_elf_header.entry; }
-
 int ELF::load_sections(PageDirectory *pd) {
 	int error = 0;
 	m_headers.iterator([&](ELFSectionHeader header) {
@@ -20,7 +18,7 @@ int ELF::load_sections(PageDirectory *pd) {
 
 		// Outright refuse to load executables that have an alignment
 		// where 2 sections will share pages. There should be no condition
-		// where LOADs are split other than having differing 
+		// where LOADs are split other than having differing
 		// permissions, so this should be a no-brainer!
 		if (header.alignment < 0x1000) {
 			error = 1;
@@ -39,8 +37,8 @@ int ELF::load_sections(PageDirectory *pd) {
 			"mov %%eax, %%cr3" ::"a"(Paging::get_physical_address(pd)));
 		memset(reinterpret_cast<char *>(header.vaddr), 0, header.memsz);
 		if (header.filesz > 0)
-			memcpy(reinterpret_cast<void *>(header.vaddr), m_buffer + header.off,
-				   header.filesz);
+			memcpy(reinterpret_cast<void *>(header.vaddr),
+				   m_buffer + header.off, header.filesz);
 		asm volatile("mov %%eax, %%cr3" ::"a"(
 			Paging::get_physical_address(current_page_directory)));
 

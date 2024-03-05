@@ -34,6 +34,7 @@ void Scheduler::setup() {
 	Scheduler::the()->m_kreaper_process = kreaper;
 
 	Process *next = new Process("init");
+	printk("init pid %d\n", next->m_pid);
 	Scheduler::the()->add_process(*next);
 
 	tss_entry.esp0 = Scheduler::the()->s_current->m_stack_top;

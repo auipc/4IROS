@@ -1,32 +1,28 @@
-#include <kernel/vfs/vfs.h>
-#include <kernel/vfs/fs/ext2.h>
-#include <kernel/vfs/block/ata.h>
 #include <kernel/util/Spinlock.h>
+#include <kernel/vfs/block/ata.h>
+#include <kernel/vfs/fs/ext2.h>
+#include <kernel/vfs/vfs.h>
 
-VFSNode::VFSNode() 
-	: m_name("")
-{}
+VFSNode::VFSNode() : m_name("") {}
 
-VFSNode::VFSNode(const char* name) 
-	: m_name(name)
-{
-}
+VFSNode::VFSNode(const char *name) : m_name(name) {}
 
-VFSNode::~VFSNode() {
-}
-
+VFSNode::~VFSNode() {}
 
 // FIXME: a deep enough filesystem will cause a stack overflow.
-VFSNode* VFSNode::traverse(Vec<const char*>& path, size_t path_index) {
+VFSNode *VFSNode::traverse(Vec<const char *> &path, size_t path_index) {
 	auto nodes = m_nodes;
 
-	if (path_index >= path.size()) return nullptr;
+	if (path_index >= path.size())
+		return nullptr;
 
 	for (size_t i = 0; i < nodes.size(); i++) {
 		if (!strcmp(nodes[i]->m_name, path[path_index])) {
-			if (path_index == path.size()-1) return nodes[i];
-			VFSNode* node = nodes[i]->traverse(path, path_index+1);
-			if (node) return node;
+			if (path_index == path.size() - 1)
+				return nodes[i];
+			VFSNode *node = nodes[i]->traverse(path, path_index + 1);
+			if (node)
+				return node;
 		}
 	}
 
@@ -37,38 +33,32 @@ VFSNode* VFSNode::traverse(Vec<const char*>& path, size_t path_index) {
 	return nullptr;
 }
 
-ZeroNode::ZeroNode(const char* name)
-	: VFSNode(name)
-{
-}
+ZeroNode::ZeroNode(const char *name) : VFSNode(name) {}
 
-FileHandle::FileHandle(VFSNode* node)
-	: m_node(node)
-{
-}
+FileHandle::FileHandle(VFSNode *node) : m_node(node) {}
 
-int FileHandle::read(void* buffer, size_t size) {
+int FileHandle::read(void *buffer, size_t size) {
 	assert(m_node);
 	// FIXME: This is a race condition waiting to happen!
 	m_node->seek(m_position);
 	return m_node->read(buffer, size);
 }
 
-int FileHandle::seek(size_t offset,	SeekMode origin) {
+int FileHandle::seek(size_t offset, SeekMode origin) {
 	assert(m_node);
-	switch(origin) {
-		case SeekMode::SEEK_SET:
-			m_position = offset;
-			break;
-		case SeekMode::SEEK_CUR:
-			m_position += offset;
-			break;
-		case SeekMode::SEEK_END:
-			m_position = m_node->size();
-			break;
-		default:
-			assert(false);
-			break;
+	switch (origin) {
+	case SeekMode::SEEK_SET:
+		m_position = offset;
+		break;
+	case SeekMode::SEEK_CUR:
+		m_position += offset;
+		break;
+	case SeekMode::SEEK_END:
+		m_position = m_node->size();
+		break;
+	default:
+		assert(false);
+		break;
 	}
 	return 0;
 }
@@ -84,40 +74,41 @@ VFS::VFS() {
 	m_root_vfs_node->m_nodes.push(m_dev_fs);
 	m_root_vfs_node->m_nodes[0]->m_nodes.push(new ZeroNode("zero"));
 	ATAManager::setup(m_dev_fs);
-	Vec<const char*> path;
+	Vec<const char *> path;
 	path.push("hd0");
-	auto fs = new Ext2FileSystem(m_dev_fs->m_nodes[1]);//traverse(path));
+	auto fs = new Ext2FileSystem(m_dev_fs->m_nodes[1]); // traverse(path));
 	fs->init();
 	m_root_vfs_node->m_mounted_filesystem = fs;
-	//print_fs(m_root_vfs_node);
+	// print_fs(m_root_vfs_node);
 }
 
-VFS::~VFS() {
-}
+VFS::~VFS() {}
 
-void VFS::print_fs(VFSNode* fs, int depth) {
+void VFS::print_fs(VFSNode *fs, int depth) {
 	for (int i = 0; i < depth; i++) {
 		printk(" ");
 	}
 	printk("-%s\n", fs->m_name);
 	for (size_t i = 0; i < fs->m_nodes.size(); i++) {
-		print_fs(fs->m_nodes[i], depth+1);
+		print_fs(fs->m_nodes[i], depth + 1);
 	}
 	if (fs->m_mounted_filesystem) {
 		for (size_t i = 0; i < fs->m_mounted_filesystem->m_nodes.size(); i++) {
-			print_fs(fs->m_mounted_filesystem->m_nodes[i], depth+1);
+			print_fs(fs->m_mounted_filesystem->m_nodes[i], depth + 1);
 		}
 	}
 }
 
-VFSNode* VFS::open(Vec<const char*>& name) {
-	VFSNode* node = m_root_vfs_node->traverse(name);
-	if (!node) return nullptr;
+VFSNode *VFS::open(Vec<const char *> &name) {
+	VFSNode *node = m_root_vfs_node->traverse(name);
+	if (!node)
+		return nullptr;
 	return node;
 }
 
-FileHandle* VFS::open_fh(Vec<const char*>& name) {
-	VFSNode* node = open(name);
-	if (!node) return nullptr;
+FileHandle *VFS::open_fh(Vec<const char *> &name) {
+	VFSNode *node = open(name);
+	if (!node)
+		return nullptr;
 	return new FileHandle(node);
 }
