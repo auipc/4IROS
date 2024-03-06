@@ -302,7 +302,7 @@ Paging::Paging(size_t total_memory) {
 	// https://wiki.osdev.org/Memory_Map_(x86)#Real_mode_address_space_.28.3C_1_MiB.29
 	// The lower half of memory really shouldn't be touched. Way too much BIOS
 	// related functionality depends on it, even in protected mode! The benefits
-	// of reclaiming this memory are negligent.
+	// of reclaiming this memory are insignificant.
 	m_allocator->mark_range(0x0, 0xFFFFF);
 
 	m_allocator->mark_range(kstart, kend - kstart);
