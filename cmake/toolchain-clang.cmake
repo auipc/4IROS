@@ -5,7 +5,6 @@ set(CMAKE_SYSTEM_NAME 4IROS)
 set(CMAKE_C_COMPILER   clang)
 set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_ASM_COMPILER clang)
-set(CMAKE_LINKER llvm-link)
 
 set(CMAKE_CXX_FLAGS "--target=i686-pc-none-elf -march=i686 -m32")
 set(CMAKE_C_FLAGS "--target=i686-pc-none-elf -march=i686 -m32")
