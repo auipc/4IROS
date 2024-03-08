@@ -58,6 +58,6 @@ class ELF {
 	void parse();
 	ElfHeader m_elf_header;
 	char *m_buffer;
-	size_t m_buffer_length;
+	[[maybe_unused]] size_t m_buffer_length;
 	Vec<ELFSectionHeader> m_headers;
 };

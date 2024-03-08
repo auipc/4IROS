@@ -75,7 +75,7 @@ class ZeroNode : public VFSNode {
 
 	virtual inline bool is_directory() override { return false; }
 
-	virtual int read(void *buffer, size_t size) {
+	virtual int read(void *buffer, size_t size) override {
 		memset((char *)buffer, 0, size);
 		return 0;
 	}

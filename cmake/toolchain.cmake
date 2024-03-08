@@ -7,6 +7,9 @@ set(CMAKE_CXX_COMPILER i686-elf-g++)
 set(CMAKE_ASM_COMPILER i686-elf-gcc)
 set(CMAKE_LINKER i686-elf-ld)
 
+set(CMAKE_C_FLAGS "-nostdinc -Wno-error=attributes")
+set(CMAKE_CXX_FLAGS "-nostdinc -Wno-error=attributes")
+
 set(CMAKE_C_COMPILER_WORKS 1)
 set(CMAKE_CXX_COMPILER_WORKS 1)
 set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
