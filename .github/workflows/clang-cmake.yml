@@ -27,7 +27,7 @@ jobs:
       - name: Install clang
         run: |
           sudo apt install build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
-          sudo apt install clang-16
+          sudo apt install clang
 
       - name: Set reusable strings
         id: strings
