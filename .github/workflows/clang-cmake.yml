@@ -1,0 +1,50 @@
+name: Test generic i686 4IROS build with Clang
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        os: [ubuntu-latest]
+        c_compiler: [clang]
+        include:
+          - os: ubuntu-latest
+            c_compiler: clang
+            cpp_compiler: clang++
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install clang
+        run: |
+          sudo apt install build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
+          sudo apt install clang-16
+
+      - name: Set reusable strings
+        id: strings
+        shell: bash
+        run: |
+          echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+
+      - name: Configure CMake
+        run: |
+          cmake -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/toolchain-clang.cmake -S ${{ github.workspace }}
+
+      - name: Build
+        run: |
+          cmake --build ${{ steps.strings.outputs.build-output-dir }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: 4IROS
+          path: ${{ github.workspace }}/build/kernel/4IROS
