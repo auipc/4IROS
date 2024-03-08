@@ -3,15 +3,9 @@
 #include <kernel/printk.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
+#include <priv/common.h>
 
 namespace Syscall {
-
-enum {
-	SYS_EXIT = 1,
-	SYS_EXEC = 2,
-	SYS_FORK = 3,
-	SYS_WRITE = 4,
-};
 
 // FIXME: Exit codes
 static void sys$exit(Process *current) {
@@ -50,6 +44,25 @@ static size_t sys$write(Process *current, uint32_t handle, size_t buffer_addr,
 	return length;
 }
 
+static void *sys$mmap(Process *current, void *address, size_t length) {
+	auto current_pd = current->page_directory();
+	size_t addr = reinterpret_cast<size_t>(address);
+	if (!length)
+		return nullptr;
+
+	size_t addr_end = (addr + length + PAGE_SIZE - 1);
+
+	for (size_t page = Paging::page_align(addr);
+		 page < Paging::page_align(addr_end); page += PAGE_SIZE) {
+		if (current_pd->is_mapped(page))
+			return nullptr;
+	}
+
+	current_pd->map_range(addr, length, PageFlags::USER);
+	printk("mmap\n");
+	return address;
+}
+
 void handler(InterruptRegisters &regs) {
 	size_t return_value = 0;
 	uint32_t syscall_no = regs.eax;
@@ -71,6 +84,10 @@ void handler(InterruptRegisters &regs) {
 	// write
 	case SYS_WRITE: {
 		return_value = sys$write(current, regs.ebx, regs.ecx, regs.edx);
+	} break;
+	case SYS_MMAP: {
+		return_value = reinterpret_cast<size_t>(
+			sys$mmap(current, reinterpret_cast<void *>(regs.ebx), regs.ecx));
 	} break;
 	default:
 		printk("Unknown syscall\n");

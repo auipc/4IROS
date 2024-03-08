@@ -1,6 +1,7 @@
 #ifndef _LIBC_STRING_H
 #define _LIBC_STRING_H
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 #ifdef __cplusplus
 extern "C" {

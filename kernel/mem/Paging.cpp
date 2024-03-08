@@ -169,12 +169,14 @@ void PageDirectory::map_range(size_t virtual_address, size_t length,
 
 	size_t number_of_pages = (length + PAGE_SIZE - 1) / PAGE_SIZE;
 
+	/*
 	size_t free_pages =
-		Paging::the()->m_allocator->find_free_pages(number_of_pages);
+		Paging::the()->m_allocator->find_free_pages(number_of_pages);*/
 	for (size_t i = 0; i < number_of_pages; i++) {
+		size_t free_page = Paging::the()->m_allocator->find_free_page();
 		auto address = virtual_address + (i * PAGE_SIZE);
 		if (!is_mapped(address)) {
-			map_page(address, free_pages + (i * PAGE_SIZE), flags);
+			map_page(address, free_page, flags);
 		} else {
 			bool user_supervisor = (flags & PageFlags::USER) != 0;
 			bool read_only = (flags & PageFlags::READONLY) != 0;

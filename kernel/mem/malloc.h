@@ -1,6 +1,7 @@
 #pragma once
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
+#include <stddef.h>
 #include <stdint.h>
 
 extern bool g_use_halfway_allocator;

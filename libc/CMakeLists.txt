@@ -6,6 +6,7 @@ set(LIBC_SRCS
 	unistd.c
 	stdio.c
 	string.c
+	sys/mman.c
 )
 
 set(LIBK_SRCS

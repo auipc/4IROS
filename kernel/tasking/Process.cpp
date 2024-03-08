@@ -33,9 +33,7 @@ Process::Process(const char *elf_file) : m_pid(s_pid++), m_userspace(true) {
 	VFSNode *node = VFS::the().open(vp);
 	size_t node_size = node->size();
 
-	printk("sdfjklsdolfjwioer\n");
 	char *prog = new char[node_size];
-	printk("sdfjklsdolfjwioer\n");
 	node->read(prog, sizeof(char) * node_size);
 
 	ELF *elf;
