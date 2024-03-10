@@ -61,7 +61,6 @@ Process::Process(Process &parent, InterruptRegisters &regs)
 	m_page_directory = parent.m_page_directory->clone();
 
 	Paging::switch_page_directory(m_page_directory);
-	// uintptr_t stack = (uintptr_t)kmalloc(STACK_SIZE);
 	m_stack_base = parent.m_stack_base;
 	m_stack_top = m_stack_base + STACK_SIZE;
 

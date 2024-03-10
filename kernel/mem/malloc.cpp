@@ -44,16 +44,6 @@ void kmalloc_init() {
 	}
 
 	Paging::the()->map_range(s_alloc_base, 70 * k_allocation_block_size, 0);
-	printk("%x\n", mem);
-
-	// Find pages used for the PageFrameAllocator
-	/*	for (size_t i = s_alloc_base; i < Paging::s_pf_allocator_end;
-			 i += k_allocation_block_size) {
-			s_mem_bt->block((void *)i);
-		}*/
-
-	// Paging::the()->map_range(s_alloc_base, 150 * k_allocation_block_size,
-	// 0);
 
 	s_use_real_allocator = true;
 }
@@ -77,7 +67,6 @@ static void *allocate_block(size_t blocks_needed) {
 		(size_t)s_mem_bt->search(blocks_needed * k_allocation_block_size);
 
 	// s_mem_bt->debug_print(s_mem_bt->m_root);
-	printk("%x\n", free_blocks);
 	if (!Paging::the()->is_mapped(free_blocks))
 		assert(false);
 
@@ -111,20 +100,6 @@ void *kmalloc_aligned(size_t size, size_t alignment) {
 	if (!s_use_real_allocator)
 		return kmalloc(size);
 	return allocate_block_temp(size / k_allocation_block_size);
-	/*
-	if (!s_mem_bt)
-		return kmalloc(size);
-
-	size_t free_blocks = (size_t)s_mem_bt->search(size);
-	while (free_blocks == 0 || (free_blocks % PAGE_SIZE)) {
-		free_blocks = (size_t)s_mem_bt->search(size);
-	}
-
-	printk("aligned\n");
-	// s_mem_bt->debug_print(s_mem_bt->m_root);
-	assert(free_blocks);
-	assert_eq((free_blocks % PAGE_SIZE), 0);
-	return reinterpret_cast<void *>(free_blocks);*/
 }
 
 void kfree(void *ptr) {
