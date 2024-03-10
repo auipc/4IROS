@@ -88,6 +88,7 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size) {
 		block_idx++;
 	}
 
+	delete[] singly_blocks;
 	return size_to_read;
 }
 

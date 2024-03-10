@@ -73,6 +73,7 @@ union PageDirectoryEntry {
 // FIXME add destructor that will delete all related pages and page tables
 struct PageDirectory {
 	MUST_BE_PAGE_ALIGNED
+
 	PageDirectory *clone();
 
 	inline uint32_t get_page_directory_index(size_t virtual_address) const {
@@ -142,6 +143,8 @@ class Paging {
 
 	static Paging *the();
 	static void *pf_allocator(size_t size);
+
+	inline PageFrameAllocator *allocator() const { return m_allocator; }
 
 	inline static size_t get_physical_address(void *virtual_address) {
 		return reinterpret_cast<size_t>(virtual_address) - VIRTUAL_ADDRESS;

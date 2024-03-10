@@ -19,7 +19,7 @@ static_assert(pow(3, 4) == 81);
 PageFrameAllocator::PageFrameAllocator(size_t memory_size) {
 	m_pages = memory_size / PAGE_SIZE;
 	for (int i = 0; i < 4; i++) {
-		m_buddies.push(new Bitmap(memory_size / (pow(2, i) * PAGE_SIZE)));
+		m_buddies.push(new Bitmap(m_pages / pow(2, i)));
 	}
 }
 

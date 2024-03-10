@@ -24,6 +24,8 @@ set(SRCS
         mem/PageFrameAllocator.h
         util/Bitmap.cpp
         util/Bitmap.h
+		util/MemBinTree.h
+		util/MemBinTree.cpp
 		util/Spinlock.cpp
 		util/Spinlock.h
 		util/Vec.h
