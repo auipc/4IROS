@@ -32,7 +32,7 @@ void kmalloc_init() {
 									  (2 * PAGE_SIZE));
 	// Steal rest of SIZE_MAX (anything above VIRTUAL_ADDRESS).
 	// This obviously won't work well on x86_64 though.
-	size_t mem = Paging::page_align(SIZE_MAX - s_alloc_base);
+	// size_t mem = Paging::page_align(SIZE_MAX - s_alloc_base);
 	s_mem_bt = new MemBinTree(s_alloc_base, 70 * k_allocation_block_size);
 
 	for (size_t i = s_alloc_base;

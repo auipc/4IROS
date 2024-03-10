@@ -26,6 +26,7 @@ Process::Process(void *entry, bool userspace)
 	setup(entry);
 }
 
+// FIXME: Load the binary outside of the constructor.
 Process::Process(const char *elf_file) : m_pid(s_pid++), m_userspace(true) {
 	Vec<const char *> vp;
 
