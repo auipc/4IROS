@@ -19,3 +19,14 @@ void Debug::stack_trace() {
 	}
 	printk("==END STACK TRACE==\n");
 }
+
+void print_type(char c) { printk("%c", c); }
+
+void Debug::print_type(const char *str) { printk("%s", str); }
+
+void Debug::print_type(int n) { printk("%d", n); }
+
+void Debug::print_type_hex(int n) { printk("%x", n); }
+
+void Debug::print_type(unsigned int n) { printk("%d", n); }
+void Debug::print_type(long long unsigned int n) { printk("%d", n); }
