@@ -18,6 +18,7 @@ Paging *Paging::the() { return s_instance; }
 
 // Instead of new_directory, maybe we could just have a page directory for
 // operating on pages...
+#if 0
 PageTable *PageTable::clone(size_t idx) {
 	PageTable *src = this;
 	PageTable *dst = new PageTable();
@@ -31,16 +32,6 @@ PageTable *PageTable::clone(size_t idx) {
 
 		// just copy all values, what could go wrong.
 		dst->entries[i].value = src->entries[i].value;
-		if (Paging::the()
-				->s_kernel_page_directory->entries[idx]
-				.get_page_table()
-				->entries[i]
-				.present) {
-#ifdef DEBUG_PAGING
-			printk("Skipping full clone of kernel page table entry\n");
-#endif
-			continue;
-		}
 
 		auto free_page = Paging::the()->m_allocator->find_free_page();
 
@@ -58,11 +49,24 @@ PageTable *PageTable::clone(size_t idx) {
 			   src->entries[i].get_page_base() + VIRTUAL_ADDRESS,
 			   free_page + VIRTUAL_ADDRESS);
 #endif
+
 		memcpy(reinterpret_cast<void *>(free_page + VIRTUAL_ADDRESS),
 			   reinterpret_cast<void *>(src->entries[i].get_page_base() +
 										VIRTUAL_ADDRESS),
 			   PAGE_SIZE);
 
+		Paging::the()->unmap_page(free_page + VIRTUAL_ADDRESS);
+		Paging::the()->unmap_page(src->entries[i].get_page_base() +
+								  VIRTUAL_ADDRESS);
+
+		printk("ent %x\n", &dst->entries[i]);
+		printk("fp %x\n", free_page);
+		dst->entries[i].set_page_base(free_page);
+
+		// sanity check
+		assert(!Paging::the()->is_mapped(free_page + VIRTUAL_ADDRESS));
+		assert(!Paging::the()->is_mapped(src->entries[i].get_page_base() +
+										 VIRTUAL_ADDRESS));
 		// TODO we need to be able to temporarily identity map this address so
 		// we can copy it's contents
 #ifdef DEBUG_PAGING
@@ -73,6 +77,7 @@ PageTable *PageTable::clone(size_t idx) {
 	// FIXME memory leak
 	return dst;
 }
+#endif
 
 void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 							 int flags) {
@@ -92,10 +97,6 @@ void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
 		entries[page_directory_index].read_write = 1;
 		if (!entries[page_directory_index].user_supervisor)
 			entries[page_directory_index].user_supervisor = user_supervisor;
-#ifdef DEBUG_PAGING
-		printk("Allocating page table: %x\n",
-			   entries[page_directory_index].get_page_table());
-#endif
 	} else {
 #ifdef DEBUG_PAGING
 		printk("Page table already exists: %x\n", page_directory_index);
@@ -207,48 +208,91 @@ void PageDirectory::map_range(size_t virtual_address, size_t length,
 }
 
 void PageDirectory::unmap_page(size_t virtual_address) {
-	(void)virtual_address;
-	assert(!"Implement me!");
+	auto pt_e = entries[get_page_directory_index(virtual_address)];
+	if (!pt_e.present) {
+		assert(false);
+		return;
+	}
+	auto pt = pt_e.get_page_table();
+
+	auto page = &pt->entries[get_page_table_index(virtual_address)];
+	Paging::the()->allocator()->release_page(page->get_page_base());
+	page->present = 0;
+
+	if (this == Paging::the()->current_page_directory()) {
+		asm volatile("invlpg (%0)" ::"r"(virtual_address) : "memory");
+	}
+}
+
+void PageDirectory::unmap_range(size_t virtual_address, size_t length) {
+	if (!length)
+		return;
+	if (length < PAGE_SIZE) {
+		length += PAGE_SIZE - length;
+	}
+
+	size_t number_of_pages = (length + PAGE_SIZE - 1) / PAGE_SIZE;
+
+	for (size_t i = 0; i < number_of_pages; i++) {
+		unmap_page(virtual_address + (number_of_pages * PAGE_SIZE));
+	}
 }
 
 PageDirectory *PageDirectory::clone() {
 	PageDirectory *src = this;
 	PageDirectory *dst = new PageDirectory();
 
+	PageDirectory *old = Paging::current_page_directory();
+	Paging::switch_page_directory(Paging::s_kernel_page_directory);
+
 	// page aligned
 	assert(reinterpret_cast<uint32_t>(dst) % PAGE_SIZE == 0);
 
-	// TODO find a good way to allocate page tables
-	// TODO every page should share the kernels page tables, mostly for
-	// interrupts and kernel tasks.
+	// sux.
 	for (int i = 0; i < 1024; i++) {
-		if (!src->entries[i].present)
-			continue;
-		// just copy all values.
+		// if (!Paging::s_kernel_page_directory->entries[i].present)
+		// continue;
+
+		// if (src->entries[i].present)
+		//	continue;
+
 		dst->entries[i].value = src->entries[i].value;
 
-		if (Paging::the()->s_kernel_page_directory->entries[i].present) {
-#ifdef DEBUG_PAGING
-			printk("Skipping full clone of kernel page table\n");
-#endif
+		if (Paging::s_kernel_page_directory->entries[i].present)
 			continue;
-		}
 
-#ifdef DEBUG_PAGING
-		printk("Cloning page table: %d\n", i);
-#endif
-		dst->entries[i].set_page_table(
-			src->entries[i].get_page_table()->clone(i));
-#ifdef DEBUG_PAGING
-		printk("src->entries[%d].value: %x\n", i, src->entries[i].value);
-#endif
+		if (!src->entries[i].present)
+			continue;
+
+		auto dst_pt = new PageTable();
+		dst->entries[i].set_page_table(dst_pt);
+		for (int j = 0; j < 1024; j++) {
+			auto src_pte = src->entries[i].get_page_table()->entries[j];
+			if (!src_pte.present)
+				continue;
+			auto free_page = Paging::the()->m_allocator->find_free_page();
+			dst_pt->entries[j].value = src_pte.value;
+			dst_pt->entries[j].present = 1;
+			dst_pt->entries[j].set_page_base(free_page);
+
+			Paging::current_page_directory()->map_page(free_page + 0xF0000000,
+													   free_page, 0);
+			Paging::current_page_directory()->map_page(
+				src_pte.get_page_base() + 0xF0000000, src_pte.get_page_base(),
+				0);
+
+			// gawdy
+			memcpy((void *)(free_page + 0xF0000000),
+				   (void *)(src_pte.get_page_base() + 0xF0000000), PAGE_SIZE);
+		}
 	}
 
+	Paging::switch_page_directory(old);
 	return dst;
 }
 
-size_t Paging::s_pf_allocator_base;
-size_t Paging::s_pf_allocator_end;
+size_t Paging::s_pf_allocator_base = 0;
+size_t Paging::s_pf_allocator_end = 0;
 
 // A tiny allocator for allocating the space we need to keep track of all
 // memory. This is static and will never change.
@@ -269,9 +313,9 @@ Paging::Paging(size_t total_memory) {
 	PageDirectory *pd = s_kernel_page_directory;
 
 	s_pf_allocator_base = page_align(kend + PAGE_SIZE);
-	s_pf_allocator_end =
-		page_align(s_pf_allocator_base +
-				   PageFrameAllocator::alloc_size(total_memory) + PAGE_SIZE);
+	s_pf_allocator_end = page_align(
+		s_pf_allocator_base + PageFrameAllocator::alloc_size(total_memory) +
+		PAGE_SIZE + PAGE_SIZE);
 
 	for (size_t ptr = s_pf_allocator_base; ptr < s_pf_allocator_end;
 		 ptr += PAGE_SIZE) {
@@ -308,6 +352,7 @@ Paging::Paging(size_t total_memory) {
 	m_allocator->mark_range(0x0, 0xFFFFF);
 
 	m_allocator->mark_range(kstart, kend - kstart);
+	m_safe_area = kmalloc_aligned(PAGE_SIZE * 2, PAGE_SIZE);
 }
 
 Paging::~Paging() { delete m_allocator; }

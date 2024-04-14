@@ -7,9 +7,11 @@ set(LIBC_SRCS
 	stdio.c
 	string.c
 	sys/mman.c
+	stdlib.c
 )
 
 set(LIBK_SRCS
+	stdlib.c
 	string.c
 )
 

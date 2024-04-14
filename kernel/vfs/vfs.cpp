@@ -3,6 +3,8 @@
 #include <kernel/vfs/fs/ext2.h>
 #include <kernel/vfs/vfs.h>
 
+static VFS *s_vfs;
+
 VFSNode::VFSNode() : m_name("") {}
 
 VFSNode::VFSNode(const char *name) : m_name(name) {}
@@ -40,8 +42,13 @@ FileHandle::FileHandle(VFSNode *node) : m_node(node) {}
 int FileHandle::read(void *buffer, size_t size) {
 	assert(m_node);
 	// FIXME: This is a race condition waiting to happen!
-	m_node->seek(m_position);
+	// m_node->seek(m_position);
 	return m_node->read(buffer, size);
+}
+
+int FileHandle::write(void *buffer, size_t size) {
+	assert(m_node);
+	return m_node->write(buffer, size);
 }
 
 int FileHandle::seek(size_t offset, SeekMode origin) {
@@ -82,7 +89,41 @@ VFS::VFS() {
 	// print_fs(m_root_vfs_node);
 }
 
+VFS &VFS::the() { return *s_vfs; }
+
+void VFS::init() { s_vfs = new VFS(); }
+
 VFS::~VFS() {}
+
+Vec<const char *> VFS::parse_path(const char *path) {
+	Vec<const char *> path_vec;
+	size_t accum_idx = 0;
+	// FIXME: we really need a string class.
+	char *accum = new char[256];
+
+	for (size_t i = 0; i < strlen(path); i++) {
+		if (path[i] == '/') {
+			if (accum_idx > 0) {
+				accum[accum_idx] = '\0';
+				path_vec.push(accum);
+				accum = new char[256];
+			}
+			accum_idx = 0;
+			continue;
+		}
+		accum[accum_idx++] = path[i];
+		if (accum_idx >= 256)
+			goto end;
+	}
+
+	if (accum_idx > 0) {
+		accum[accum_idx] = '\0';
+		path_vec.push(accum);
+	}
+
+end:
+	return path_vec;
+}
 
 void VFS::print_fs(VFSNode *fs, int depth) {
 	for (int i = 0; i < depth; i++) {

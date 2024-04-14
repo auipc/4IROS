@@ -1,5 +1,9 @@
 set(PROGRAMS_SRCS
 	init.c
+	term.c
+	shell.c
+	ls.c
+	cat.c
 )
 
 foreach(PROGRAM IN LISTS PROGRAMS_SRCS)

@@ -4,14 +4,14 @@
 
 struct InterruptRegisters {
 	uint32_t ds, es, fs, gs;
-	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
-	uint32_t eip, cs, eflags;						 // Pushed by the processor.
+	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+	uint32_t eip, cs, eflags, user_esp;
 } __attribute__((packed));
 
-struct InterruptRegistersPF {
+struct InterruptRegistersFault {
 	uint32_t ds, es, fs, gs;
-	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
-	uint32_t eip, cs, eflags;						 // Pushed by the processor.
+	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+	uint32_t error, weird, cs, eflags, eip;
 } __attribute__((packed));
 
 struct IDTPointer {
@@ -43,8 +43,8 @@ class InterruptHandler {
 
 	static void setup();
 
-	void setHandler(uint8_t interrupt, void (*handler)());
-	void setUserHandler(uint8_t interrupt, void (*handler)());
+	void set_handler(uint8_t interrupt, void (*handler)(), bool reload = true);
+	void set_user_handler(uint8_t interrupt, void (*handler)());
 
   private:
 	void refresh();

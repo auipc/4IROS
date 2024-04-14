@@ -1,6 +1,5 @@
 #include <kernel/arch/i386/IO.h>
 #include <kernel/printk.h>
-#include <kernel/stdarg.h>
 #include <kernel/util/Spinlock.h>
 #include <string.h>
 
@@ -85,13 +84,16 @@ void printk_use_interface(PrintInterface *interface) {
 	s_interface = interface;
 }
 
+extern "C" void itoa(unsigned int n, char *buf, int base);
+extern "C" void ftoa(double f, char *buf, int precision);
+
 void printk(const char *str, ...) {
 	if (!s_interface)
 		return;
 	s_print_spinlock.acquire();
 
-	va_list ap;
-	va_start(ap, str);
+	__builtin_va_list ap;
+	__builtin_va_start(ap, str);
 	for (size_t j = 0; j < strlen(str); j++) {
 		char c = str[j];
 		switch (c) {
@@ -111,7 +113,7 @@ void printk(const char *str, ...) {
 
 			switch (c2) {
 			case 'd': {
-				int value = va_arg(ap, int);
+				unsigned int value = __builtin_va_arg(ap, unsigned int);
 				char buffer[32];
 				itoa(value, buffer, 10);
 				for (size_t i = 0; i < strlen(buffer); i++) {
@@ -120,7 +122,7 @@ void printk(const char *str, ...) {
 				break;
 			}
 			case 'x': {
-				int value = va_arg(ap, int);
+				int value = __builtin_va_arg(ap, unsigned long long);
 				char buffer[32];
 				itoa(value, buffer, 16);
 				for (size_t i = 0; i < strlen(buffer); i++) {
@@ -129,19 +131,19 @@ void printk(const char *str, ...) {
 				break;
 			}
 			case 's': {
-				char *value = va_arg(ap, char *);
+				char *value = __builtin_va_arg(ap, char *);
 				for (size_t i = 0; i < strlen(value); i++) {
 					s_interface->write_character(value[i]);
 				}
 				break;
 			}
 			case 'c': {
-				char value = va_arg(ap, int);
+				char value = __builtin_va_arg(ap, int);
 				s_interface->write_character(value);
 				break;
 			}
 			case 'f': {
-				float value = va_arg(ap, double);
+				float value = __builtin_va_arg(ap, double);
 				char buffer[32];
 				ftoa(value, buffer, precision);
 				for (size_t i = 0; i < strlen(buffer); i++) {
@@ -162,6 +164,6 @@ void printk(const char *str, ...) {
 			break;
 		}
 	}
-	va_end(ap);
+	__builtin_va_end(ap);
 	s_print_spinlock.release();
 }

@@ -11,10 +11,14 @@ int printf(const char *str, ...) {
 		switch (c) {
 		case '%': {
 			j++;
-			int precision = 6;
+			int precision = -1;
 			char c2 = str[j];
 			if (c2 == '.') {
-				precision = str[j + 1] - '0';
+				char precision_char = str[j + 1];
+				if (precision_char == '*')
+					precision = __builtin_va_arg(ap, int);
+
+				precision = precision_char - '0';
 				j += 2;
 				c2 = str[j];
 
@@ -40,7 +44,11 @@ int printf(const char *str, ...) {
 			}
 			case 's': {
 				char *value = __builtin_va_arg(ap, char *);
-				write(1, value, strlen(value));
+				if (precision >= 0) {
+					write(1, value, precision);
+				} else {
+					write(1, value, strlen(value));
+				}
 				break;
 			}
 			case 'c': {

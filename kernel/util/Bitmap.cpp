@@ -2,7 +2,7 @@
 #include <kernel/util/Bitmap.h>
 #include <string.h>
 
-Bitmap::Bitmap(size_t elems) {
+Bitmap::Bitmap(size_t elems) : m_elems(elems) {
 	// FIXME: uint32_t containers WILL be better
 	data = new bitmap_container_t[elems];
 	memset(reinterpret_cast<char *>(data), 0, elems);
@@ -18,7 +18,7 @@ size_t Bitmap::alloc_size(size_t elems) {
 }
 
 void Bitmap::set(size_t i) {
-	if (i >= size) {
+	if (i >= m_elems) {
 		return;
 	}
 	int byteIndex = i / 8;
@@ -28,7 +28,7 @@ void Bitmap::set(size_t i) {
 }
 
 void Bitmap::unset(size_t i) {
-	if (i >= size) {
+	if (i >= m_elems) {
 		return;
 	}
 	int byteIndex = i / 8;
@@ -38,7 +38,7 @@ void Bitmap::unset(size_t i) {
 }
 
 uint8_t Bitmap::get(size_t i) const {
-	if (i >= size) {
+	if (i >= m_elems) {
 		assert(false);
 	}
 	int byteIndex = i / 8;
@@ -48,7 +48,7 @@ uint8_t Bitmap::get(size_t i) const {
 
 uint32_t Bitmap::scan(uint32_t nr) {
 	uint32_t streak = 0;
-	for (size_t i = 0; i < size; i++) {
+	for (size_t i = 0; i < m_elems; i++) {
 		if (!get(i)) {
 			streak++;
 		} else {
@@ -57,7 +57,7 @@ uint32_t Bitmap::scan(uint32_t nr) {
 
 		if (streak == nr) {
 			for (size_t j = 0; j < streak; j++)
-				set(i + j);
+				set(i - j);
 
 			return i;
 		}
@@ -67,7 +67,7 @@ uint32_t Bitmap::scan(uint32_t nr) {
 
 uint32_t Bitmap::scan_no_set(uint32_t nr) {
 	uint32_t streak = 0;
-	for (size_t i = 0; i < size; i++) {
+	for (size_t i = 0; i < m_elems; i++) {
 		if (!get(i)) {
 			streak++;
 		} else {
@@ -83,7 +83,7 @@ uint32_t Bitmap::scan_no_set(uint32_t nr) {
 
 uint32_t Bitmap::count() {
 	uint32_t c = 0;
-	for (size_t i = 0; i < size; i++)
+	for (size_t i = 0; i < m_elems; i++)
 		if (i)
 			c++;
 	return c;

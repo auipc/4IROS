@@ -2,9 +2,23 @@ cmake_minimum_required(VERSION 3.13)
 project(4IROS C CXX ASM)
 set(CMAKE_CXX_STANDARD 17)
 
+if (ARM_COMPILE)
+	set(ARCH_SHIM_SRCS
+		arch/arm/asm/boot.S
+		arch/arm/init.cpp
+	)
+	set(ARCH_SRCS
+		arch/arm/arm_main.cpp
+	)
+else()
+	set(ARCH_SRCS
+		arch/i386/asm/boot.S
+        arch/i386/IO.h
+		arch/i386/asm/interrupt.S
+        arch/i386/kernel.h
+	)
+
 set(SRCS
-        arch/i386/asm/boot.S
-        arch/i386/asm/interrupt.S
         main.cpp
         mem/malloc.h
         mem/malloc.cpp
@@ -55,11 +69,29 @@ set(SRCS
 		driver/PS2Keyboard.h
 		driver/PS2Keyboard.cpp
 )
+endif()
 
-add_executable(4IROS ${SRCS})
+if (ARM_COMPILE)
+add_executable(4IROS ${ARCH_SRCS} ${SRCS})
+add_executable(4IROS_SHIM ${ARCH_SHIM_SRCS} ${SRCS})
+target_include_directories(4IROS_SHIM PRIVATE ${CMAKE_SOURCE_DIR}/)
+else()
+add_executable(4IROS ${ARCH_SRCS} ${SRCS})
+endif()
+
 
 target_include_directories(4IROS PRIVATE ${CMAKE_SOURCE_DIR}/)
+if (NOT ARM_COMPILE)
 target_include_directories(4IROS PRIVATE ${CMAKE_SOURCE_DIR}/libc)
 target_link_libraries(4IROS ${LIBK_DIR}/libk.a)
+endif()
+
+if (NOT ARM_COMPILE)
 target_link_options(4IROS PRIVATE LINKER:-T ${CMAKE_SOURCE_DIR}/kernel/linker.ld -nostdlib -nodefaultlibs)
 set_target_properties(4IROS PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/kernel/linker.ld)
+else()
+target_link_options(4IROS_SHIM PRIVATE LINKER:-T ${CMAKE_SOURCE_DIR}/kernel/arch/arm/shim.ld -nostdlib -nodefaultlibs)
+set_target_properties(4IROS_SHIM PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/kernel/arch/arm/shim.ld)
+target_link_options(4IROS PRIVATE LINKER:-T ${CMAKE_SOURCE_DIR}/kernel/arch/arm/linker.ld -nostdlib -nodefaultlibs)
+set_target_properties(4IROS PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/kernel/arch/arm/linker.ld)
+endif()

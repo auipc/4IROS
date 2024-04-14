@@ -41,5 +41,5 @@ class MemBinTree {
 	void populate(MemBinTreeNode *node, size_t size);
 
 	// The smallest possible container
-	static constexpr size_t s_granularity = 4096 * 2;
+	static constexpr size_t s_granularity = 4096;
 };

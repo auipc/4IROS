@@ -3,6 +3,7 @@
 #include <kernel/Syscall.h>
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
+#include <kernel/driver/PS2Keyboard.h>
 #include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/mem/Paging.h>
@@ -11,7 +12,9 @@
 #include <kernel/printk.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
+#include <kernel/util/NBitmap.h>
 #include <kernel/util/Spinlock.h>
+#include <kernel/util/Vec.h>
 #include <kernel/vfs/vfs.h>
 
 Spinlock cxa_spinlock;
@@ -56,15 +59,23 @@ extern "C" void kernel_main(uint32_t magic, uint32_t mb_ptr_phys) {
 
 	printk_use_interface(new VGAInterface());
 
-	printk("%d\n", (mb->mem_lower + mb->mem_upper));
+	printk("memory %d\n", (mb->mem_lower + mb->mem_upper));
 
 	GDT::setup();
 	PIC::setup();
 	InterruptHandler::setup();
-	InterruptHandler::the()->setUserHandler(0x80, &syscall_interrupt_handler);
+	InterruptHandler::the()->set_user_handler(0x80, &syscall_interrupt_handler);
 
 	asm volatile("sti");
-	printk("fbaddr %x\n", mb->framebuffer_addr);
+	Debug::dbg("fbaddr {x}\n", mb->framebuffer_addr);
+
+	printk("test %d test %d\n", 1, 2);
+	Debug::dbg("hello {x}\n", 0xDEADBEEF);
+
+	VFS::init();
+	printk("ps2\n");
+	PS2Keyboard::init();
+
 	Scheduler::setup();
 
 	while (1)

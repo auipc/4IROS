@@ -9,6 +9,7 @@ class VFSNode {
 	VFSNode();
 	VFSNode(const char *m_name);
 	~VFSNode();
+	VFSNode(VFSNode &) = delete;
 	virtual inline bool is_directory() { return true; }
 
 	virtual VFSNode *traverse(Vec<const char *> &path, size_t path_index = 0);
@@ -28,6 +29,12 @@ class VFSNode {
 		return -1;
 	}
 
+	virtual int write(void *buffer, size_t size) {
+		(void)buffer;
+		(void)size;
+		return -1;
+	}
+
 	virtual int seek(size_t position) {
 		m_position = position;
 		return 0;
@@ -37,6 +44,9 @@ class VFSNode {
 		m_position += position;
 		return 0;
 	}
+
+	virtual bool check_blocked() { return false; }
+	virtual void block_if_required(size_t) {}
 
 	virtual size_t position() { return m_position; }
 
@@ -60,9 +70,15 @@ enum SeekMode { SEEK_SET = 0, SEEK_CUR = 1, SEEK_END = 2 };
 class FileHandle {
   public:
 	FileHandle(VFSNode *node);
+	FileHandle(FileHandle &) = delete;
 	int read(void *buffer, size_t size);
+	int write(void *buffer, size_t size);
 	int seek(size_t offset, SeekMode origin);
 	size_t tell();
+	bool check_blocked() { return m_node->check_blocked(); }
+	void block_if_required(size_t size) {
+		return m_node->block_if_required(size);
+	}
 
   private:
 	size_t m_position = 0;
@@ -82,14 +98,17 @@ class ZeroNode : public VFSNode {
 };
 
 class VFS {
-	SINGLETON(VFS)
   public:
 	VFS();
 	~VFS();
+	static void init();
+	Vec<const char *> parse_path(const char *path);
 	VFSNode *open(Vec<const char *> &name);
 	FileHandle *open_fh(Vec<const char *> &name);
 
 	void print_fs(VFSNode *root, int depth = 0);
+
+	static VFS &the();
 
 	inline VFSNode *get_root_fs() { return m_root_vfs_node; }
 	inline VFSNode *get_dev_fs() { return m_dev_fs; }

@@ -1,5 +1,7 @@
 #pragma once
+#include <kernel/util/Spinlock.h>
 
+class Spinlock;
 class Process;
 
 class Scheduler {
@@ -19,6 +21,8 @@ class Scheduler {
 	static void schedule(uint32_t *esp);
 
 	static Process *s_current;
+
+	Spinlock sched_spinlock;
 
   private:
 	static void reaper();

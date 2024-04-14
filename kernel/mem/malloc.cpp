@@ -3,8 +3,7 @@
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
-#include <kernel/util/MemBinTree.h>
-#include <limits.h>
+#include <kernel/util/NBitmap.h>
 #include <string.h>
 
 extern "C" char _heap_start;
@@ -13,8 +12,7 @@ static size_t s_mem_offset = 0;
 static size_t s_mem_end = 0;
 static bool s_use_real_allocator = false;
 bool g_use_halfway_allocator = false;
-// static Bitmap *s_alloc_bitmap;
-static MemBinTree *s_mem_bt;
+static NBitmap *s_mem_nbm;
 
 static size_t s_alloc_base = 0;
 static const size_t k_allocation_block_size = 4096;
@@ -30,20 +28,23 @@ void kmalloc_temp_init() {
 void kmalloc_init() {
 	s_alloc_base = Paging::page_align(reinterpret_cast<size_t>(&_kernel_end) +
 									  (2 * PAGE_SIZE));
-	// Steal rest of SIZE_MAX (anything above VIRTUAL_ADDRESS).
-	// This obviously won't work well on x86_64 though.
-	// size_t mem = Paging::page_align(SIZE_MAX - s_alloc_base);
-	s_mem_bt = new MemBinTree(s_alloc_base, 70 * k_allocation_block_size);
+	s_mem_nbm = new NBitmap((5000 * KB) / k_allocation_block_size);
 
-	for (size_t i = s_alloc_base;
-		 i < s_alloc_base + 70 * k_allocation_block_size;
-		 i += k_allocation_block_size) {
-		if (Paging::the()->is_mapped(i)) {
-			// s_mem_bt->block((void *)i);
+	for (size_t i = 0; i < 5000 * KB; i += k_allocation_block_size) {
+		if (Paging::the()->is_mapped(Paging::s_pf_allocator_end + i)) {
+			s_mem_nbm->set(i, 1);
 		}
 	}
 
-	Paging::the()->map_range(s_alloc_base, 70 * k_allocation_block_size, 0);
+	for (size_t i = Paging::page_align(0xC03FF000 - Paging::s_pf_allocator_end);
+		 i < Paging::page_align(0xC03FF000 - Paging::s_pf_allocator_end) +
+				 (PAGE_SIZE * 10);
+		 i += PAGE_SIZE) {
+		s_mem_nbm->set(i / k_allocation_block_size, 1);
+	}
+
+	Paging::s_kernel_page_directory->map_range(Paging::s_pf_allocator_end,
+											   (5000 * KB), 0);
 
 	s_use_real_allocator = true;
 }
@@ -52,8 +53,6 @@ static void *allocate_block_temp(size_t blocks_needed) {
 	assert(blocks_needed > 0);
 	s_mem_offset += blocks_needed * k_allocation_block_size;
 	assert(s_mem_offset < s_mem_end);
-	printk("mem offset: 0x%x/0x%x\n", s_mem_offset / k_allocation_block_size,
-		   s_mem_end / k_allocation_block_size);
 	return reinterpret_cast<void *>(s_mem_offset);
 }
 
@@ -64,11 +63,12 @@ static void *allocate_block(size_t blocks_needed) {
 
 	// FIXME: We really need to stop playing fast and loose with types
 	size_t free_blocks =
-		(size_t)s_mem_bt->search(blocks_needed * k_allocation_block_size);
+		Paging::s_pf_allocator_end +
+		(s_mem_nbm->scan(blocks_needed) * k_allocation_block_size);
 
-	// s_mem_bt->debug_print(s_mem_bt->m_root);
-	if (!Paging::the()->is_mapped(free_blocks))
+	if (!Paging::the()->is_mapped(free_blocks)) {
 		assert(false);
+	}
 
 	return reinterpret_cast<void *>(free_blocks);
 }
@@ -103,8 +103,9 @@ void *kmalloc_aligned(size_t size, size_t alignment) {
 }
 
 void kfree(void *ptr) {
-	if (s_mem_bt)
-		s_mem_bt->free(ptr);
+	if (s_mem_nbm)
+		s_mem_nbm->group_free(((size_t)ptr - Paging::s_pf_allocator_end) /
+							  k_allocation_block_size);
 }
 
 void *operator new(size_t size) { return kmalloc(size); }

@@ -1,8 +1,42 @@
 #include <kernel/Debug.h>
+#include <kernel/arch/i386/i386.h>
+#include <kernel/gdt.h>
 #include <kernel/idt.h>
 #include <kernel/printk.h>
 #include <kernel/tasking/Process.h>
 #include <kernel/tasking/Scheduler.h>
+
+enum class Exceptions {
+	DivError = 0,
+	Debug = 1,
+	NMI = 2,
+	Breakpoint = 3,
+	Overflow = 4,
+	// Do modern compilers even emit the instruction to trigger this?
+	BoundRangeExceeded = 5,
+	InvalidOp = 6,
+	// Another i386 era exception that will never trigger!
+	DeviceNotAvailable = 7,
+	DoubleFault = 8,
+	// Unused
+	CoprocessorSegOverrun = 9,
+	InvalidTSS = 10,
+	SegmentNotPresent = 11,
+	StackSegFault = 12,
+	GeneralProtFault = 13,
+	PageFault = 14,
+	Reserved = 15,
+	x87FP = 16,
+	AlignCheck = 17,
+	MachineCheck = 18,
+	COUNT,
+};
+
+static_assert(static_cast<uint8_t>(Exceptions::COUNT) <= 256);
+
+enum class PageFaultBits {
+	User = (1 << 2),
+};
 
 static InterruptHandler *s_the;
 
@@ -36,138 +70,117 @@ extern "C" void unhandled_interrupt() {
 	}
 }
 
-extern "C" void interrupt_14(InterruptRegisters regs) {
-	Debug::stack_trace();
-	size_t faulting_address;
-	asm volatile("mov %%cr2, %0" : "=r"(faulting_address));
-	Process *current = Scheduler::the()->current();
-	printk("Current PID: %d\n", current->pid());
-	printk("Page fault at %x\n", faulting_address);
-	printk("EIP: %x\n", regs.eip);
-	printk("Error code 0x%x\n", regs.eflags);
-	// Halt the CPU
-	while (1) {
-		asm volatile("cli");
-		asm volatile("hlt");
+extern "C" void div_interrupt(InterruptRegisters regs) {
+	printk("[[Div error]]\n");
+	printk("CS %x\n", regs.cs);
+	if (regs.cs == USER_CS) {
+		Process *current = Scheduler::the()->current();
+		printk("Killing PID %d\n", current->pid());
+		Scheduler::the()->kill_process(*current);
+		Scheduler::the()->schedule((uint32_t *)regs.esp);
+	}
+	while (1)
+		;
+}
+
+extern "C" void gpf_interrupt(InterruptRegistersFault regs) {
+	printk("[[General Protection Fault]]\n");
+	if (regs.error != 0) {
+		printk("Caused by segment %d\n", regs.error);
+	}
+
+	while (1)
+		;
+}
+
+extern "C" void df_interrupt(InterruptRegisters) {
+	printk("[[Double Fault]]");
+	while (1)
+		;
+}
+
+extern "C" void invalidtss_interrupt(InterruptRegisters) {
+	printk("[[Invalid TSS]]");
+	while (1)
+		;
+}
+
+extern "C" void pf_interrupt(InterruptRegistersFault regs) {
+	uint32_t fault_addr = get_cr2();
+
+	// Paging::the()->resolve_fault(Paging::current_page_directory(),
+	// fault_addr);
+	if (regs.cs == USER_CS &&
+		(regs.error & static_cast<uint32_t>(PageFaultBits::User))) {
+		Process *current = Scheduler::the()->current();
+		printk("Current PTR %x\n", current);
+		printk("Current PID %x\n", current->pid());
+		printk("[[Page fault in userspace while accessing address 0x%x. "
+			   "Killing PID "
+			   "%d]]\n",
+			   fault_addr, current->pid());
+		printk("Error code 0x%x\n", regs.error);
+		Debug::stack_trace();
+		Scheduler::the()->kill_process(*current);
+		Scheduler::the()->schedule((uint32_t *)regs.esp);
+		while (1)
+			;
+	} else {
+		printk("[[Unrecoverable kernel page fault while accessing address "
+			   "0x%x]]\n",
+			   fault_addr);
+		printk("EIP: %x\n", regs.eip);
+		printk("Error code 0x%x\n", regs.error);
+		Debug::stack_trace();
+		// We PF'd in kernel, halt the CPU.
+		while (1) {
+			asm volatile("cli");
+			asm volatile("hlt");
+		}
 	}
 }
 
-#define INTERRUPT_HANDLER(x)                                                   \
-	extern "C" void interrupt_##x##_handler();                                 \
-	asm("interrupt_" #x "_handler:");                                          \
-	asm("	pusha");                                                           \
-	asm("   push %gs");                                                        \
-	asm("   push %fs");                                                        \
-	asm("   push %es");                                                        \
-	asm("   push %ds");                                                        \
-	asm("	call interrupt_" #x);                                              \
-	asm("   add $0x10, %esp");                                                 \
-	asm("	popa");                                                            \
-	asm("	iret");
-
-#define HALTING_INTERRUPT_STUB(x, msg)                                         \
-	extern "C" void interrupt_##x(InterruptRegisters regs) {                   \
-		printk(msg "\n");                                                      \
-		printk("Error code 0x%x\n", regs.eflags);                              \
-		printk("Registers EAX: 0x%x EBX: 0x%x ECX: 0x%x EDX: 0x%x EIP: 0x%x "  \
-			   "CS: 0x%x\n",                                                   \
-			   regs.eax, regs.ebx, regs.ecx, regs.edx, regs.eip, regs.cs);     \
-		while (1) {                                                            \
-			asm volatile("cli");                                               \
-			asm volatile("hlt");                                               \
-		}                                                                      \
-	}
-
-INTERRUPT_HANDLER(0)  // Divide by zero
-INTERRUPT_HANDLER(1)  // Debug
-INTERRUPT_HANDLER(2)  // Non-maskable interrupt
-INTERRUPT_HANDLER(3)  // Breakpoint
-INTERRUPT_HANDLER(4)  // Overflow
-INTERRUPT_HANDLER(5)  // Bound range exceeded
-INTERRUPT_HANDLER(6)  // Invalid opcode
-INTERRUPT_HANDLER(7)  // Device not available
-INTERRUPT_HANDLER(8)  // Double fault
-INTERRUPT_HANDLER(9)  // Coprocessor segment overrun
-INTERRUPT_HANDLER(10) // Invalid TSS
-INTERRUPT_HANDLER(11) // Segment not present
-INTERRUPT_HANDLER(12) // Stack-segment fault
-INTERRUPT_HANDLER(13) // General protection fault
-INTERRUPT_HANDLER(14) // Page fault
-INTERRUPT_HANDLER(15) // Reserved
-INTERRUPT_HANDLER(16) // x87 floating-point exception
-INTERRUPT_HANDLER(17) // Alignment check
-INTERRUPT_HANDLER(18) // Machine check
-INTERRUPT_HANDLER(19) // SIMD floating-point exception
-INTERRUPT_HANDLER(20) // Virtualization exception
-
-HALTING_INTERRUPT_STUB(0, "Divide by zero")
-HALTING_INTERRUPT_STUB(1, "Debug")
-HALTING_INTERRUPT_STUB(2, "Non-maskable interrupt")
-HALTING_INTERRUPT_STUB(3, "Breakpoint")
-HALTING_INTERRUPT_STUB(4, "Overflow")
-HALTING_INTERRUPT_STUB(5, "Bound range exceeded")
-HALTING_INTERRUPT_STUB(6, "Invalid opcode")
-HALTING_INTERRUPT_STUB(7, "Device not available")
-HALTING_INTERRUPT_STUB(8, "Double fault")
-HALTING_INTERRUPT_STUB(9, "Coprocessor segment overrun")
-HALTING_INTERRUPT_STUB(10, "Invalid TSS")
-HALTING_INTERRUPT_STUB(11, "Segment not present")
-HALTING_INTERRUPT_STUB(12, "Stack-segment fault")
-HALTING_INTERRUPT_STUB(13, "General protection fault")
-// HALTING_INTERRUPT_STUB(14, "Page fault")
-HALTING_INTERRUPT_STUB(15, "Reserved")
-HALTING_INTERRUPT_STUB(16, "x87 floating-point exception")
-HALTING_INTERRUPT_STUB(17, "Alignment check")
-HALTING_INTERRUPT_STUB(18, "Machine check")
-HALTING_INTERRUPT_STUB(19, "SIMD floating-point exception")
-HALTING_INTERRUPT_STUB(20, "Virtualization exception")
+extern "C" void div_interrupt_handler();
+extern "C" void gpf_interrupt_handler();
+extern "C" void df_interrupt_handler();
+extern "C" void invalidtss_interrupt_handler();
+extern "C" void pf_interrupt_handler();
 
 void InterruptHandler::setup() {
 	s_the = new InterruptHandler();
-	idtPointer.limit = sizeof(IDTEntry) * 256 - 1;
+	idtPointer.limit = sizeof(IDTEntry) * 255;
 	idtPointer.base = (size_t)&idtEntries[0];
 
 	s_the->refresh();
 	for (uint8_t i = 0; i < 255; i++) {
-		s_the->setHandler(i, unhandled_interrupt);
+		s_the->set_handler(i, unhandled_interrupt, false);
 	}
 
-	s_the->setHandler(0, interrupt_0_handler);
-	s_the->setHandler(1, interrupt_1_handler);
-	s_the->setHandler(2, interrupt_2_handler);
-	s_the->setHandler(3, interrupt_3_handler);
-	s_the->setHandler(4, interrupt_4_handler);
-	s_the->setHandler(5, interrupt_5_handler);
-	s_the->setHandler(6, interrupt_6_handler);
-	s_the->setHandler(7, interrupt_7_handler);
-	s_the->setHandler(8, interrupt_8_handler);
-	s_the->setHandler(9, interrupt_9_handler);
-	s_the->setHandler(10, interrupt_10_handler);
-	s_the->setHandler(11, interrupt_11_handler);
-	s_the->setHandler(12, interrupt_12_handler);
-	s_the->setHandler(13, interrupt_13_handler);
-	s_the->setHandler(14, interrupt_14_handler);
-	s_the->setHandler(15, interrupt_15_handler);
-	s_the->setHandler(16, interrupt_16_handler);
-	s_the->setHandler(17, interrupt_17_handler);
-	s_the->setHandler(18, interrupt_18_handler);
-	s_the->setHandler(19, interrupt_19_handler);
-	s_the->setHandler(20, interrupt_20_handler);
+	s_the->set_handler(static_cast<uint8_t>(Exceptions::DivError),
+					   div_interrupt_handler, false);
+	s_the->set_handler(static_cast<uint8_t>(Exceptions::GeneralProtFault),
+					   gpf_interrupt_handler, false);
+	s_the->set_handler(static_cast<uint8_t>(Exceptions::DoubleFault),
+					   df_interrupt_handler, false);
+	s_the->set_handler(static_cast<uint8_t>(Exceptions::InvalidTSS),
+					   invalidtss_interrupt_handler, false);
+	s_the->set_handler(static_cast<uint8_t>(Exceptions::PageFault),
+					   pf_interrupt_handler, false);
+
+	s_the->refresh();
 }
 
-void InterruptHandler::setHandler(uint8_t interrupt, void (*handler)()) {
+void InterruptHandler::set_handler(uint8_t interrupt, void (*handler)(),
+								   bool reload) {
 	idtEntries[interrupt].setBase(reinterpret_cast<uintptr_t>(handler));
 	idtEntries[interrupt].kernel_cs = 0x08;
 	idtEntries[interrupt].reserved = 0;
 	idtEntries[interrupt].attributes = 0x8E;
-
-	// TODO is there a way we can defer this to a later time? Excessive calls to
-	// lidt will increase boot time. we could just hardcode the interrupts by
-	// hand and only call setHandler when we need to change one.
-	refresh();
+	if (reload)
+		refresh();
 }
 
-void InterruptHandler::setUserHandler(uint8_t interrupt, void (*handler)()) {
+void InterruptHandler::set_user_handler(uint8_t interrupt, void (*handler)()) {
 	idtEntries[interrupt].setBase(reinterpret_cast<uintptr_t>(handler));
 	idtEntries[interrupt].kernel_cs = 0x08;
 	idtEntries[interrupt].reserved = 0;

@@ -2,6 +2,19 @@
 #include <kernel/arch/i386/kernel.h>
 #include <stdint.h>
 
+static constexpr uint8_t USER_CS = 0x1b;
+static constexpr uint8_t KERN_CS = 0x08;
+
+static constexpr uint8_t USER_DS = 0x23;
+static constexpr uint8_t USER_GS = 0x23;
+static constexpr uint8_t USER_FS = 0x23;
+static constexpr uint8_t USER_ES = 0x23;
+
+static constexpr uint8_t KERN_DS = 0x10;
+static constexpr uint8_t KERN_GS = 0x10;
+static constexpr uint8_t KERN_FS = 0x10;
+static constexpr uint8_t KERN_ES = 0x10;
+
 // https://wiki.osdev.org/Getting_to_Ring_3#The_TSS
 struct TSS {
 	uint32_t prev_tss; // The previous TSS - with hardware task switching these

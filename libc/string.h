@@ -10,7 +10,7 @@ int strncmp(const char *s1, const char *s2, size_t n);
 int strcmp(const char *s1, const char *s2);
 void *memcpy(void *dest, const void *src, size_t size);
 void memset(char *buffer, char value, size_t size);
-void itoa(unsigned long int n, char *buf, int base);
+void itoa(unsigned int n, char *buf, int base);
 void ftoa(double f, char *buf, int precision);
 
 size_t strlen(const char *str);

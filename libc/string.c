@@ -1,5 +1,8 @@
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 int strncmp(const char *s1, const char *s2, size_t n) {
 
 	if (n == 0)
@@ -35,7 +38,7 @@ void *memcpy(void *s1, const void *s2, size_t n) {
 	return s1;
 }
 
-void itoa(unsigned long int n, char *buf, int base) {
+void itoa(unsigned int n, char *buf, int base) {
 	unsigned long int tmp;
 	int i, j;
 
@@ -86,3 +89,6 @@ size_t strlen(const char *str) {
 		str++;
 	return str - start;
 }
+#ifdef __cplusplus
+};
+#endif

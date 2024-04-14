@@ -13,7 +13,7 @@ extern "C" void sched_asm(uintptr_t *prev_stack, uintptr_t *next_stack,
 
 extern TSS tss_entry;
 extern "C" void pit_interrupt_handler();
-extern "C" __attribute__((fastcall)) void pit_interrupt(uint32_t *esp) {
+extern "C" void pit_interrupt(uint32_t *esp) {
 	if (Scheduler::the()) {
 		Scheduler::the()->schedule(esp);
 	}
@@ -25,7 +25,7 @@ void PIT::setup() {
 	uint16_t freq = 1193181 / 20;
 
 	// Channel 0 is connected directly to IRQ0
-	InterruptHandler::the()->setHandler(0x50, pit_interrupt_handler);
+	InterruptHandler::the()->set_handler(0x50, pit_interrupt_handler);
 	outb(0x43, 0x36);
 
 	outb(0x40, freq & 0xFF);

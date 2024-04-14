@@ -111,7 +111,8 @@ class Ext2FileSystem : public VFSNode {
 	INode *read_inode(size_t index);
 	void seek_block(size_t block_addr);
 	Vec<Directory> scan_dir_entries(INode &inode);
-	uint32_t read_from_inode(INode &inode, void *out, size_t size);
+	uint32_t read_from_inode(INode &inode, void *out, size_t size,
+							 size_t position);
 	VFSNode *m_block_dev;
 	Ext2SuperBlock block;
 	INode *m_root_inode;

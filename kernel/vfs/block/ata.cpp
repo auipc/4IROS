@@ -42,7 +42,6 @@ int ATABlockNode::read(void *buffer, size_t size) {
 	if (!size)
 		return -1;
 
-	printk("reading at position %x\n", m_position);
 	size_t lba_sector_count = (size + 512 - 1) / 512;
 	uint16_t *b = new uint16_t[256 * lba_sector_count];
 	size_t old_pos = m_position;

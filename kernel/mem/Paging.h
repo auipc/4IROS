@@ -3,7 +3,6 @@
 #include <kernel/assert.h>
 #include <kernel/mem/PageFrameAllocator.h>
 #include <kernel/mem/malloc.h>
-#include <kernel/printk.h>
 #include <kernel/util/Vec.h>
 #include <stdint.h>
 
@@ -32,9 +31,9 @@ union PageTableEntry {
 
 	uint32_t value;
 
-	inline void set_page_base(uint32_t base) { page_base = (base) >> 12; }
+	inline void set_page_base(uint32_t base) { page_base = (base >> 12); }
 
-	inline uint32_t get_page_base() const { return (page_base) << 12; }
+	inline uint32_t get_page_base() const { return page_base << 12; }
 } __attribute__((packed));
 
 struct PageTable {
@@ -75,6 +74,7 @@ struct PageDirectory {
 	MUST_BE_PAGE_ALIGNED
 
 	PageDirectory *clone();
+	PageDirectory *explicitly_stupid_clone();
 
 	inline uint32_t get_page_directory_index(size_t virtual_address) const {
 		return (virtual_address >> 22) & 0x3ff;
@@ -90,6 +90,7 @@ struct PageDirectory {
 	void map_range(size_t virtual_address, size_t length, int flags);
 
 	void unmap_page(size_t virtual_address);
+	void unmap_range(size_t virtual_address, size_t length);
 
 	PageDirectoryEntry entries[1024];
 } __attribute__((packed)) __attribute__((aligned(PAGE_SIZE)));
@@ -141,8 +142,25 @@ class Paging {
 		current_page_directory()->unmap_page(virtual_address);
 	}
 
+	inline void unmap_range(size_t virtual_address, size_t length) {
+		current_page_directory()->unmap_range(virtual_address, length);
+	}
+
+	bool resolve_fault(PageDirectory *pd, size_t fault_addr);
+
+	inline uint32_t get_page_directory_index(size_t virtual_address) const {
+		return (virtual_address >> 22) & 0x3ff;
+	}
+
+	inline uint32_t get_page_table_index(size_t virtual_address) const {
+		return (virtual_address >> 12) & 0x3ff;
+	}
+
 	static Paging *the();
 	static void *pf_allocator(size_t size);
+
+	void copy_range(PageDirectory *src, PageDirectory *dst,
+					size_t virtual_address, size_t range);
 
 	inline PageFrameAllocator *allocator() const { return m_allocator; }
 
@@ -172,6 +190,8 @@ class Paging {
 	friend struct PageDirectory;
 	friend struct PageTable;
 
+	// Region of memory reserved for copying pages
+	void *m_safe_area;
 	PageFrameAllocator *m_allocator;
 	static PageDirectory *s_current_page_directory;
 	static Paging *s_instance;

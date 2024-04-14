@@ -2,7 +2,10 @@
 #include <kernel/arch/i386/kernel.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/util/Vec.h>
+#include <kernel/vfs/vfs.h>
 #include <stdint.h>
+
+enum ELFArch : uint16_t { Unspecified = 0, x86 = 0x03, Arm = 0x28 };
 
 struct ELFHeader32 {
 	char magic[4];
@@ -12,7 +15,7 @@ struct ELFHeader32 {
 	uint8_t abi;
 	char unused[8];
 	uint16_t bintype;
-	uint16_t isa;
+	ELFArch isa;
 	uint32_t ver;
 	uint32_t entry;
 	uint32_t phtable;
@@ -46,7 +49,7 @@ typedef ELFSectionHeader32 ELFSectionHeader;
 
 class ELF {
   public:
-	ELF(char *buffer, size_t buffer_length);
+	ELF(VFSNode *exec);
 	~ELF();
 
 	inline uintptr_t program_entry() { return m_elf_header.entry; }
@@ -56,8 +59,8 @@ class ELF {
 	enum SegmentFlags { EXEC = 1, WRITE = 2, READ = 4 };
 
 	void parse();
+	char *m_buffer = nullptr;
 	ElfHeader m_elf_header;
-	char *m_buffer;
-	[[maybe_unused]] size_t m_buffer_length;
-	Vec<ELFSectionHeader> m_headers;
+	VFSNode *m_exec_fd = nullptr;
+	ELFSectionHeader *m_headers = nullptr;
 };

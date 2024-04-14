@@ -13,8 +13,7 @@ Ext2Entry::Ext2Entry(Ext2FileSystem *fs, INode *&&inode)
 Ext2Entry::~Ext2Entry() { delete m_inode; }
 
 int Ext2Entry::read(void *buffer, size_t size) {
-	m_fs->read_from_inode(*m_inode, buffer, size);
-	return 0;
+	return m_fs->read_from_inode(*m_inode, buffer, size, m_position);
 }
 
 Ext2FileSystem::Ext2FileSystem(VFSNode *block_dev)
@@ -43,26 +42,24 @@ void Ext2FileSystem::seek_block(size_t block_addr) {
 	m_block_dev->seek(block_addr * block_size);
 }
 
-uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size) {
-	printk("read_from_inode\n");
-	size_t size_to_read = size;
-	size_t block_idx = 0;
+uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
+										 size_t position) {
+	size_t actual_size = (size > inode.size_low) ? inode.size_low : size;
+	size_t size_to_read = actual_size;
+	size_t block_idx = position / block_size;
 	if (size_to_read > inode.size_low) {
 		// size_to_read = inode.size_low;
 	}
-
-	/*
-	seek_block(inode.dbp[0]);
-	m_block_dev->read(((char *)out) + (0 * block_size),
-					  min(size_to_read, (size_t)block_size));
-					  */
 
 	uint32_t *singly_blocks = nullptr;
 	while (size_to_read) {
 		switch (block_idx / 12) {
 		case 0: {
 			seek_block(inode.dbp[block_idx]);
-			m_block_dev->read(((char *)out) + (block_idx * block_size),
+			m_block_dev->seek((inode.dbp[block_idx] * block_size) +
+							  (position % block_size));
+
+			m_block_dev->read((char *)out + (block_idx * block_size),
 							  min(size_to_read, (size_t)block_size));
 		} break;
 		case 1: {
@@ -71,14 +68,11 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size) {
 				seek_block(inode.sibp);
 				m_block_dev->read((char *)singly_blocks, sizeof(uint32_t) * 12);
 			}
-			for (int i = 0; i < 12; i++) {
-				printk("%d, ", singly_blocks[i]);
-			}
-			printk("\n");
 
-			printk("x %x\n", singly_blocks[block_idx - 12] * block_size);
-			seek_block(singly_blocks[block_idx - 12]);
-			m_block_dev->read(((char *)out) + (block_idx * block_size),
+			m_block_dev->seek((singly_blocks[block_idx - 12] * block_size) +
+							  (position % block_size));
+
+			m_block_dev->read((char *)out + (block_idx * block_size),
 							  min(size_to_read, (size_t)block_size));
 		} break;
 		default:
@@ -89,13 +83,12 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size) {
 	}
 
 	delete[] singly_blocks;
-	return size_to_read;
+	return actual_size;
 }
 
 Vec<Directory> Ext2FileSystem::scan_dir_entries(INode &inode) {
 	Vec<Directory> entries;
 	seek_block(inode.dbp[0]);
-	printk("%d\n", m_block_dev->position() - inode.dbp[0] * block_size);
 
 	// A group of directory entries fits into a single block. If size remains
 	// when all the directory entries are read, the last entry fills the rest of
@@ -138,12 +131,7 @@ VFSNode *Ext2FileSystem::traverse_internal(INode *cur_inode,
 	// Ext2 directories always contain at least 2 directories (. and ..).
 	// I'd rather have the VFS layer handle these, so we skip over them.
 	for (size_t i = 2; i < dir_entries.size(); i++) {
-		printk("\"%s\" == \"%s\"\n", dir_entries[i].name, path[path_index]);
 		if (!strcmp(dir_entries[i].name, path[path_index])) {
-			printk("found\n");
-			printk("inode index %d\n", dir_entries[i].entry.inode);
-			printk("s %s\n", path[path_index]);
-			printk("%s\n", dir_entries[i].name);
 			auto inode = read_inode(dir_entries[i].entry.inode);
 			return new Ext2Entry(this, move(inode));
 		}
