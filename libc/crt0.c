@@ -1,4 +1,4 @@
-extern int main();
+int main();
 
 void _start() {
 	int r = main();

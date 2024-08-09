@@ -32,7 +32,7 @@ template <typename T> class Vec {
 		return *t;
 	}
 
-	// soft way to access stuff
+	// soft way to access stuff (no)
 	T *get(size_t idx) {
 		if (idx >= m_size)
 			return nullptr;
@@ -45,13 +45,13 @@ template <typename T> class Vec {
 		m_size++;
 		if (container) {
 			// container = kmalloc(sizeof(T));
-			T *tmp = reinterpret_cast<T *>(kmalloc(sizeof(T) * m_size));
+			T *tmp = new T[m_size];
 			memcpy(tmp, container, sizeof(T) * m_size);
 			if (container)
 				kfree(container);
 			container = tmp;
 		} else {
-			container = reinterpret_cast<T *>(kmalloc(sizeof(T)));
+			container = new T[m_size];
 		}
 
 		container[m_size - 1] = entry;
@@ -63,7 +63,7 @@ template <typename T> class Vec {
 		T *tmp = nullptr;
 
 		if (m_size - 1 != 0) {
-			tmp = reinterpret_cast<T *>(kmalloc(sizeof(T) * m_size - 1));
+			tmp = new T[m_size-1];
 
 			uint32_t new_pos = 0;
 			for (uint32_t i = 0; i < m_size; i++) {

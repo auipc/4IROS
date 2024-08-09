@@ -38,48 +38,24 @@ void *memcpy(void *s1, const void *s2, size_t n) {
 	return s1;
 }
 
-void itoa(unsigned int n, char *buf, int base) {
-	unsigned long int tmp;
-	int i, j;
+void itoa(uint64_t n, char *buf, int base) {
+	int i = 0;
 
-	i = 0;
-
+	buf[i++] = '\0';
 	do {
-		tmp = n % base;
-		buf[i++] = (tmp < 10) ? (tmp + '0') : (tmp + 'a' - 10);
-	} while (n /= base);
-	buf[i--] = 0;
+		if ((n%base) < 10)
+			buf[i++] = '0'+(n%base);
+		else
+			buf[i++] = 'A'+((n-10)%base);
+		n /= base;
+	} while (n);
 
-	for (j = 0; j < i; j++, i--) {
-		tmp = buf[j];
-		buf[j] = buf[i];
-		buf[i] = tmp;
+	i--;
+	for (int j = 0; j < i; j++, i--) {
+		uint64_t tmp = buf[i];
+		buf[i] = buf[j];
+		buf[j] = tmp;
 	}
-}
-
-void ftoa(double f, char *buf, int precision) {
-	int pos = 0;
-	if (f < 0) {
-		buf[pos++] = '-';
-		f = -f;
-	}
-
-	int intPart = (int)f;
-	double remainder = f - (double)intPart;
-
-	itoa(intPart, buf + pos, 10);
-	pos += strlen(buf + pos);
-
-	buf[pos++] = '.';
-
-	for (int i = 0; i < precision; i++) {
-		remainder *= 10;
-		int digit = (int)remainder;
-		buf[pos++] = digit + '0';
-		remainder -= digit;
-	}
-
-	buf[pos] = '\0';
 }
 
 size_t strlen(const char *str) {

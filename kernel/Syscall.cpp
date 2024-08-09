@@ -9,10 +9,10 @@
 
 namespace Syscall {
 
-static bool verify_buffer(PageDirectory *pd, size_t buffer_addr, size_t size) {
-	size_t start_addr = buffer_addr - (buffer_addr % PAGE_SIZE);
+static bool verify_buffer(PageDirectory *pd, uintptr_t buffer_addr, size_t size) {
+	uintptr_t start_addr = buffer_addr - (buffer_addr % PAGE_SIZE);
 
-	for (size_t i = start_addr; i < PAGE_SIZE + size; i += PAGE_SIZE) {
+	for (uintptr_t i = start_addr; i < PAGE_SIZE + size; i += PAGE_SIZE) {
 		if (!pd->is_mapped(buffer_addr + i))
 			return false;
 		if (!pd->is_user_page(buffer_addr + i))
@@ -37,7 +37,7 @@ static void sys$exit(Process *current, int status) {
 }
 
 static size_t sys$exec(Process *current, const char *buffer) {
-	if (!verify_buffer(current->page_directory(), (size_t)buffer, 255))
+	if (!verify_buffer(current->page_directory(), (uintptr_t)buffer, 255))
 		return -1;
 
 	auto vp = VFS::the().parse_path(buffer);
@@ -74,7 +74,7 @@ asm("read_eip:");
 asm("pop %eax");
 asm("jmp *%eax");
 
-static size_t sys$write(Process *current, uint32_t handle, size_t buffer_addr,
+static size_t sys$write(Process *current, uint32_t handle, uintptr_t buffer_addr,
 						size_t length) {
 	auto current_pd = current->page_directory();
 
@@ -92,7 +92,7 @@ static size_t sys$write(Process *current, uint32_t handle, size_t buffer_addr,
 
 static int sys$open(Process *current, const char *buffer, int flags) {
 	(void)flags;
-	if (!verify_buffer(current->page_directory(), (size_t)buffer, PAGE_SIZE))
+	if (!verify_buffer(current->page_directory(), (uintptr_t)buffer, PAGE_SIZE))
 		return -1;
 
 	auto path = VFS::the().parse_path(buffer);
@@ -110,7 +110,7 @@ static int sys$open(Process *current, const char *buffer, int flags) {
 // for another process reading it).
 static int sys$read(Process *current, int fd, const char *buffer,
 					size_t count) {
-	if (!verify_buffer(current->page_directory(), (size_t)buffer, count))
+	if (!verify_buffer(current->page_directory(), (uintptr_t)buffer, count))
 		return -1;
 
 	if ((size_t)fd > (current->m_file_descriptors->size() - 1))

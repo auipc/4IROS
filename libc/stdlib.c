@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 
+#ifdef __i386__
 static size_t addr = 0;
 
 void *malloc(size_t size) {
@@ -11,3 +12,4 @@ void *malloc(size_t size) {
 	addr += size;
 	return p;
 }
+#endif

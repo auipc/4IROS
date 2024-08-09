@@ -1,169 +1,111 @@
-#include <kernel/arch/i386/IO.h>
+#include <kernel/arch/x86_common/IO.h>
 #include <kernel/printk.h>
 #include <kernel/util/Spinlock.h>
 #include <string.h>
 
+struct VGAChar {
+	char c;
+	uint8_t color;
+};
+
+// lol
+VGAChar* screen_buf = (VGAChar*)0xB8000;
+size_t screen_buf_x = 0;
+size_t screen_buf_y = 0;
 #define PORT 0x3f8
+#define SCREEN_SIZE (80*25*sizeof(VGAChar))
 
-int init_serial() {
-	outb(PORT + 1, 0x00); // Disable all interrupts
-	outb(PORT + 3, 0x80); // Enable DLAB (set baud rate divisor)
-	outb(PORT + 0, 0x03); // Set divisor to 3 (lo byte) 38400 baud
-	outb(PORT + 1, 0x00); //                  (hi byte)
-	outb(PORT + 3, 0x03); // 8 bits, no parity, one stop bit
-	outb(PORT + 2, 0xC7); // Enable FIFO, clear them, with 14-byte threshold
-	outb(PORT + 4, 0x0B); // IRQs enabled, RTS/DSR set
-	outb(PORT + 4, 0x1E); // Set in loopback mode, test the serial chip
-	outb(PORT + 0, 0xAE); // Test serial chip (send byte 0xAE and check if
-						  // serial returns same byte)
-
-	// Check if serial is faulty (i.e: not same byte as sent)
-	if (inb(PORT + 0) != 0xAE) {
-		return 1;
-	}
-
-	// If serial is not faulty set it in normal operation mode
-	// (not-loopback with IRQs enabled and OUT#1 and OUT#2 bits enabled)
-	outb(PORT + 4, 0x0F);
-	return 0;
-}
-
-int is_transmit_empty() { return inb(PORT + 5) & 0x20; }
-
-void write_serial(char a) {
-	while (is_transmit_empty() == 0)
-		;
-
-	outb(PORT, a);
-}
-
-static Spinlock s_print_spinlock;
-static PrintInterface *s_interface = nullptr;
-
-VGAInterface::VGAInterface()
-	: m_x(0), m_y(0), m_screen(reinterpret_cast<uint16_t *>(0xC03FF000)) {
-	init_serial();
-	clear_output();
-}
-
-void VGAInterface::clear_output() {
-	for (int i = 0; i < 80 * 25; i++) {
-		m_screen[i] = ' ' | (0x7 << 8);
-	}
-}
-
-void VGAInterface::write_character(char c) {
+void write_scb(char c, uint8_t color) {
 	if (c == '\n') {
-		m_x = 0;
-		m_y++;
-	} else {
-		m_screen[m_y * 80 + m_x] = c | (0x7 << 8);
-		m_x++;
+		screen_buf_x = 0;
+		screen_buf_y++;
+		return;
 	}
 
-	if (m_x >= 80) {
-		m_x = 0;
-		m_y++;
+	if (screen_buf_x == 80) {
+		screen_buf_x = 0;
+		screen_buf_y++;
 	}
 
-	// scroll the screen
-	if (m_y >= 25) {
-		memcpy((char *)m_screen, (char *)(m_screen) + 160, 160 * 24);
-		for (int i = 0; i < 80; i++) {
-			m_screen[24 * 80 + i] = ' ' | (0x7 << 8);
+	if (screen_buf_y >= 24) {
+		for (int i = 1; i < 25; i++) {
+			memcpy((char*)&screen_buf[screen_buf_x+80*(i-1)], (char*)&screen_buf[screen_buf_x+80*(i)], 80*sizeof(VGAChar));
 		}
-		m_y--;
+		memset((char*)&screen_buf[screen_buf_x+80*screen_buf_y], 0, 80*sizeof(VGAChar));
+		screen_buf_y--;
 	}
 
-	write_serial(c);
+	screen_buf[screen_buf_x+80*screen_buf_y].c = c;
+	screen_buf[screen_buf_x+80*screen_buf_y].color = color;
+	screen_buf_x++;
 }
 
-PrintInterface *printk_get_interface() { return s_interface; }
-
-void printk_use_interface(PrintInterface *interface) {
-	s_interface = interface;
+void write_scb_str(const char* str, uint8_t color) {
+	while (*str != '\0') {
+		write_scb(*str, color);
+		str++;
+	}
 }
 
-extern "C" void itoa(unsigned int n, char *buf, int base);
-extern "C" void ftoa(double f, char *buf, int precision);
+void screen_init() {
+	memset((char*)screen_buf, 0, SCREEN_SIZE);
+}
 
 void printk(const char *str, ...) {
-	if (!s_interface)
-		return;
-	s_print_spinlock.acquire();
-
-	__builtin_va_list ap;
-	__builtin_va_start(ap, str);
-	for (size_t j = 0; j < strlen(str); j++) {
-		char c = str[j];
-		switch (c) {
-		case '%': {
-			j++;
-			int precision = 6;
-			char c2 = str[j];
-			if (c2 == '.') {
-				precision = str[j + 1] - '0';
-				j += 2;
-				c2 = str[j];
-
-				// Skip invalid precision
-				if (precision > 9)
-					break;
-			}
-
-			switch (c2) {
-			case 'd': {
-				unsigned int value = __builtin_va_arg(ap, unsigned int);
-				char buffer[32];
-				itoa(value, buffer, 10);
-				for (size_t i = 0; i < strlen(buffer); i++) {
-					s_interface->write_character(buffer[i]);
+	__builtin_va_list list;
+	__builtin_va_start(list, str);
+	size_t next_str_length = 0;
+	while (*str != '\0') {
+		char c = *str;
+		switch(c) {
+			case '%': {
+				char c1 = *(++str);
+				switch(c1) {
+					case 'x': {
+						uint64_t n = __builtin_va_arg(list, uint64_t);
+						char buf[33] = {};
+						itoa(n, buf, 16);
+						write_scb_str(buf, 7);
+					} break;
+					case 'd': {
+						uint64_t n = __builtin_va_arg(list, uint64_t);
+						char buf[33] = {};
+						itoa(n, buf, 10);
+						write_scb_str(buf, 7);
+					} break;
+					case 's': {
+						char* str = __builtin_va_arg(list, char*);
+						write_scb_str(str, next_str_length ? next_str_length : strlen(str));
+						next_str_length = 0;
+					} break;
+					default: {
+						write_scb(c, 7);
+						write_scb(c1, 7);
+					} break;
 				}
-				break;
-			}
-			case 'x': {
-				int value = __builtin_va_arg(ap, unsigned long long);
-				char buffer[32];
-				itoa(value, buffer, 16);
-				for (size_t i = 0; i < strlen(buffer); i++) {
-					s_interface->write_character(buffer[i]);
-				}
-				break;
-			}
-			case 's': {
-				char *value = __builtin_va_arg(ap, char *);
-				for (size_t i = 0; i < strlen(value); i++) {
-					s_interface->write_character(value[i]);
-				}
-				break;
-			}
-			case 'c': {
-				char value = __builtin_va_arg(ap, int);
-				s_interface->write_character(value);
-				break;
-			}
-			case 'f': {
-				float value = __builtin_va_arg(ap, double);
-				char buffer[32];
-				ftoa(value, buffer, precision);
-				for (size_t i = 0; i < strlen(buffer); i++) {
-					s_interface->write_character(buffer[i]);
-				}
-				break;
-			}
+			} break;
 			default:
-				s_interface->write_character(c);
-				s_interface->write_character(c2);
+				write_scb(c, 7);
 				break;
-			}
-			break;
 		}
-		default:
-			if (s_interface)
-				s_interface->write_character(c);
-			break;
-		}
+		str++;
 	}
-	__builtin_va_end(ap);
-	s_print_spinlock.release();
+	__builtin_va_end(list);
+}
+
+[[noreturn]] void panic(const char *str) {
+	write_scb_str("PANIC: ", 7|(4<<4)|(8<<4));
+	write_scb_str(str, 7|(4<<4)|(8<<4));
+	
+	outb(0x43, (2<<6) | (3<<4) | (0b011<<1));
+	outb(0x42, 0xFF);
+	outb(0x42, 0xFF);
+
+	outb(0x61, 1<<1 | 1<<0);
+	for (size_t i = 0; i < 10000000; i++) {
+		asm volatile("nop");
+	}
+	outb(0x61, 0);
+
+	while(1);
 }

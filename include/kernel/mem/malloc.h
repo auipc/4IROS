@@ -5,7 +5,6 @@
 #include <stdint.h>
 
 extern bool g_use_halfway_allocator;
-// TODO Specify the amount of memory available to us
 void kmalloc_temp_init();
 void kmalloc_init();
 

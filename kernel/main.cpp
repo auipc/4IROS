@@ -17,19 +17,6 @@
 #include <kernel/util/Vec.h>
 #include <kernel/vfs/vfs.h>
 
-Spinlock cxa_spinlock;
-
-extern "C" int __cxa_guard_acquire(long long int *) {
-	cxa_spinlock.acquire();
-	return 1;
-}
-
-extern "C" void __cxa_guard_release(long long int *) { cxa_spinlock.release(); }
-
-extern "C" void __cxa_pure_virtual() {
-	// Do nothing or print an error message.
-}
-
 extern "C" void syscall_interrupt_handler();
 
 extern "C" void syscall_interrupt(InterruptRegisters &regs) {

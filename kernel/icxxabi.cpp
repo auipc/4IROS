@@ -1,4 +1,5 @@
 #include <kernel/icxxabi.h>
+#include <kernel/util/Spinlock.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -9,6 +10,19 @@ uarch_t __atexit_func_count = 0;
 
 void *__dso_handle = 0; // Attention! Optimally, you should remove the '= 0'
 						// part and define this in your asm script.
+
+Spinlock cxa_spinlock;
+
+int __cxa_guard_acquire(long long int *) {
+	cxa_spinlock.acquire();
+	return 1;
+}
+
+void __cxa_guard_release(long long int *) { cxa_spinlock.release(); }
+
+void __cxa_pure_virtual() {
+	// Do nothing or print an error message.
+}
 
 int __cxa_atexit(void (*f)(void *), void *objptr, void *dso) {
 	if (__atexit_func_count >= ATEXIT_MAX_FUNCS) {
