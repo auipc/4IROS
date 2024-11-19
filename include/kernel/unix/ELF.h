@@ -9,6 +9,18 @@
 
 enum ELFArch : uint16_t { Unspecified = 0, x86 = 0x03, Arm = 0x28 };
 
+struct ELFPlatAgon {
+	char magic[4];
+	uint8_t subarch;
+	uint8_t endian;
+	uint8_t version;
+	uint8_t abi;
+	char unused[8];
+	uint16_t bintype;
+	ELFArch isa;
+	uint32_t ver;
+};
+
 struct ELFHeader32 {
 	char magic[4];
 	uint8_t subarch;
@@ -75,12 +87,7 @@ struct ELFSectionHeader64 {
 	uint64_t alignment;
 } PACKED;
 
-#if defined(__i386__)
-typedef ELFHeader32 ElfHeader;
-typedef ELFSectionHeader32 ELFSectionHeader;
-#elif defined(__x86_64__)
-typedef ELFHeader64 ElfHeader;
-typedef ELFSectionHeader64 ELFSectionHeader;
+#if defined(__i386__) || defined(__x86_64__)
 #else
 #error Unsupported architecture
 #endif

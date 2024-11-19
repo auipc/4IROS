@@ -8,6 +8,8 @@ set(SRCS
         x64_start.cpp
 )
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+
 add_executable(BOOT_SHIM ${SRCS})
 
 target_include_directories(BOOT_SHIM PRIVATE ${CMAKE_SOURCE_DIR}/include)
@@ -16,3 +18,4 @@ target_link_libraries(BOOT_SHIM ${CMAKE_CURRENT_BINARY_DIR}/4IROS.o)
 #target_link_libraries(BOOT_SHIM ${LIBK_DIR}/libk.a)
 target_link_options(BOOT_SHIM PRIVATE LINKER:-T ${CMAKE_SOURCE_DIR}/kernel/arch/amd64/linker.ld -nostdlib -nodefaultlibs)
 set_target_properties(BOOT_SHIM PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/kernel/linker.ld)
+add_dependencies(BOOT_SHIM 4IROS)

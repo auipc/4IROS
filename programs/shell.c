@@ -23,7 +23,7 @@ void builtin_echo(int argc, char **argv) {
 static const builtin_t s_builtins[] = {{"echo", &builtin_echo}};
 
 void handle_cmd(const char *buf, size_t buf_sz) {
-	pid_t pid;
+	pid_t pid = 0;
 	int status = 0;
 	if (buf_sz <= 1)
 		return;
@@ -73,9 +73,8 @@ void handle_cmd(const char *buf, size_t buf_sz) {
 }
 
 int main() {
-	char buf[4096] = {};
+	char* buf = (char*)malloc(4096);
 	size_t buf_sz = 0;
-
 	printf(">");
 	while (1) {
 		buf_sz += read(0, buf + buf_sz, 1);

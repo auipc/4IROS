@@ -28,5 +28,11 @@ SECTIONS
 		*(.bootstrap_stack)
 	}
 
+	.temp_page ALIGN(4K) : {
+		_heap_start = .;
+		. += 0x30000;
+		_heap_end = .;
+	}
+
 	_kernel_end = .;
 }

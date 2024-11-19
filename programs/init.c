@@ -14,6 +14,8 @@ int main() {
 	}
 
 	waitpid(pid, NULL, 0);
+	printf("Exit PID %d\n", pid);
+	while(1);
 
 	/*
 	printf("pid: %d\n", pid);

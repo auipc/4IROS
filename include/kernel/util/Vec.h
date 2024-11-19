@@ -39,6 +39,10 @@ template <typename T> class Vec {
 		return &container[idx];
 	}
 
+	T *data() {
+		return container;
+	}
+
 	inline size_t size() { return m_size; }
 
 	void push(T entry) {

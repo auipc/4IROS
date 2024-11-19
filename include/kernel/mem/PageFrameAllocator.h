@@ -8,7 +8,7 @@ class PageFrameAllocator {
   public:
 	PageFrameAllocator(size_t memory_size);
 	~PageFrameAllocator();
-	void mark_range(uint32_t start, uint32_t end);
+	void mark_range(uintptr_t start, size_t end);
 	size_t find_free_page();
 	size_t find_free_pages(size_t pages);
 	void release_page(size_t page);

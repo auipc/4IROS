@@ -2,7 +2,6 @@
 .macro pushregs
 	pushq %rbp
 	movq %rsp, %rbp
-	subq $112, %rsp
 	pushq %r8
 	pushq %r9
 	pushq %r10
@@ -17,6 +16,7 @@
 	pushq %rcx
 	pushq %rbx
 	pushq %rax
+	movq %rsp, %rdi
 .endm
 
 .macro popregs
@@ -34,8 +34,6 @@
 	popq %r10
 	popq %r9
 	popq %r8
-	//addq $8, %rsp
-	addq $112, %rsp
 	popq %rbp
 .endm
 
@@ -147,10 +145,21 @@ interrupt_16_begin:
 interrupt_65_begin:
 	cli
 	pushregs
-	call keyboard_interrupt
+	call ps2kbd_interrupt
 	popregs
 	sti
 	iretq
+
+
+.global interrupt_78_begin
+interrupt_78_begin:
+	cli
+	pushregs
+	call write_eoi
+	popregs
+	sti
+	iretq
+
 
 .global interrupt_85_begin
 interrupt_85_begin:

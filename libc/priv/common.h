@@ -10,5 +10,6 @@ enum {
 	SYS_OPEN = 6,
 	SYS_MMAP = 8,
 	SYS_WAITPID = 9,
+	SYS_LSEEK = 10,
 };
 #endif

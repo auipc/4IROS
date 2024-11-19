@@ -30,7 +30,7 @@ int printf(const char *str, ...) {
 			switch (c2) {
 			case 'd': {
 				unsigned int value = __builtin_va_arg(ap, unsigned int);
-				char buffer[10];
+				char buffer[10] = {};
 				itoa(value, buffer, 10);
 				write(1, buffer, strlen(buffer));
 				break;

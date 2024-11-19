@@ -1,295 +1,19 @@
-#include <kernel/arch/i386/kernel.h>
 #include <kernel/assert.h>
 #include <kernel/mem/PageFrameAllocator.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
+#include <kernel/arch/amd64/x86_64.h>
 #include <string.h>
 
 // #define DEBUG_PAGING
 
-extern "C" PageDirectory boot_page_directory;
+//extern "C" PageLevel boot_page_directory;
 
 Paging *Paging::s_instance = nullptr;
-PageDirectory *Paging::s_kernel_page_directory = nullptr;
-PageDirectory *Paging::s_current_page_directory = &boot_page_directory;
+RootPageLevel *Paging::s_kernel_page_directory = nullptr;
 
 Paging *Paging::the() { return s_instance; }
-
-// Instead of new_directory, maybe we could just have a page directory for
-// operating on pages...
-#if 0
-PageTable *PageTable::clone(size_t idx) {
-	PageTable *src = this;
-	PageTable *dst = new PageTable();
-
-	// page aligned
-	assert(reinterpret_cast<uint32_t>(dst) % PAGE_SIZE == 0);
-
-	for (int i = 0; i < 1024; i++) {
-		if (!src->entries[i].present)
-			continue;
-
-		// just copy all values, what could go wrong.
-		dst->entries[i].value = src->entries[i].value;
-
-		auto free_page = Paging::the()->m_allocator->find_free_page();
-
-#ifdef DEBUG_PAGING
-		printk("free page: %x\n", free_page);
-		printk("physical address: %x\n", free_page);
-#endif
-
-		Paging::the()->map_page(free_page + VIRTUAL_ADDRESS, free_page, 0);
-		Paging::the()->map_page(src->entries[i].get_page_base() +
-									VIRTUAL_ADDRESS,
-								src->entries[i].get_page_base(), 0);
-#ifdef DEBUG_PAGING
-		printk("Copying from %x to %x\n",
-			   src->entries[i].get_page_base() + VIRTUAL_ADDRESS,
-			   free_page + VIRTUAL_ADDRESS);
-#endif
-
-		memcpy(reinterpret_cast<void *>(free_page + VIRTUAL_ADDRESS),
-			   reinterpret_cast<void *>(src->entries[i].get_page_base() +
-										VIRTUAL_ADDRESS),
-			   PAGE_SIZE);
-
-		Paging::the()->unmap_page(free_page + VIRTUAL_ADDRESS);
-		Paging::the()->unmap_page(src->entries[i].get_page_base() +
-								  VIRTUAL_ADDRESS);
-
-		printk("ent %x\n", &dst->entries[i]);
-		printk("fp %x\n", free_page);
-		dst->entries[i].set_page_base(free_page);
-
-		// sanity check
-		assert(!Paging::the()->is_mapped(free_page + VIRTUAL_ADDRESS));
-		assert(!Paging::the()->is_mapped(src->entries[i].get_page_base() +
-										 VIRTUAL_ADDRESS));
-		// TODO we need to be able to temporarily identity map this address so
-		// we can copy it's contents
-#ifdef DEBUG_PAGING
-		printk("free page: %x\n", Paging::the()->m_allocator->find_free_page());
-#endif
-	}
-
-	// FIXME memory leak
-	return dst;
-}
-#endif
-
-void PageDirectory::map_page(size_t virtual_address, size_t physical_address,
-							 int flags) {
-	bool user_supervisor = (flags & PageFlags::USER) != 0;
-	bool read_only = (flags & PageFlags::READONLY) != 0;
-
-#ifdef DEBUG_PAGING
-	printk("user_supervisor %d read_only %d\n", user_supervisor, read_only);
-#endif
-
-	auto page_directory_index = get_page_directory_index(virtual_address);
-	auto page_table_index = get_page_table_index(virtual_address);
-
-	if (!entries[page_directory_index].present) {
-		entries[page_directory_index].set_page_table(new PageTable());
-		entries[page_directory_index].present = 1;
-		entries[page_directory_index].read_write = 1;
-		if (!entries[page_directory_index].user_supervisor)
-			entries[page_directory_index].user_supervisor = user_supervisor;
-	} else {
-#ifdef DEBUG_PAGING
-		printk("Page table already exists: %x\n", page_directory_index);
-		printk("Is writable: %d\n", entries[page_directory_index].read_write);
-#endif
-	}
-
-	auto &page_table_entry = entries[page_directory_index]
-								 .get_page_table()
-								 ->entries[page_table_index];
-
-	memset(reinterpret_cast<char *>(&page_table_entry), 0,
-		   sizeof(PageTableEntry));
-
-	page_table_entry.set_page_base(physical_address);
-
-	page_table_entry.user_supervisor = user_supervisor;
-	page_table_entry.read_write = !read_only;
-	page_table_entry.present = 1;
-
-#ifdef DEBUG_PAGING
-	printk("Mapped page: %x -> %x\n", virtual_address, physical_address);
-#endif
-
-	if (this == Paging::the()->current_page_directory()) {
-#ifdef DEBUG_PAGING
-		printk("Invalidating page: %x\n", virtual_address);
-#endif
-		asm volatile("invlpg (%0)" ::"r"(virtual_address) : "memory");
-	}
-}
-
-bool PageDirectory::is_mapped(size_t virtual_address) {
-	auto page_directory_index = get_page_directory_index(virtual_address);
-	auto page_table_index = get_page_table_index(virtual_address);
-
-	if (!entries[page_directory_index].present)
-		return false;
-	if (!entries[page_directory_index]
-			 .get_page_table()
-			 ->entries[page_table_index]
-			 .present)
-		return false;
-
-	return true;
-}
-
-bool PageDirectory::is_user_page(size_t virtual_address) {
-	auto page_directory_index = get_page_directory_index(virtual_address);
-	auto page_table_index = get_page_table_index(virtual_address);
-
-	if (!entries[page_directory_index].user_supervisor)
-		return false;
-
-	if (!entries[page_directory_index]
-			 .get_page_table()
-			 ->entries[page_table_index]
-			 .user_supervisor)
-		return false;
-
-	return true;
-}
-
-void PageDirectory::map_range(size_t virtual_address, size_t length,
-							  int flags) {
-	if (!length)
-		return;
-	if (length < PAGE_SIZE) {
-		length += PAGE_SIZE - length;
-	}
-
-	size_t number_of_pages = (length + PAGE_SIZE - 1) / PAGE_SIZE;
-
-	/*
-	size_t free_pages =
-		Paging::the()->m_allocator->find_free_pages(number_of_pages);*/
-	for (size_t i = 0; i < number_of_pages; i++) {
-		size_t free_page = Paging::the()->m_allocator->find_free_page();
-		auto address = virtual_address + (i * PAGE_SIZE);
-		if (!is_mapped(address)) {
-			map_page(address, free_page, flags);
-		} else {
-			bool user_supervisor = (flags & PageFlags::USER) != 0;
-			bool read_only = (flags & PageFlags::READONLY) != 0;
-
-			auto page_directory_index = get_page_directory_index(address);
-			auto page_table_index = get_page_table_index(address);
-
-			if (!entries[page_directory_index].present) {
-				return;
-			}
-
-			entries[page_directory_index].user_supervisor = 1;
-			entries[page_directory_index].read_write = 1;
-
-			auto &page_table_entry = entries[page_directory_index]
-										 .get_page_table()
-										 ->entries[page_table_index];
-
-			page_table_entry.user_supervisor = user_supervisor;
-			page_table_entry.read_write = !read_only;
-			page_table_entry.present = 1;
-
-			if (this == Paging::the()->current_page_directory()) {
-				asm volatile("invlpg (%0)" ::"r"(virtual_address) : "memory");
-			}
-		}
-	}
-}
-
-void PageDirectory::unmap_page(size_t virtual_address) {
-	auto pt_e = entries[get_page_directory_index(virtual_address)];
-	if (!pt_e.present) {
-		assert(false);
-		return;
-	}
-	auto pt = pt_e.get_page_table();
-
-	auto page = &pt->entries[get_page_table_index(virtual_address)];
-	Paging::the()->allocator()->release_page(page->get_page_base());
-	page->present = 0;
-
-	if (this == Paging::the()->current_page_directory()) {
-		asm volatile("invlpg (%0)" ::"r"(virtual_address) : "memory");
-	}
-}
-
-void PageDirectory::unmap_range(size_t virtual_address, size_t length) {
-	if (!length)
-		return;
-	if (length < PAGE_SIZE) {
-		length += PAGE_SIZE - length;
-	}
-
-	size_t number_of_pages = (length + PAGE_SIZE - 1) / PAGE_SIZE;
-
-	for (size_t i = 0; i < number_of_pages; i++) {
-		unmap_page(virtual_address + (number_of_pages * PAGE_SIZE));
-	}
-}
-
-PageDirectory *PageDirectory::clone() {
-	PageDirectory *src = this;
-	PageDirectory *dst = new PageDirectory();
-
-	PageDirectory *old = Paging::current_page_directory();
-	Paging::switch_page_directory(Paging::s_kernel_page_directory);
-
-	// page aligned
-	assert(reinterpret_cast<uint32_t>(dst) % PAGE_SIZE == 0);
-
-	// sux.
-	for (int i = 0; i < 1024; i++) {
-		// if (!Paging::s_kernel_page_directory->entries[i].present)
-		// continue;
-
-		// if (src->entries[i].present)
-		//	continue;
-
-		dst->entries[i].value = src->entries[i].value;
-
-		if (Paging::s_kernel_page_directory->entries[i].present)
-			continue;
-
-		if (!src->entries[i].present)
-			continue;
-
-		auto dst_pt = new PageTable();
-		dst->entries[i].set_page_table(dst_pt);
-		for (int j = 0; j < 1024; j++) {
-			auto src_pte = src->entries[i].get_page_table()->entries[j];
-			if (!src_pte.present)
-				continue;
-			auto free_page = Paging::the()->m_allocator->find_free_page();
-			dst_pt->entries[j].value = src_pte.value;
-			dst_pt->entries[j].present = 1;
-			dst_pt->entries[j].set_page_base(free_page);
-
-			Paging::current_page_directory()->map_page(free_page + 0xF0000000,
-													   free_page, 0);
-			Paging::current_page_directory()->map_page(
-				src_pte.get_page_base() + 0xF0000000, src_pte.get_page_base(),
-				0);
-
-			// gawdy
-			memcpy((void *)(free_page + 0xF0000000),
-				   (void *)(src_pte.get_page_base() + 0xF0000000), PAGE_SIZE);
-		}
-	}
-
-	Paging::switch_page_directory(old);
-	return dst;
-}
 
 size_t Paging::s_pf_allocator_base = 0;
 size_t Paging::s_pf_allocator_end = 0;
@@ -303,15 +27,13 @@ void *Paging::pf_allocator(size_t size) {
 	return addr;
 }
 
-extern "C" char _kernel_start;
-extern "C" char _kernel_end;
-Paging::Paging(size_t total_memory) {
-	static const size_t kstart = reinterpret_cast<size_t>(&_kernel_start);
-	static const size_t kend = reinterpret_cast<size_t>(&_kernel_end);
-	printk("kend: %x\n", kend);
+Paging::Paging(size_t total_memory, const KernelBootInfo& kbootinfo) {
+	static const size_t kstart = reinterpret_cast<size_t>(kbootinfo.kmap_start);
+	static const size_t ksz = reinterpret_cast<size_t>(kbootinfo.kmap_end);
 
-	PageDirectory *pd = s_kernel_page_directory;
+	//PageLevel *pd = s_kernel_page_directory;
 
+	/*
 	s_pf_allocator_base = page_align(kend + PAGE_SIZE);
 	s_pf_allocator_end = page_align(
 		s_pf_allocator_base + PageFrameAllocator::alloc_size(total_memory) +
@@ -319,47 +41,272 @@ Paging::Paging(size_t total_memory) {
 
 	for (size_t ptr = s_pf_allocator_base; ptr < s_pf_allocator_end;
 		 ptr += PAGE_SIZE) {
-		PageDirectory *pd = s_kernel_page_directory;
+		PageLevel *pd = s_kernel_page_directory;
 		pd->map_page(ptr, ptr - VIRTUAL_ADDRESS, 0);
-	}
+	}*/
 
-	g_use_halfway_allocator = true;
+	//g_use_halfway_allocator = true;
 	// PageFrameAllocator structures
 	m_allocator = new PageFrameAllocator(total_memory);
-	g_use_halfway_allocator = false;
+	m_allocator->mark_range(0x0, 0xFFFFF+kstart+ksz+0x00100000+100*KB);
+	printk("lol %x\n", 0xFFFFF+kstart+ksz+0x00100000+100*KB);
+	//m_allocator->mark_range(kstart, ksz);
+	// I forgor the size of the bootloader help
+	//m_allocator->mark_range(0x00100000, 100*KB);
 
-	for (int i = 0; i < 1024; i++) {
-		if (!pd->entries[i].present)
-			continue;
-
-		auto pt = pd->entries[i].get_page_table();
-		for (int j = 0; j < 1024; j++) {
-			if (!pt->entries[j].present)
-				continue;
-
-			auto base = pt->entries[j].get_page_base();
-			m_allocator->mark_range(base, base + PAGE_SIZE);
-		}
-	}
-
-	m_allocator->mark_range(s_pf_allocator_base - VIRTUAL_ADDRESS,
-							s_pf_allocator_end - s_pf_allocator_base);
-
-	// https://wiki.osdev.org/Memory_Map_(x86)#Real_mode_address_space_.28.3C_1_MiB.29
-	// The lower half of memory really shouldn't be touched. Way too much BIOS
-	// related functionality depends on it, even in protected mode! The benefits
-	// of reclaiming this memory are insignificant.
-	m_allocator->mark_range(0x0, 0xFFFFF);
-
-	m_allocator->mark_range(kstart, kend - kstart);
-	m_safe_area = kmalloc_aligned(PAGE_SIZE * 2, PAGE_SIZE);
+	// Safe area to map and edit pages
+	m_safe_area = (uint8_t*)kmalloc_aligned(PAGE_SIZE * 2, PAGE_SIZE);
 }
 
 Paging::~Paging() { delete m_allocator; }
 
-void Paging::setup(size_t total_memory) {
-	s_kernel_page_directory = &boot_page_directory;
-	s_instance = new Paging(total_memory);
-	s_kernel_page_directory = s_kernel_page_directory->clone();
+// FIXME we need a ref counter for allocated pages or smth
+void Paging::unmap_page(RootPageLevel& pd, uintptr_t virt) {
+	auto current_pgl = (RootPageLevel*)get_cr3();
+	switch_page_directory(m_safe_pgl);
+	auto& pdpt = pd.entries[(virt>>39)&0x1ff];
+	if (!pdpt.is_mapped()) return;
+	auto& pdpte = pdpt.level()->entries[(virt>>30)&0x1ff];
+	if (!pdpte.is_mapped()) return;
+	auto& pdt = pdpte.level()->entries[(virt>>21)&0x1ff];
+	if (!pdt.is_mapped()) return;
+	auto& pt = pdt.level()->entries[(virt>>12)&0x1ff];
+	if (!pt.is_mapped()) return;
+
+	m_allocator->release_page(pt.addr());
+	pt.pdata = 0;
+
+	// FIXME INVLPG isn't working and I'm too lazy to figure it out
+	asm volatile("mov %0, %%cr3"::"a"(get_cr3()));
+	switch_page_directory(current_pgl);
+}
+
+#if 0
+void Paging::map_page_assume(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags) {
+	auto current_pgl = (RootPageLevel*)get_cr3();
+	switch_page_directory(m_safe_pgl);
+	auto& pdpt = pd.entries[(virt>>39)&0x1ff];
+	if (!pdpt.is_mapped()) {
+		Debug::stack_trace();
+		panic("pdpt NM");
+	}
+
+	auto& pdpte = pdpt.level()->entries[(virt>>30)&0x1ff];
+	if (!pdpte.is_mapped()) {
+		printk("lol %x\n", pdpt.pdata);
+		printk("lol %x\n", pdpte.pdata);
+		Debug::stack_trace();
+		panic("pdpte NM");
+	}
+	auto& pdt = pdpte.level()->entries[(virt>>21)&0x1ff];
+	if (!pdt.is_mapped()) panic("pdt NM");
+	auto& pt = pdt.level()->entries[(virt>>12)&0x1ff];
+	if (!pt.is_mapped()) panic("pt NM");
+
+	pdpt.copy_flags(flags);
+	pdpte.copy_flags(flags);
+	pdt.copy_flags(flags);
+	pt.pdata = phys | flags;
+
+	// FIXME INVLPG isn't working and I'm too lazy to figure it out
+	asm volatile("mov %0, %%cr3"::"a"(get_cr3()));
+	switch_page_directory(current_pgl);
+}
+#endif
+
+extern "C" char _heap_start;
+
+void Paging::create_page_level(PageSkellington& lvl) {
+	PageLevel* pvl = new PageLevel();
+	// FIXME oh no
+	lvl.set_addr(((uintptr_t)pvl)-0x280103000+0x20000+0x4000);
+}
+
+// change flags of subpages, use when flags are mutually exclusive 
+// i.e. user can exist in a kernel root page but kernel pages cannot exist in a user page.
+#if 0
+void Paging::mark_sub(PageLevel& plv, uint64_t flags) {
+	for (int i = 0; i < 512; i++) {
+		auto e = plv->entries[i];
+		if ((e.flags() & PAEPageFlags::User) == (flags & PAEPageFlags::User)) 
+		for (int j = 0; j < 512; j++) {
+			for (int k = 0; k < 512; K++) {
+			}
+		}
+	}
+}
+#endif
+
+// FIXME when permissions are conflicting, the lesser strict permission.
+void Paging::map_page(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags) {
+	auto current_pgl = (RootPageLevel*)get_cr3();
+	switch_page_directory(m_safe_pgl);
+	auto& pdpt = pd.entries[(virt>>39)&0x1ff];
+	uint64_t cast_flags = flags & (PAEPageFlags::User | PAEPageFlags::Write | PAEPageFlags::ExecuteDisable);
+
+	if (!pdpt.is_mapped()) {
+		printk("vvvv %x\n", (virt>>39)&0x1ff);
+		create_page_level(pdpt);
+		pdpt.pdata |= pdpt.flags() | flags;
+	}
+
+	pdpt.pdata |= pdpt.flags() | cast_flags;
+
+	auto& pdpte = pdpt.level()->entries[(virt>>30)&0x1ff];
+	if (!pdpte.is_mapped()) {
+		create_page_level(pdpte);
+		pdpte.pdata |= pdpt.flags() | flags;
+	}
+
+	pdpte.pdata |= pdpte.flags() | cast_flags;
+
+	auto& pdt = pdpte.level()->entries[(virt>>21)&0x1ff];
+	if (!pdt.is_mapped()) {
+		create_page_level(pdt);
+		pdt.pdata |= pdpt.flags() | flags;
+	}
+
+	pdt.pdata |= pdt.flags() | cast_flags;
+
+	auto& pt = pdt.level()->entries[(virt>>12)&0x1ff];
+	pt.pdata = phys | flags;
+
+	// FIXME INVLPG isn't working and I'm too lazy to figure it out
+	//asm volatile("mov %0, %%cr3"::"a"(get_cr3()));
+	switch_page_directory(current_pgl);
+}
+
+uintptr_t RootPageLevel::get_page_flags(uintptr_t addr) {
+	auto& pdpt = entries[addr>>39];
+	if (!pdpt.is_mapped()) return 0;
+	auto& pdpte = pdpt.level()->entries[addr>>30];
+	if (!pdpte.is_mapped()) return 0;
+	auto& pdt = pdpte.level()->entries[addr>>21];
+	if (!pdt.is_mapped()) return 0;
+	auto& pt = pdt.level()->entries[addr>>12];
+	return pt.flags();
+}
+
+char* temp_area[6] = {};
+RootPageLevel* Paging::clone(const RootPageLevel& pml4) {
+	auto root_page = m_allocator->find_free_page();
+	//auto current_pgl = (RootPageLevel*)get_cr3();
+	map_page(*(RootPageLevel*)get_cr3(), root_page, root_page);
+	//switch_page_directory(m_safe_pgl);
+	//map_page(*(RootPageLevel*)get_cr3(), root_page, root_page);
+	auto root_pd = new ((void*)root_page) RootPageLevel();
+
+	for (int i = 0; i < 512; i++) {
+		auto& root_pdpt = root_pd->entries[i];
+		auto pdpt = pml4.entries[i];
+		if (!pdpt.is_mapped()) continue;
+		if (!(pdpt.flags() & PAEPageFlags::User)) {
+			root_pdpt.pdata = pdpt.pdata;
+			continue;
+		}
+		// TODO copy
+		if (!root_pdpt.is_mapped()) {
+			create_page_level(root_pdpt);
+		}
+
+		for (int j = 0; j < 512; j++) {
+			auto& root_pdpte = root_pdpt.level()->entries[j];
+			auto pdpte = pdpt.level()->entries[j];
+			root_pdpte.pdata = pdpte.pdata;
+		}
+		panic("wow");
+	}
+
+	//switch_page_directory(current_pgl);
+	return root_pd;
+}
+
+RootPageLevel* Paging::clone_for_fork(const RootPageLevel& pml4, bool just_copy) {
+	auto root_page = m_allocator->find_free_page();
+	//auto current_pgl = (RootPageLevel*)get_cr3();
+	map_page(*(RootPageLevel*)get_cr3(), root_page, root_page);
+	//switch_page_directory(m_safe_pgl);
+	//map_page(*(RootPageLevel*)get_cr3(), root_page, root_page);
+	auto root_pd = new ((void*)root_page) RootPageLevel();
+
+	for (int i = 0; i < 512; i++) {
+		auto& root_pdpt = root_pd->entries[i];
+		auto pdpt = pml4.entries[i];
+		if (!pdpt.is_mapped()) continue;
+		if (!pdpt.is_user() && !just_copy) {
+			root_pdpt.pdata = pdpt.pdata;
+			continue;
+		}
+		// TODO copy
+		if (!root_pdpt.is_mapped()) {
+			root_pdpt.copy_flags(pdpt.pdata);
+			create_page_level(root_pdpt);
+		}
+
+		for (int j = 0; j < 512; j++) {
+			auto& root_pdpte = root_pdpt.level()->entries[j];
+			auto pdpte = pdpt.level()->entries[j];
+			if (!pdpte.is_mapped()) continue;
+
+			if (!pdpte.is_user() && !just_copy) {
+				root_pdpte.pdata = pdpte.pdata;
+				continue;
+			}
+
+			if (!root_pdpte.is_mapped()) {
+				root_pdpte.copy_flags(pdpte.pdata);
+				create_page_level(root_pdpte);
+			}
+
+			for (int k = 0; k < 512; k++) {
+				auto& root_pdt = root_pdpte.level()->entries[k];
+				auto pdt = pdpte.level()->entries[k];
+				if (!pdt.is_mapped()) continue;
+
+				if (!pdt.is_user()) {
+					root_pdt.pdata = pdt.pdata;
+					continue;
+				}
+
+				if (!root_pdt.is_mapped()) {
+					root_pdt.copy_flags(pdt.pdata);
+					create_page_level(root_pdt);
+				}
+
+				for (int l = 0; l < 512; l++) {
+					auto& root_pt = root_pdt.level()->entries[l];
+					auto pt = pdt.level()->entries[l];
+					if (!pt.is_mapped()) continue;
+
+					if (!pt.is_user()) {
+						root_pt.pdata = pt.pdata;
+						continue;
+					}
+
+					auto free_page = m_allocator->find_free_page();
+
+					map_page(*(RootPageLevel*)get_cr3(), (uintptr_t)temp_area[0], pt.addr());
+					map_page(*(RootPageLevel*)get_cr3(), (uintptr_t)temp_area[1], free_page);
+					memcpy((void*)temp_area[1], (void*)temp_area[0], sizeof(char)*PAGE_SIZE);
+
+					root_pt.copy_flags(pt.pdata);
+					root_pt.set_addr(free_page);
+				}
+			}
+		}
+		//panic("wow");
+	}
+
+	return root_pd;
+}
+
+void Paging::setup(size_t total_memory, const KernelBootInfo& kbootinfo) {
+	for (int i = 0; i < 2; i++) {
+		temp_area[i] = (char*)kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+	}
+	s_instance = new Paging(total_memory, kbootinfo);
+	Paging::the()->m_safe_pgl = (RootPageLevel*)get_cr3();
+	s_kernel_page_directory = Paging::the()->clone(*(RootPageLevel*)get_cr3());
 	switch_page_directory(s_kernel_page_directory);
+	printk("Clone done\n");
 }

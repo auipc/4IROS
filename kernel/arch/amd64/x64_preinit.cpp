@@ -1,10 +1,16 @@
 //#define TEST_TIMER
 #include <kernel/mem/malloc.h>
 #include <kernel/arch/amd64/kernel.h>
+#include <kernel/mem/Paging.h>
+#include <kernel/Debug.h>
 #include <string.h>
 #include <kernel/arch/x86_common/IO.h>
 #include <kernel/arch/amd64/x86_64.h>
 #include <kernel/arch/amd64/x64_sched_help.h>
+#include <kernel/vfs/vfs.h>
+#include <kernel/unix/ELF.h>
+#include <kernel/multiboot.h>
+#include <kernel/shedule/proc.h>
 
 struct IDTPTR {
 	uint16_t limit;
@@ -50,6 +56,8 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 #define INT(no) \
 	assert((uint64_t)&interrupt_##no##_begin <= BIT48_MAX); \
 	idtgate[no].present = 1; \
+	/* remove me?*/ \
+	/*idtgate[no].ist = 1;*/ \
 	idtgate[no].segment = 0x8; \
 	idtgate[no].type = (no < 0x10) ? 0xe : 0xf; \
 	idtgate[no].offset_lo = (uint64_t)&interrupt_##no##_begin & 0xFFFF; \
@@ -68,7 +76,9 @@ INTEXT(13);
 INTEXT(14);
 INTEXT(16);
 INTEXT(65);
+INTEXT(78);
 INTEXT(85);
+
 
 void interrupts_init() {
 	//get_idt(&idtptr);
@@ -97,6 +107,7 @@ void interrupts_init() {
 	INT(14);
 	INT(16);
 	INT(65);
+	INT(78);
 	INT(85);
 
 	uint64_t ptr = (uint64_t)&idtptr;
@@ -201,6 +212,16 @@ uint64_t to_virt(uint64_t addr) {
 #define VIRT_MASK_ADDR(x,y) (x + (((virt>>y))&0x1ffull))
 //#define VIRT_MASK_ADDR(x,y) (x + (((virt>>y))&0x1ffull))
 
+uintptr_t get_page_map(uint64_t virt) {
+	PageLevel* pml4 = 0;
+	asm volatile("mov %%cr3, %%rax":"=a"(pml4):);
+	auto p1 = pml4->entries[(virt>>39)&0x1ff].level();
+	auto p2 = p1->entries[(virt>>30)&0x1ff].level();
+	auto p3 = p2->entries[(virt>>21)&0x1ff].level();
+	auto p4 = p3->entries[(virt>>12)&0x1ff].addr();
+	return p4;
+}
+
 void simp_map_page(uint64_t virt, uint64_t phys) {
 	printk("Map %x\n", virt);
 	uint64_t* pml4 = 0;
@@ -225,9 +246,11 @@ void simp_map_page(uint64_t virt, uint64_t phys) {
 
 	uint64_t* pte = (uint64_t*)VIRT_MASK_ADDR((uint64_t*)to_virt(*pt & ~4095ull), 12);
 
+#if 0
 	if (*pte != *((uint64_t*)VIRT_MASK_ADDR((*pt & ~4095ull), 12))) {
 		panic("Mismatch");
 	}
+#endif
 
 
 	*pte = phys&~4095;
@@ -293,7 +316,7 @@ uint64_t scan_acpi_apic(RSDP* rsdp) {
 				switch (type) {
 					case 0: {
 						LocalAPIC* localapic = (LocalAPIC*)madt_entries+2;
-						printk("kkkk %x\n", localapic->apic_id);
+						(void)localapic;
 					} break;
 					case 1: {
 						//IOAPIC* ioapic = (IOAPIC*)madt_entries+2;
@@ -350,7 +373,20 @@ extern "C" void div_interrupt() {
 	panic("Division Fault\n");
 }
 
-extern "C" void gpf_interrupt() {
+extern "C" void gpf_interrupt(ExceptReg& eregs) {
+	if (eregs.error) {
+		// lol
+		const char* table_str = "GDT";
+		uint8_t table = ((eregs.error>>1)&3);
+		if (table == 1 || table == 3) {
+			table_str = "IDT";
+		} else {
+			table_str = "LDT";
+		}
+		printk("GPF caused by segment %x in table %s",eregs.error>>3, table_str);
+	}
+	printk("Fault at 0x%x\n", eregs.rip);
+	Debug::stack_trace((uint64_t*)&eregs);
 	panic("General Protection Fault\n");
 }
 
@@ -362,9 +398,23 @@ extern "C" void tss_interrupt() {
 	panic("Invalid TSS");
 }
 
-extern "C" void pf_interrupt() {
-	uint32_t fault_addr = get_cr2();
-	printk("Unrecoverable kernel page fault while accessing address 0x%x\n", fault_addr);
+extern "C" void pf_interrupt(ExceptReg& eregs) {
+	uint64_t fault_addr = get_cr2();
+	printk("Unrecoverable %s page fault caused by ", (eregs.error&4) ? "user" : "kernel");
+	if (eregs.error & 2) {
+		printk("write to ");
+	}
+	else {
+		printk("read from ");
+	}
+
+	if (eregs.error & 1) {
+		printk("present page");
+	} else {
+		printk("non-present page");
+	}
+	printk(" located at address 0x%x RIP 0x%x\n", fault_addr, eregs.rip);
+	Debug::stack_trace();
 	panic("Page Fault");
 }
 
@@ -381,45 +431,89 @@ void sleep(const uint64_t ms_time) {
 static uint64_t fp_per_tick = 0;
 uint64_t tick_counter = 0;
 
-extern "C" void keyboard_interrupt() {
-	(void)inb(0x60);
-#ifdef TEST_TIMER
-	// Read comparator
-	ms_elapsed = (tick_counter*0xB00B15*fp_per_tick)/1000000000000;
-
-	tick_counter++;
-	printk("Timer %x %x %x %x\n", tick_counter, fp_per_tick, tick_counter*fp_per_tick, ms_elapsed);
-	uint64_t cr3;
-	asm volatile("movq %%cr3, %0":"=a"(cr3));
-
-	uint64_t* stupidstack = (uint64_t*)kmalloc_aligned(sizeof(uint64_t)*50, 8);
-	uint64_t* stp = x64_create_task_stack(stupidstack+50);
-	x64_switch((void*)(stp),cr3);
-#else
-	panic("Keyboard\n");
-#endif
-	write_eoi();
-}
-
-extern "C" void timer_interrupt(InterruptReg regs) {
-	(void)regs;
+extern "C" void timer_interrupt(InterruptReg* regs) {
+	/*
 #ifndef TEST_TIMER
+	if (!mt_enable) goto end; 
 	// Read comparator
 	ms_elapsed = (tick_counter*0xB00B15*fp_per_tick)/1000000000000;
 
 	tick_counter++;
-	printk("Timer %x %x %x %x\n", tick_counter, fp_per_tick, tick_counter*fp_per_tick, ms_elapsed);
+	//printk("Timer %x %x %x %x\n", tick_counter, fp_per_tick, tick_counter*fp_per_tick, ms_elapsed);
 	uint64_t cr3;
 	asm volatile("movq %%cr3, %0":"=a"(cr3));
 
-	uint64_t* stupidstack = (uint64_t*)kmalloc_aligned(sizeof(uint64_t)*50, 8);
-	uint64_t* stp = x64_create_task_stack(stupidstack+50);
-	x64_switch((void*)(stp),cr3);
+	// Only save executed tasks
+	if (current_task->current_sp)
+		current_task->current_sp = (uint64_t*)regs;
+	current_task = current_task->next;
+	x64_switch((void*)current_task->current_sp,(uint64_t)current_task->pd);
+	panic("Task switch failed somehow???\n");
 #endif 
+end:
+*/
+	Process::sched((uintptr_t)regs);
 	write_eoi();
 }
 
-[[noreturn]] extern "C" void kx86_64_preinit() {
+// Write to Interrupt Command Register
+void write_icr(uint64_t value) {
+	write_msr(0x830, value & 0xFFFFFFFF, (value>>32) & 0xFFFFFFFF);
+}
+
+TSS tss = {
+};
+
+static_assert(sizeof(TSS) <= 0xFFFF);
+
+uint32_t gdt[] __attribute__((aligned(8))) = {
+	// Null
+	0,0,
+	// kcode
+	0, 0x209b00,
+	// kdata
+	0, 0x409300,
+	// Here, the order of the segments is reversed because sysret *for some reason* adds +16 to the user CS base
+	// when the operand size is 64 bits. Probably to accomodate 16 byte segments?
+	// udata
+	0, 0x40f300,
+	// ucode
+	0, 0x20fb00,
+	// tss
+	//(uint32_t)(((TSS_PTR&0xFFFF)<<16) | sizeof(TSS)), (uint32_t)(((TSS_PTR>>16)&0xFF0000FF) | 0x8900), (uint32_t)(TSS_PTR>>32), 0,
+	(uint32_t)(sizeof(TSS)), (uint32_t)(0x8900), (uint32_t)(0), 0,
+	//(uint32_t)(((((uintptr_t)&tss)&0xFFFF)<<16) | (sizeof(TSS)&0xFFFF)), (uint32_t)(0x8900 | ((((uintptr_t)&tss)>>16)&0xFF) | (((((uintptr_t)&tss)>>24)&0xFF)<<24)), (uint32_t)(((uintptr_t)&tss)>>32), 0
+};
+
+struct {
+	uint16_t length;
+	uint64_t ptr;
+} PACKED gdt_ptr __attribute__((aligned(8))) = {
+	.length = sizeof(gdt)-1,
+	.ptr = (uint64_t)gdt,
+};
+
+KSyscallData ksyscall_data;
+
+extern "C" void syscall_entry();
+
+extern "C" [[noreturn]] void kernel_main();
+[[noreturn]] extern "C" void kx86_64_preinit(const KernelBootInfo& kbootinfo, multiboot_info* boot_head) {
+	uintptr_t tss_ptr = get_page_map((uintptr_t)&tss)+(((uintptr_t)&tss)&4095);
+	assert(tss_ptr <= ((1ull<<32ull)-1ull));
+	// update gdt with TSS
+	gdt[10] |= (tss_ptr&0xffff)<<16;
+	gdt[11] |= ((tss_ptr>>16)&0xff);
+	gdt[11] |= ((tss_ptr>>24)&0xff)<<24;
+	
+	// Load new GDT
+	asm volatile("lgdt %0"::"m"(gdt_ptr));
+
+	// Load TSS
+	// From the documentation: a stack switch in IA-32e mode works like the legacy stack switch, except that a new SS selector is not
+	// loaded from the TSS. Instead, the new SS is forced to NULL.
+	asm volatile("ltr %%ax"::"a"(0x28));
+	
 	// Setup FPU
 	uint64_t cr0, cr4;
 	asm volatile("mov %%cr0, %%rax":"=a"(cr0):);
@@ -479,6 +573,8 @@ extern "C" void timer_interrupt(InterruptReg regs) {
 
 		ioapic_set_ioredir_val(i, 0x40+i);
 	}
+
+	// Keyboard enable
 	/*ioapic_set_ioredir_val(1, 65);
 	ioapic_set_ioredir_val(21, 85);*/
 
@@ -494,10 +590,33 @@ extern "C" void timer_interrupt(InterruptReg regs) {
 	// Comparator
 	*(uint64_t*)(hpet->address.address+0x108) = 0xB00B15;
 
-	asm volatile("sti");
-
 	//sleep(5000);
 	printk("Sleep 5s\n");
+	printk("kbootinfo %x %x\n", kbootinfo.kmap_start, kbootinfo.kmap_end);
 
-	while(1);
+	printk("Available memory %x\n", (1*MB)+(boot_head->mem_upper*KB));
+	Paging::setup((1*MB)+(boot_head->mem_upper*KB), kbootinfo);
+
+	auto current_pd = (RootPageLevel*)get_cr3();
+	size_t base = kbootinfo.kmap_end+50*MB;
+	for (int i = 0; i <= 5*MB; i+=PAGE_SIZE) {
+		Paging::the()->map_page(*current_pd, base+i, base+i);
+	}
+	actual_malloc_init((void*)base, 5*MB);
+
+	// stuff 4 syscall
+	// IA32_LSTAR
+	write_msr(0xC0000082, (uint32_t)(uintptr_t)&syscall_entry, (uint32_t)((uintptr_t)&syscall_entry>>32));
+	// IA32_STAR
+	write_msr(0xC0000081, 0x0, 0x8 | (0x10<<16));
+	// IA32_FMASK EFLAGS mask
+	write_msr(0xC0000084, (1<<9) | (3<<12) | (1<<17), 0);
+
+	// IA32_KERNEL_GS_BASE
+	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data, (uint32_t)((uintptr_t)&ksyscall_data>>32));
+
+	// mp stuff
+	//write_icr((3<<18)|(1<<15)|(5<<8));
+
+	kernel_main();
 }

@@ -24,7 +24,7 @@
 
 # Allocate the initial stack.
 .section .bootstrap_stack, "aw", @nobits
-.align 8
+.align 16
 stack_bottom:
 .skip 16384 # 16 KiB
 stack_top:
@@ -59,13 +59,18 @@ gdt:
 # FIXME do we need the RW bit set?
 # entry 1 (kcode)
 .long 0
-# QEMU might have a bug because interrupts break when DB is set.
-# Or, I didn't read the spec hard enough and L is supposed to be set while DB isn't.
+# I didn't read the spec hard enough and L is supposed to be set while DB isn't.
 #.long 0x609b00
 .long 0x209b00
 # entry 2 (kdata)
 .long 0
 .long 0x409300
+# entry 3 (ucode)
+#.long 0
+#.long 0x20fb00
+# entry 4 (udata)
+#.long 0
+#.long 0x40f300
 gdt_end:
 
 gdtptr:
@@ -130,6 +135,9 @@ map_page:
 .type _start, @function
 _start:
 	cli
+	# move multiboot header
+	mov %eax, %edi
+	mov %ebx, %esi
 	// https://wiki.osdev.org/X86-64#How_do_I_enable_Long_Mode_.3F
 	movl $(stack_top - HIGHER_HALF), %esp
 	# set Page Address Extension bit

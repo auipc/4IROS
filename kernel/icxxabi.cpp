@@ -14,11 +14,11 @@ void *__dso_handle = 0; // Attention! Optimally, you should remove the '= 0'
 Spinlock cxa_spinlock;
 
 int __cxa_guard_acquire(long long int *) {
-	cxa_spinlock.acquire();
+	//cxa_spinlock.acquire();
 	return 1;
 }
 
-void __cxa_guard_release(long long int *) { cxa_spinlock.release(); }
+void __cxa_guard_release(long long int *) { /*cxa_spinlock.release();*/ }
 
 void __cxa_pure_virtual() {
 	// Do nothing or print an error message.

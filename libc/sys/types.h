@@ -3,6 +3,7 @@
 #pragma once
 #include <stdint.h>
 
+typedef int64_t off_t;
 typedef uint32_t pid_t;
 
 #endif

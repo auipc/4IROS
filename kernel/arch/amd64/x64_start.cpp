@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <kernel/arch/x86_common/IO.h>
 #include <kernel/unix/ELF.h>
+#include <kernel/arch/amd64/kernel.h>
+#include <kernel/multiboot.h>
 
 #define VGA_REGISTER_1 0x3C4
 #define VGA_REGISTER_2 0x3CE
@@ -48,19 +50,18 @@ extern "C" uint64_t pdpte0[512];
 extern "C" uint64_t pdbad[512];
 extern "C" uint64_t ptbad[512];
 
-[[noreturn]] extern "C" void kx86_64_start() {
-	const ElfHeader* ehead = reinterpret_cast<const ElfHeader*>(_binary_4IROS_start);
-	const ELFSectionHeader* esecheads = reinterpret_cast<const ELFSectionHeader*>(_binary_4IROS_start + ehead->phtable);
+[[noreturn]] extern "C" void kx86_64_start(uint32_t multiboot_header, multiboot_info* boot_head) {
+	(void)multiboot_header;
 
-	//uint64_t base = 0x2800ff000;
-	
+	const ELFHeader64* ehead = reinterpret_cast<const ELFHeader64*>(_binary_4IROS_start);
+	const ELFSectionHeader64* esecheads = reinterpret_cast<const ELFSectionHeader64*>(_binary_4IROS_start + ehead->phtable);
+	size_t kend = 0;
 
 	for (int i = 0; i < ehead->phnum; i++) {
 		const auto sechead = esecheads[i];
 		if (sechead.seg != 1) continue;
 		uint64_t off = 0x20000 + sechead.off;
 		uint64_t flags = 1;
-		// Kinda dumb that you can't get execute only memory without a protection key on x86, whatever.
 		// Disable execution if no ELF executable flag 
 		flags |= ((uint64_t)!(sechead.flags & 1ull))<<63ull;
 		// Writable? Ideally, panic if both eXecute and Writable are enabled.
@@ -72,6 +73,9 @@ extern "C" uint64_t ptbad[512];
 			pdbad[(vaddr >> 21) & 0x1ff] = ((uint64_t)ptbad) | 1;
 			ptbad[(vaddr >> 12) & 0x1ff] = base | flags;
 		}
+
+		uint64_t totalsz = sechead.off + sechead.memsz;
+		kend = totalsz > kend ? totalsz : kend;
 		memset((char*)off, 0, sechead.memsz);
 		memcpy((char*)off, (char*)_binary_4IROS_start + sechead.off, sechead.filesz);
 		//off += sechead.memsz;
@@ -80,10 +84,12 @@ extern "C" uint64_t ptbad[512];
 	uint64_t cr3;
 	asm volatile("mov %%cr3, %%rax":"=a"(cr3));
 	asm volatile("mov %%rax, %%cr3"::"a"(cr3));
-	typedef void (*pentryt)();
+	typedef void (*pentryt)(const KernelBootInfo&, multiboot_info*);
+	KernelBootInfo kbootinfo = {0x20000, kend};
+
 	pentryt pentry = (pentryt)ehead->entry;
 
-	pentry();
+	pentry(kbootinfo, boot_head);
 	/*
 	vga_init();
 	// Mode Control

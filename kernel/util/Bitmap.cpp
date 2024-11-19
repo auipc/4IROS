@@ -2,89 +2,91 @@
 #include <kernel/util/Bitmap.h>
 #include <string.h>
 
-Bitmap::Bitmap(size_t elems) : m_elems(elems) {
-	// FIXME: uint32_t containers WILL be better
-	data = new bitmap_container_t[elems];
-	memset(reinterpret_cast<char *>(data), 0, elems);
-	size = elems / (8 * sizeof(bitmap_container_t));
+Bitmap::Bitmap(size_t bits) : m_containers((bits + 63) / s_bits_per_container) {
+	m_data = new bitmap_container_t[m_containers];
 }
 
-Bitmap::~Bitmap() { delete[] data; }
+Bitmap::~Bitmap() { delete[] m_data; }
 
-size_t Bitmap::alloc_size(size_t elems) {
-	size_t a = sizeof(Bitmap);
-	a += sizeof(bitmap_container_t) * elems;
-	return a;
-}
-
-void Bitmap::set(size_t i) {
-	if (i >= m_elems) {
-		return;
-	}
-	int byteIndex = i / 8;
-	int bitIndex = i % 8;
-	unsigned char mask = 1 << bitIndex;
-	data[byteIndex] |= mask; // Set the bit to 1
-}
+void Bitmap::set(size_t i) { m_data[i / s_bits_per_container] |= 1ull << (i%s_bits_per_container); }
 
 void Bitmap::unset(size_t i) {
-	if (i >= m_elems) {
-		return;
-	}
-	int byteIndex = i / 8;
-	int bitIndex = i % 8;
-	unsigned char mask = 1 << bitIndex;
-	data[byteIndex] &= ~mask; // Set the bit to 0
+	m_data[i / s_bits_per_container] &= ~(1ull << i);
 }
 
 uint8_t Bitmap::get(size_t i) const {
-	if (i >= m_elems) {
-		assert(false);
-	}
-	int byteIndex = i / 8;
-	int bitIndex = i % 8;
-	return (data[byteIndex] >> bitIndex) & 1;
+	return !!(m_data[i / s_bits_per_container] &
+			  1ull << (i % s_bits_per_container));
 }
 
-uint32_t Bitmap::scan(uint32_t nr) {
-	uint32_t streak = 0;
-	for (size_t i = 0; i < m_elems; i++) {
-		if (!get(i)) {
-			streak++;
-		} else {
-			streak = 0;
-		}
-
-		if (streak == nr) {
-			for (size_t j = 0; j < streak; j++)
-				set(i - j);
-
-			return i;
-		}
+size_t Bitmap::count_unset() const {
+	size_t unset = 0;
+	for (size_t i = 0; i < m_containers; i++) {
+		unset += count_unset_container(i);
 	}
-	assert(false);
+	return unset;
 }
 
-uint32_t Bitmap::scan_no_set(uint32_t nr) {
-	uint32_t streak = 0;
-	for (size_t i = 0; i < m_elems; i++) {
-		if (!get(i)) {
-			streak++;
-		} else {
-			streak = 0;
-		}
+// FIXME cache last location
+size_t Bitmap::scan(const size_t span) {
+	size_t streak = 0;
+	for (size_t i = 0; i < m_containers; i++) {
+		if (count_unset_container(i) < span)
+			continue;
+		for (size_t j = 0; j < s_bits_per_container; j++) {
+			// slow
+			if (!get(i * s_bits_per_container + j)) {
+				streak++;
+			}
 
-		if (streak == nr) {
-			return i;
+			if (streak == span) {
+				size_t base = i * s_bits_per_container + j - (streak - 1);
+				for (size_t k = base; k < base + streak; k++) {
+					set(k);
+				}
+				return base;
+			}
 		}
 	}
 	assert(false);
 }
 
-uint32_t Bitmap::count() {
-	uint32_t c = 0;
-	for (size_t i = 0; i < m_elems; i++)
-		if (i)
-			c++;
-	return c;
+size_t Bitmap::scan_no_set(const size_t span) const {
+	size_t streak = 0;
+	for (size_t i = 0; i < m_containers; i++) {
+		if (count_unset_container(i) < span)
+			continue;
+		for (size_t j = 0; j < s_bits_per_container; j++) {
+			// slow
+			if (!get(i * s_bits_per_container + j)) {
+				streak++;
+			}
+
+			if (streak == span) {
+				size_t base = i * s_bits_per_container + j - (streak - 1);
+				return base;
+			}
+		}
+	}
+	assert(false);
+}
+
+/*
+size_t Bitmap::scan_no_set(size_t span) const {
+	(void)span;
+	for (size_t i = 0; i < m_containers; i++) {
+	}
+	assert(false);
+}*/
+
+size_t Bitmap::count_unset_container(const size_t container) const {
+	size_t unset = 0;
+#ifdef OS_SSE4
+	unset += 64ull - __builtin_popcountll(m_data[container]);
+#else
+	for (size_t i = 0; i < s_bits_per_container; i++) {
+		unset += !(m_data[container] & 1ull << i);
+	}
+#endif
+	return unset;
 }

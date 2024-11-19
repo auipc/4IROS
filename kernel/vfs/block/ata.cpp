@@ -1,4 +1,4 @@
-#include <kernel/arch/i386/IO.h>
+#include <kernel/arch/x86_common/IO.h>
 #include <kernel/printk.h>
 #include <kernel/vfs/block/ata.h>
 
@@ -30,9 +30,15 @@ int ATABlockNode::read_512(uint16_t *buffer) {
 
 	while (!(inb(STATUS_PORT) & 0x8))
 		;
-	for (size_t i = 0; i < 256; i++) {
-		uint16_t w = inw(DATA_PORT);
-		buffer[i] = w;
+	for (size_t i = 0; i < 256; i+=8) {
+		buffer[i] = inw(DATA_PORT);
+		buffer[i+1] = inw(DATA_PORT);
+		buffer[i+2] = inw(DATA_PORT);
+		buffer[i+3] = inw(DATA_PORT);
+		buffer[i+4] = inw(DATA_PORT);
+		buffer[i+5] = inw(DATA_PORT);
+		buffer[i+6] = inw(DATA_PORT);
+		buffer[i+7] = inw(DATA_PORT);
 	}
 	m_position += 512;
 	return 0;
@@ -42,7 +48,14 @@ int ATABlockNode::read(void *buffer, size_t size) {
 	if (!size)
 		return -1;
 
-	size_t lba_sector_count = (size + 512 - 1) / 512;
+
+	// Disable interrupts when reading the disk for speed
+	// very 70s
+	bool disable_int = interrupts_enabled();
+	if (disable_int)
+		asm volatile("cli");
+
+	size_t lba_sector_count = (size + 511) / 512;
 	uint16_t *b = new uint16_t[256 * lba_sector_count];
 	size_t old_pos = m_position;
 
@@ -58,6 +71,8 @@ int ATABlockNode::read(void *buffer, size_t size) {
 	m_position += size;
 	delete[] b;
 
+	if (disable_int)
+		asm volatile("sti");
 	return 0;
 }
 

@@ -51,11 +51,11 @@ int FileHandle::write(void *buffer, size_t size) {
 	return m_node->write(buffer, size);
 }
 
-int FileHandle::seek(size_t offset, SeekMode origin) {
+int FileHandle::seek(int64_t offset, SeekMode origin) {
 	assert(m_node);
 	switch (origin) {
 	case SeekMode::SEEK_SET:
-		m_position = offset;
+		m_position = (offset > 0) ? offset : 0;
 		break;
 	case SeekMode::SEEK_CUR:
 		m_position += offset;
@@ -86,7 +86,7 @@ VFS::VFS() {
 	auto fs = new Ext2FileSystem(m_dev_fs->m_nodes[1]); // traverse(path));
 	fs->init();
 	m_root_vfs_node->m_mounted_filesystem = fs;
-	// print_fs(m_root_vfs_node);
+	print_fs(m_root_vfs_node);
 }
 
 VFS &VFS::the() { return *s_vfs; }
@@ -144,6 +144,7 @@ VFSNode *VFS::open(Vec<const char *> &name) {
 	VFSNode *node = m_root_vfs_node->traverse(name);
 	if (!node)
 		return nullptr;
+	node->init(); 
 	return node;
 }
 

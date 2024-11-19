@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 void *malloc(size_t);
+void free(void* addr);
 
 #ifdef __cplusplus
 };

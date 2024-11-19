@@ -28,9 +28,13 @@ int main() {
 	int shell_pid = 0;
 	if (!(shell_pid = fork())) {
 		exec("shell");
+		while(1);
 	}
 
+	printf("shell %d\n", shell_pid);
+
 	int fd = open("/dev/keyboard", 0);
+	if (fd < 0) return 1;
 	uint8_t use_upper = 0;
 
 	while (1) {
@@ -46,10 +50,10 @@ int main() {
 
 				if (!use_upper) {
 					printf("%c", scancode_ascii[buf[i + 1]]);
-					write(0, &scancode_ascii[buf[i + 1]], 1);
+					//write(0, &scancode_ascii[buf[i + 1]], 1);
 				} else {
 					printf("%c", scancode_ascii_upper[buf[i + 1]]);
-					write(0, &scancode_ascii_upper[buf[i + 1]], 1);
+					//write(0, &scancode_ascii_upper[buf[i + 1]], 1);
 				}
 			}
 		}

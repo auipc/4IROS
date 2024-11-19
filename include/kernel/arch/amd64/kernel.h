@@ -1,4 +1,6 @@
 #pragma once
+#include <stddef.h>
+#include <stdint.h>
 
 #define KB 1024
 #define MB (1024 * KB)
@@ -9,3 +11,14 @@
 
 #define PACKED __attribute__((packed))
 #define BIT48_MAX (0xffffffffffff)
+
+struct KernelBootInfo {
+	uintptr_t kmap_start;
+	uintptr_t kmap_end;
+};
+
+struct SymTab {
+	uintptr_t addr;
+	size_t size;
+	const char* func_name;
+};

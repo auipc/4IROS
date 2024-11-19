@@ -1,7 +1,5 @@
-#include <kernel/PIC.h>
-#include <kernel/arch/i386/IO.h>
+#include <kernel/arch/x86_common/IO.h>
 #include <kernel/driver/PS2Keyboard.h>
-#include <kernel/idt.h>
 
 char *PS2Keyboard::s_buffer = nullptr;
 size_t PS2Keyboard::s_buffer_pos = 0;
@@ -56,19 +54,22 @@ static bool is_port_keyboard(uint8_t port) {
 }
 #endif
 
-extern "C" void ps2kbd_interrupt_handler();
+// FIXME UHHHHHHHHHHHHHHHHH
+extern "C" void write_eoi();
+
 extern "C" void ps2kbd_interrupt() {
+	printk("ps2\n");
+	uint8_t scan = inb(0x60);
 	if (!PS2Keyboard::s_initialized) {
-		PIC::eoi(1);
+		write_eoi();
 		return;
 	}
-	uint8_t scan = inb(0x60);
 	bool released = scan & 0x80;
 	PS2Keyboard::s_buffer[PS2Keyboard::s_writer_pos++] = released;
 	PS2Keyboard::s_buffer[PS2Keyboard::s_writer_pos %
 						  PS2Keyboard::KEYBD_BUFFER_SZ] = scan & ~0x80;
 	PS2Keyboard::s_writer_pos++;
-	PIC::eoi(1);
+	write_eoi();
 }
 
 void PS2Keyboard::init() {
@@ -78,10 +79,9 @@ void PS2Keyboard::init() {
 		(void)inb(0x60);
 	} while (timeout++ < 300);
 
-	VFS::the().get_dev_fs()->push(new PS2Keyboard());
-	InterruptHandler::the()->set_handler(0x51, ps2kbd_interrupt_handler);
-	PIC::enable(1);
+	// FIXME hmmm
 	s_initialized = true;
+	VFSNode::init();
 }
 
 bool PS2Keyboard::check_blocked() { return (m_position) >= s_writer_pos; }
@@ -95,7 +95,7 @@ int PS2Keyboard::read(void *buffer, size_t size) {
 
 	size_t read_at = (m_position % KEYBD_BUFFER_SZ) + size_to_read;
 
-	// There must be a better way to do this
+	// There's a better way to do this
 	size_t circular_remainder =
 		read_at >= KEYBD_BUFFER_SZ ? (read_at) % KEYBD_BUFFER_SZ : 0;
 	memcpy(buffer, s_buffer + m_position, size_to_read - circular_remainder);

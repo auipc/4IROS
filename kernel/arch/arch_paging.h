@@ -15,5 +15,5 @@ public:
 	virtual void map_page(uintptr_t virt, uintptr_t phys);
 	virtual void unmap_page(uintptr_t virt);
 	virtual bool is_mapped(uintptr_t virt);
-	virtual  mapped_page_flags(uintptr_t virt);
+	virtual PageInterfaceFlags mapped_page_flags(uintptr_t virt);
 };

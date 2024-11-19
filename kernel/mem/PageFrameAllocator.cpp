@@ -3,32 +3,22 @@
 #include <kernel/mem/PageFrameAllocator.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/util/Bitmap.h>
-
-constexpr int pow(int a, int b) {
-	int result = 1;
-
-	for (int i = 0; i < b; i++) {
-		result *= a;
-	}
-
-	return result;
-}
-
-static_assert(pow(3, 4) == 81);
+#include <math.h>
 
 PageFrameAllocator::PageFrameAllocator(size_t memory_size) {
 	m_pages = memory_size / PAGE_SIZE;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 1; i <= 4; i++) {
 		m_buddies.push(new Bitmap(m_pages / pow(2, i)));
 	}
 }
 
 PageFrameAllocator::~PageFrameAllocator() {
-	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
+	for (size_t buddy = 0; buddy < m_buddies.size(); buddy++) {
 		delete m_buddies[buddy];
 	}
 }
 
+/*
 size_t PageFrameAllocator::alloc_size(size_t memory_size) {
 	size_t a = sizeof(PageFrameAllocator);
 	a += sizeof(Vec<Bitmap>) * 4;
@@ -37,16 +27,18 @@ size_t PageFrameAllocator::alloc_size(size_t memory_size) {
 	}
 
 	return a;
-}
+}*/
 
-void PageFrameAllocator::mark_range(uint32_t start, uint32_t end) {
-	if ((end / PAGE_SIZE) > m_pages)
-		return;
+void PageFrameAllocator::mark_range(uintptr_t start, size_t end) {
+	printk("mark_range %x-%x\n", start, start+end);
+	if ((end / PAGE_SIZE) > m_pages) {
+		panic("Mark range area is larger than the amount of pages we have!");
+	}
 
-	for (uint32_t i = start; i < end; i += PAGE_SIZE) {
+	for (uintptr_t i = start; i < end; i += PAGE_SIZE) {
 		m_buddies[0]->set(i / PAGE_SIZE);
 		for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
-			if ((i % (pow(2, buddy) * PAGE_SIZE)) == 0) {
+			if ((i % (uintptr_t)(pow(2, buddy) * PAGE_SIZE)) == 0) {
 				m_buddies[buddy]->set(i / (pow(2, buddy) * PAGE_SIZE));
 			}
 		}
@@ -60,7 +52,7 @@ size_t PageFrameAllocator::find_free_page() {
 	m_buddies[0]->set(address / PAGE_SIZE);
 
 	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
-		if ((address % (pow(2, buddy) * PAGE_SIZE)) == 0) {
+		if ((address % (size_t)(pow(2, buddy) * PAGE_SIZE)) == 0) {
 			m_buddies[buddy]->set(address / (pow(2, buddy) * PAGE_SIZE));
 		}
 	}
@@ -78,7 +70,7 @@ size_t PageFrameAllocator::find_free_pages(size_t pages) {
 	for (size_t i = start; i < pages; i++) {
 		m_buddies[0]->set(i);
 		for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
-			if (((i * PAGE_SIZE) % (pow(2, buddy) * PAGE_SIZE)) == 0) {
+			if (((i * PAGE_SIZE) % (uintptr_t)(pow(2, buddy) * PAGE_SIZE)) == 0) {
 				m_buddies[buddy]->set((i * PAGE_SIZE) /
 									  (pow(2, buddy) * PAGE_SIZE));
 			}
@@ -107,9 +99,8 @@ size_t PageFrameAllocator::largest_container(size_t size) {
 
 void PageFrameAllocator::release_page(size_t page) {
 	(void)page;
-	/*if (!m_bitmap->get(page / PAGE_SIZE)) {
-		return;
-	}
 
-	m_bitmap->unset(page / PAGE_SIZE);*/
+	for (size_t buddy = 0; buddy < m_buddies.size(); buddy++) {
+		m_buddies[buddy]->unset((page/pow(2,buddy))*PAGE_SIZE);
+	}
 }
