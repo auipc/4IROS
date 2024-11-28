@@ -84,7 +84,7 @@ class Ext2FileSystem;
 
 class Ext2Entry : public VFSNode {
   public:
-	Ext2Entry(Ext2FileSystem *fs, const char* name, INode *&&inode);
+	Ext2Entry(Ext2FileSystem *fs, const char *name, INode *&&inode);
 	~Ext2Entry();
 
 	virtual inline bool is_directory() override { return false; }
@@ -106,7 +106,8 @@ class Ext2FileSystem : public VFSNode {
 	virtual VFSNode *traverse(Vec<const char *> &path, size_t path_index = 0);
 
   private:
-	void read_singly(INode &inode, size_t singly_position, void* out, size_t block_idx, size_t size_to_read, size_t position);
+	void read_singly(INode &inode, size_t singly_position, void *out,
+					 size_t block_idx, size_t size_to_read, size_t position);
 	VFSNode *traverse_internal(INode *cur_inode, Vec<const char *> &path,
 							   size_t path_index = 0);
 	INode *read_inode(size_t index);

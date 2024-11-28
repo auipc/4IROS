@@ -1,19 +1,19 @@
 #include <kernel/Debug.h>
 #include <kernel/arch/amd64/kernel.h>
+#include <kernel/arch/amd64/x64_sched_help.h>
+#include <kernel/arch/x86_common/IO.h>
+#include <kernel/assert.h>
+#include <kernel/driver/BochsFramebuffer.h>
 #include <kernel/driver/PS2Keyboard.h>
 #include <kernel/driver/VGAFramebuffer.h>
-#include <kernel/driver/BochsFramebuffer.h>
-#include <kernel/assert.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
-#include <kernel/shedule/proc.h>
 #include <kernel/printk.h>
+#include <kernel/shedule/proc.h>
 #include <kernel/util/NBitmap.h>
 #include <kernel/util/Spinlock.h>
 #include <kernel/util/Vec.h>
 #include <kernel/vfs/vfs.h>
-#include <kernel/arch/x86_common/IO.h>
-#include <kernel/arch/amd64/x64_sched_help.h>
 //#define STB_TRUETYPE_IMPLEMENTATION
 //#include <stb_truetype.h>
 
@@ -36,9 +36,7 @@ void test_fs() {
 	assert(zero_file == 0);
 }
 
-template <class T> constexpr T abs(const T &a) {
-	return a > 0 ? a : -a;
-}
+template <class T> constexpr T abs(const T &a) { return a > 0 ? a : -a; }
 
 template <class T> constexpr T min(const T &a, const T &b) {
 	return a < b ? a : b;
@@ -49,7 +47,8 @@ template <class T> constexpr T max(const T &a, const T &b) {
 }
 
 void kidle() {
-	while(1);
+	while (1)
+		;
 }
 
 #if 0
@@ -190,9 +189,10 @@ void kproc() {
 		delete[] image_buffer;
 	}
 #endif
-	while(1);
+	while (1)
+		;
 }
-	// FIXME this should be the kernel stack
+// FIXME this should be the kernel stack
 
 extern bool s_use_actual_allocator;
 extern TSS tss;
@@ -204,10 +204,10 @@ extern "C" [[noreturn]] void kernel_main() {
 	printk("ps2\n");
 	auto kbd = new PS2Keyboard();
 	VFS::the().get_dev_fs()->push(kbd);
-	kbd->init(); 
+	kbd->init();
 
 	VFS::the().get_dev_fs()->push(new BochsFramebuffer());
-	//printk("ps2\n");
+	// printk("ps2\n");
 
 #if 0
 	// Read generated symtab file
@@ -224,15 +224,17 @@ extern "C" [[noreturn]] void kernel_main() {
 	}
 #endif
 
-	Process* proc = Process::create_user("init");
+	Process *proc = Process::create_user("init");
 	proc->next = proc;
 	proc->prev = proc;
 	current_process = proc;
 
 	ksyscall_data.stack = proc->kern_stack_top();
-	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data, (uint32_t)((uintptr_t)&ksyscall_data>>32));
+	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
+			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
 	tss.rsp[0] = proc->kern_stack_top();
-	x64_switch((void*)proc->kern_stack_top(),(uint64_t)proc->root_page_level());
+	x64_switch((void *)proc->kern_stack_top(),
+			   (uint64_t)proc->root_page_level());
 	panic("Task switch failed somehow???\n");
 	while (1)
 		;

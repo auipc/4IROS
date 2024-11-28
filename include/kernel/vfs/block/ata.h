@@ -1,6 +1,6 @@
 #pragma once
-#include <kernel/vfs/vfs.h>
 #include <kernel/arch/amd64/x86_64.h>
+#include <kernel/vfs/vfs.h>
 
 class ATAManager {
   public:

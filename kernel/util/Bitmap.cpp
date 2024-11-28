@@ -8,7 +8,9 @@ Bitmap::Bitmap(size_t bits) : m_containers((bits + 63) / s_bits_per_container) {
 
 Bitmap::~Bitmap() { delete[] m_data; }
 
-void Bitmap::set(size_t i) { m_data[i / s_bits_per_container] |= 1ull << (i%s_bits_per_container); }
+void Bitmap::set(size_t i) {
+	m_data[i / s_bits_per_container] |= 1ull << (i % s_bits_per_container);
+}
 
 void Bitmap::unset(size_t i) {
 	m_data[i / s_bits_per_container] &= ~(1ull << i);

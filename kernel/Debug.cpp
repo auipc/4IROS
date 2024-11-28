@@ -1,12 +1,12 @@
 #include <kernel/Debug.h>
 #include <kernel/printk.h>
-#include <kernel/util/ism.h>
 #include <kernel/util/Vec.h>
+#include <kernel/util/ism.h>
 #include <stdint.h>
 
 Vec<SymTab> debug_symtabs;
 
-void Debug::parse_symtab(const char* buffer, size_t length) {
+void Debug::parse_symtab(const char *buffer, size_t length) {
 	for (size_t idx = 0; idx < length; idx++) {
 		size_t i = 0;
 		uintptr_t addr = 0;
@@ -14,7 +14,8 @@ void Debug::parse_symtab(const char* buffer, size_t length) {
 		SymTab tab = {};
 
 		for (i = idx; i < length; i++) {
-			if (buffer[i] == ',') break;
+			if (buffer[i] == ',')
+				break;
 
 			addr *= 16;
 			uint8_t val = buffer[i] - '0';
@@ -22,21 +23,23 @@ void Debug::parse_symtab(const char* buffer, size_t length) {
 				val = buffer[i] - 'W';
 			addr += val;
 		}
-		idx += i-idx+1;
+		idx += i - idx + 1;
 		for (i = idx; i < length; i++) {
-			if (buffer[i] == ',') break;
+			if (buffer[i] == ',')
+				break;
 			sz *= 10;
 			uint8_t val = buffer[i] - '0';
 			sz += val;
 		}
-		idx += i-idx+1;
+		idx += i - idx + 1;
 		for (i = idx; i < length; i++) {
-			if (buffer[i] == '\n') break;
+			if (buffer[i] == '\n')
+				break;
 		}
-		char* func_name = new char[i-idx+1];
-		memcpy(func_name, &buffer[idx], i-idx);
-		func_name[i-idx] = '\0';
-		idx += i-idx;
+		char *func_name = new char[i - idx + 1];
+		memcpy(func_name, &buffer[idx], i - idx);
+		func_name[i - idx] = '\0';
+		idx += i - idx;
 
 		tab.addr = addr;
 		tab.size = sz;
@@ -45,16 +48,19 @@ void Debug::parse_symtab(const char* buffer, size_t length) {
 	}
 }
 
-SymTab* Debug::resolve_symbol(uintptr_t addr) {
-	if (!debug_symtabs.size()) return nullptr;
+SymTab *Debug::resolve_symbol(uintptr_t addr) {
+	if (!debug_symtabs.size())
+		return nullptr;
 	for (size_t i = 0; i < debug_symtabs.size(); i++) {
-		auto& debug_symbol = debug_symtabs[i];
-		if (debug_symbol.addr <= addr && (debug_symbol.addr+debug_symbol.size) >= addr) return &debug_symbol;
+		auto &debug_symbol = debug_symtabs[i];
+		if (debug_symbol.addr <= addr &&
+			(debug_symbol.addr + debug_symbol.size) >= addr)
+			return &debug_symbol;
 	}
 	return nullptr;
 }
 
-void Debug::stack_trace(uint64_t* rbp) {
+void Debug::stack_trace(uint64_t *rbp) {
 	if (!rbp)
 		READ_REGISTER("rbp", rbp);
 
@@ -64,11 +70,13 @@ void Debug::stack_trace(uint64_t* rbp) {
 			break;
 
 		uint64_t rip = *(rbp + 1);
-		if (!rip) break;
+		if (!rip)
+			break;
 
 		printk("RIP: %x", rip);
-		SymTab* symbol = resolve_symbol(rip);
-		if (symbol) printk(" Function: %s", symbol->func_name);
+		SymTab *symbol = resolve_symbol(rip);
+		if (symbol)
+			printk(" Function: %s", symbol->func_name);
 		printk("\n");
 		rbp = (uint64_t *)*(rbp);
 	}

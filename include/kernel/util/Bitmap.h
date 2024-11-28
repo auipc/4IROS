@@ -22,9 +22,11 @@ class Bitmap {
 	size_t scan(const size_t span);
 	size_t scan_no_set(const size_t span) const;
 	size_t count_unset() const;
+
   private:
 	size_t count_unset_container(const size_t container) const;
 	bitmap_container_t *m_data;
-	static constexpr size_t s_bits_per_container = 8*sizeof(bitmap_container_t);
+	static constexpr size_t s_bits_per_container =
+		8 * sizeof(bitmap_container_t);
 	size_t m_containers;
 };

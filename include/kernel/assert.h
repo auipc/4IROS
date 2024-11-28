@@ -5,7 +5,8 @@
 #ifdef __i386__
 #define assert(x)                                                              \
 	if (!(x)) {                                                                \
-		printk("Assertion failed: file %s, func %s, line %d\n", __FILE__, __func__, __LINE__);    \
+		printk("Assertion failed: file %s, func %s, line %d\n", __FILE__,      \
+			   __func__, __LINE__);                                            \
 		Debug::stack_trace();                                                  \
 		while (1) {                                                            \
 			asm volatile("cli");                                               \
@@ -25,15 +26,16 @@
 	}
 #else
 #define assert(x)                                                              \
-	{ \
-		if (!(x)) {                                                                \
-			printk("Assertion failed: file %s, func %s, line %d\n", __FILE__, __func__, __LINE__);    \
-			Debug::stack_trace();                                                  \
-			while (1) {                                                            \
-				asm volatile("cli");                                               \
-				asm volatile("hlt");                                               \
-			}                                                                      \
-		} \
+	{                                                                          \
+		if (!(x)) {                                                            \
+			printk("Assertion failed: file %s, func %s, line %d\n", __FILE__,  \
+				   __func__, __LINE__);                                        \
+			Debug::stack_trace();                                              \
+			while (1) {                                                        \
+				asm volatile("cli");                                           \
+				asm volatile("hlt");                                           \
+			}                                                                  \
+		}                                                                      \
 	}
 
 #define assert_eq(lhs, rhs)                                                    \

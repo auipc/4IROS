@@ -39,9 +39,7 @@ template <typename T> class Vec {
 		return &container[idx];
 	}
 
-	T *data() {
-		return container;
-	}
+	T *data() { return container; }
 
 	inline size_t size() { return m_size; }
 
@@ -67,7 +65,7 @@ template <typename T> class Vec {
 		T *tmp = nullptr;
 
 		if (m_size - 1 != 0) {
-			tmp = new T[m_size-1];
+			tmp = new T[m_size - 1];
 
 			uint32_t new_pos = 0;
 			for (uint32_t i = 0; i < m_size; i++) {

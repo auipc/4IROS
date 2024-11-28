@@ -1,11 +1,11 @@
 #define STUPID_BAD_UGLY_BAD_DESIGN_TURN_OFF_STRING_H
 #define BOOT_STUB
-#include <stdint.h>
-#include <stddef.h>
-#include <kernel/arch/x86_common/IO.h>
-#include <kernel/unix/ELF.h>
 #include <kernel/arch/amd64/kernel.h>
+#include <kernel/arch/x86_common/IO.h>
 #include <kernel/multiboot.h>
+#include <kernel/unix/ELF.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #define VGA_REGISTER_1 0x3C4
 #define VGA_REGISTER_2 0x3CE
@@ -16,9 +16,7 @@ void vga_init() {
 	inb(0x3DA);
 }
 
-void vga_write_misc_port(uint8_t byte) {
-	outb(0x3C2, byte);
-}
+void vga_write_misc_port(uint8_t byte) { outb(0x3C2, byte); }
 
 void vga_write_fixed_port(uint8_t index, uint8_t byte) {
 	outb(0x3C0, index);
@@ -27,21 +25,21 @@ void vga_write_fixed_port(uint8_t index, uint8_t byte) {
 
 void vga_write_index_port(uint16_t port, uint8_t index, uint8_t byte) {
 	outb(port, index);
-	outb(port+1, byte);
+	outb(port + 1, byte);
 }
 
 extern const char _binary_4IROS_start[];
 extern size_t _binary_4IROS_size;
 
-extern "C" void memset(char* dest, int value, size_t size) {
+extern "C" void memset(char *dest, int value, size_t size) {
 	for (size_t i = 0; i < size; i++) {
-		((char*)dest)[i] = value; 
+		((char *)dest)[i] = value;
 	}
 }
 
-extern "C" void *memcpy(void* dest, const void* src, size_t size) {
+extern "C" void *memcpy(void *dest, const void *src, size_t size) {
 	for (size_t i = 0; i < size; i++) {
-		((char*)dest)[i] = ((const char*)src)[i];
+		((char *)dest)[i] = ((const char *)src)[i];
 	}
 	return nullptr;
 }
@@ -50,25 +48,30 @@ extern "C" uint64_t pdpte0[512];
 extern "C" uint64_t pdbad[512];
 extern "C" uint64_t ptbad[512];
 
-[[noreturn]] extern "C" void kx86_64_start(uint32_t multiboot_header, multiboot_info* boot_head) {
+[[noreturn]] extern "C" void kx86_64_start(uint32_t multiboot_header,
+										   multiboot_info *boot_head) {
 	(void)multiboot_header;
 
-	const ELFHeader64* ehead = reinterpret_cast<const ELFHeader64*>(_binary_4IROS_start);
-	const ELFSectionHeader64* esecheads = reinterpret_cast<const ELFSectionHeader64*>(_binary_4IROS_start + ehead->phtable);
+	const ELFHeader64 *ehead =
+		reinterpret_cast<const ELFHeader64 *>(_binary_4IROS_start);
+	const ELFSectionHeader64 *esecheads =
+		reinterpret_cast<const ELFSectionHeader64 *>(_binary_4IROS_start +
+													 ehead->phtable);
 	size_t kend = 0;
 
 	for (int i = 0; i < ehead->phnum; i++) {
 		const auto sechead = esecheads[i];
-		if (sechead.seg != 1) continue;
+		if (sechead.seg != 1)
+			continue;
 		uint64_t off = 0x20000 + sechead.off;
 		uint64_t flags = 1;
-		// Disable execution if no ELF executable flag 
-		flags |= ((uint64_t)!(sechead.flags & 1ull))<<63ull;
+		// Disable execution if no ELF executable flag
+		flags |= ((uint64_t) !(sechead.flags & 1ull)) << 63ull;
 		// Writable? Ideally, panic if both eXecute and Writable are enabled.
-		flags |= (!!(sechead.flags & 2ull))<<1ull;
+		flags |= (!!(sechead.flags & 2ull)) << 1ull;
 
-		for (uint64_t base = off; base < off + sechead.memsz; base+=0x1000) {
-			uint64_t vaddr = (base-off) + sechead.vaddr;
+		for (uint64_t base = off; base < off + sechead.memsz; base += 0x1000) {
+			uint64_t vaddr = (base - off) + sechead.vaddr;
 			pdpte0[(vaddr >> 30) & 0x1ff] = ((uint64_t)pdbad) | 1;
 			pdbad[(vaddr >> 21) & 0x1ff] = ((uint64_t)ptbad) | 1;
 			ptbad[(vaddr >> 12) & 0x1ff] = base | flags;
@@ -76,15 +79,16 @@ extern "C" uint64_t ptbad[512];
 
 		uint64_t totalsz = sechead.off + sechead.memsz;
 		kend = totalsz > kend ? totalsz : kend;
-		memset((char*)off, 0, sechead.memsz);
-		memcpy((char*)off, (char*)_binary_4IROS_start + sechead.off, sechead.filesz);
-		//off += sechead.memsz;
+		memset((char *)off, 0, sechead.memsz);
+		memcpy((char *)off, (char *)_binary_4IROS_start + sechead.off,
+			   sechead.filesz);
+		// off += sechead.memsz;
 	}
 
 	uint64_t cr3;
-	asm volatile("mov %%cr3, %%rax":"=a"(cr3));
-	asm volatile("mov %%rax, %%cr3"::"a"(cr3));
-	typedef void (*pentryt)(const KernelBootInfo&, multiboot_info*);
+	asm volatile("mov %%cr3, %%rax" : "=a"(cr3));
+	asm volatile("mov %%rax, %%cr3" ::"a"(cr3));
+	typedef void (*pentryt)(const KernelBootInfo &, multiboot_info *);
 	KernelBootInfo kbootinfo = {0x20000, kend};
 
 	pentryt pentry = (pentryt)ehead->entry;
@@ -118,12 +122,13 @@ extern "C" uint64_t ptbad[512];
 	vga_write_index_port(VGA_REGISTER_3, 0x14, 0x40);
 	vga_write_index_port(VGA_REGISTER_3, 0x17, 0xA3);
 	while(1) {
-		for (uint8_t* p = (uint8_t*)0x000A0000; p < (uint8_t*)(0x000BFFFF); p++) {
-			uint8_t lol = 255; 
+		for (uint8_t* p = (uint8_t*)0x000A0000; p < (uint8_t*)(0x000BFFFF); p++)
+	{ uint8_t lol = 255;
 			//asm volatile("rdrand %%eax":"=a"(lol));
 			*p = lol;
 		}
 	}
 	*/
-	while(1);
+	while (1)
+		;
 }

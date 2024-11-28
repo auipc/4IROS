@@ -7,7 +7,7 @@ template <class T> constexpr T min(const T &a, const T &b) {
 
 uint32_t block_size = 1024;
 
-Ext2Entry::Ext2Entry(Ext2FileSystem *fs, const char* name, INode*&& inode)
+Ext2Entry::Ext2Entry(Ext2FileSystem *fs, const char *name, INode *&&inode)
 	: VFSNode(name), m_fs(fs), m_inode(inode) {}
 
 Ext2Entry::~Ext2Entry() { delete m_inode; }
@@ -44,18 +44,20 @@ void Ext2FileSystem::seek_block(size_t block_addr) {
 	m_block_dev->seek(block_addr * block_size);
 }
 
-void Ext2FileSystem::read_singly(INode &inode, size_t singly_position, void* out, size_t block_idx, size_t size_to_read, size_t position) {
-	if (!inode.sibp) panic("No sibp\n");
-	uint32_t* singly_blocks = new uint32_t[256];
+void Ext2FileSystem::read_singly(INode &inode, size_t singly_position,
+								 void *out, size_t block_idx,
+								 size_t size_to_read, size_t position) {
+	if (!inode.sibp)
+		panic("No sibp\n");
+	uint32_t *singly_blocks = new uint32_t[256];
 	seek_block(singly_position);
 	m_block_dev->read((char *)singly_blocks, sizeof(uint32_t) * 256);
 
 	m_block_dev->seek((singly_blocks[block_idx] * block_size) +
 					  (position % block_size));
-	m_block_dev->read((char *)out,
-					  min(size_to_read, (size_t)block_size));
+	m_block_dev->read((char *)out, min(size_to_read, (size_t)block_size));
 	delete[] singly_blocks;
-	//return true;
+	// return true;
 }
 
 uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
@@ -66,7 +68,8 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 	size_t block_idx = position / block_size;
 	size_t output_ptr = 0;
 
-	printk("size_to_read %d ? inode.size_low %d\n", size_to_read, inode.size_low);
+	printk("size_to_read %d ? inode.size_low %d\n", size_to_read,
+		   inode.size_low);
 	uint32_t *doubly_blocks = nullptr;
 	while (size_to_read) {
 		switch (block_idx) {
@@ -78,34 +81,41 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 							  min(size_to_read, (size_t)block_size));
 		} break;
 		// https://www.nongnu.org/ext2-doc/ext2.html
-		// With a 1KiB block size, blocks 13 to 268 of the file data are contained in this indirect block.
+		// With a 1KiB block size, blocks 13 to 268 of the file data are
+		// contained in this indirect block.
 		case 12 ... 267: {
-			read_singly(inode, inode.sibp, (void*)((uintptr_t)out + output_ptr), block_idx-12, size_to_read, position);
+			read_singly(inode, inode.sibp,
+						(void *)((uintptr_t)out + output_ptr), block_idx - 12,
+						size_to_read, position);
 		} break;
 		case 268 ... 65803: {
-			if (!inode.dibp) panic("No dibp\n");
+			if (!inode.dibp)
+				panic("No dibp\n");
 			if (!doubly_blocks) {
 				doubly_blocks = new uint32_t[256];
 				seek_block(inode.dibp);
-				m_block_dev->read((char *)doubly_blocks, sizeof(uint32_t) * 256);
+				m_block_dev->read((char *)doubly_blocks,
+								  sizeof(uint32_t) * 256);
 			}
-			//printk("dbl %x\n", doubly_blocks[(block_idx-268)/256]);
-			read_singly(inode, doubly_blocks[(block_idx-268)/256], (void*)((uintptr_t)out + output_ptr), (block_idx-268)%256, size_to_read, position);
+			// printk("dbl %x\n", doubly_blocks[(block_idx-268)/256]);
+			read_singly(inode, doubly_blocks[(block_idx - 268) / 256],
+						(void *)((uintptr_t)out + output_ptr),
+						(block_idx - 268) % 256, size_to_read, position);
 		} break;
 		default:
 			panic("Unsupported block index!\n");
 			break;
 		}
-		output_ptr += block_size-(position%block_size);
+		output_ptr += block_size - (position % block_size);
 		position = 0;
-		//position += min(size_to_read, (size_t)block_size);
+		// position += min(size_to_read, (size_t)block_size);
 		size_to_read -= min(size_to_read, (size_t)block_size);
 		block_idx++;
 	}
 
 	/*
 	if (size > 10000) {
-		for (size_t i = 0; i < size; i++) 
+		for (size_t i = 0; i < size; i++)
 		{
 			printk("%x\n", &((uint8_t*)out)[i]);
 			printk("%x\n", ((uint8_t*)out)[i]);
@@ -139,7 +149,7 @@ Vec<Directory> Ext2FileSystem::scan_dir_entries(INode &inode) {
 		m_block_dev->seek_cur(entry.size - sizeof(DirEntry) -
 							  entry.name_length);
 		entries.push(Directory{name, entry});
-		assert(entries[entries.size()-1].name == name);
+		assert(entries[entries.size() - 1].name == name);
 	}
 
 	seek_block(inode.dbp[1]);
@@ -156,7 +166,7 @@ Vec<Directory> Ext2FileSystem::scan_dir_entries(INode &inode) {
 		m_block_dev->seek_cur(entry.size - sizeof(DirEntry) -
 							  entry.name_length);
 		entries.push(Directory{name, entry});
-		assert(entries[entries.size()-1].name == name);
+		assert(entries[entries.size() - 1].name == name);
 	}
 
 	return entries;

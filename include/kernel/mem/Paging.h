@@ -1,12 +1,12 @@
 #pragma once
+#include <kernel/Debug.h>
 #include <kernel/arch/amd64/kernel.h>
+#include <kernel/arch/amd64/x86_64.h>
 #include <kernel/assert.h>
 #include <kernel/mem/PageFrameAllocator.h>
 #include <kernel/mem/malloc.h>
 #include <kernel/util/Vec.h>
 #include <stdint.h>
-#include <kernel/arch/amd64/x86_64.h>
-#include <kernel/Debug.h>
 
 struct PageLevel;
 struct LovelyPageLevel;
@@ -31,10 +31,11 @@ inline uint64_t get_cr3() {
 class Paging {
   public:
 	~Paging();
-	static void setup(size_t total_memory, const KernelBootInfo& kbootinfo);
-	
-	RootPageLevel* clone(const RootPageLevel&);
-	RootPageLevel* clone_for_fork(const RootPageLevel&, bool just_copy=false);
+	static void setup(size_t total_memory, const KernelBootInfo &kbootinfo);
+
+	RootPageLevel *clone(const RootPageLevel &);
+	RootPageLevel *clone_for_fork(const RootPageLevel &,
+								  bool just_copy = false);
 
 	inline static RootPageLevel *kernel_root_directory() {
 		// This shouldn't be null
@@ -43,8 +44,7 @@ class Paging {
 	}
 
 	inline static PageLevel *current_root_directory() {
-		auto pd =
-			reinterpret_cast<PageLevel *>(get_cr3() + VIRTUAL_ADDRESS);
+		auto pd = reinterpret_cast<PageLevel *>(get_cr3() + VIRTUAL_ADDRESS);
 		return pd;
 	}
 
@@ -62,8 +62,8 @@ class Paging {
 	static Paging *the();
 	static void *pf_allocator(size_t size);
 
-	void copy_range(PageLevel *src, PageLevel *dst,
-					size_t virtual_address, size_t range);
+	void copy_range(PageLevel *src, PageLevel *dst, size_t virtual_address,
+					size_t range);
 
 	inline PageFrameAllocator *allocator() const { return m_allocator; }
 
@@ -72,20 +72,30 @@ class Paging {
 	}
 
 	inline static void switch_page_directory(PageLevel *page_directory) {
-		asm volatile(
-			"movq %0, %%cr3" ::"a"(page_directory));
+		asm volatile("movq %0, %%cr3" ::"a"(page_directory));
 	}
 
-	void unmap_page(RootPageLevel& pd, uintptr_t virt);
-	void map_page_assume(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
-	void map_page_temp(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
-	void map_page(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
-	void create_page_level(PageSkellington& lvl);
-	// Allows for the mapping a page without a proper way to address it later. 
-	// For example, if we want to map one of our page levels so it can be modified with a lower level or new permissions. Then we'd have to map with impunity. 
-	// Sooo the solution is to map the current level with impunity and map the level beyond that with no impunity (I know this is horrible).
-	// The only other solution I can come up with is having a temporary address outside the virtual address of the highest page level and temporarily mapping the page levels we want to modify to that address.
-	//void map_page_with_no_impunity(RootPageLevel& pd, uintptr_t virt, uintptr_t phys);
+	void unmap_page(RootPageLevel &pd, uintptr_t virt);
+	void map_page_assume(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
+						 uint64_t flags = PAEPageFlags::Present |
+										  PAEPageFlags::Write);
+	void map_page_temp(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
+					   uint64_t flags = PAEPageFlags::Present |
+										PAEPageFlags::Write);
+	void map_page(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
+				  uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
+	void create_page_level(PageSkellington &lvl);
+	// Allows for the mapping a page without a proper way to address it later.
+	// For example, if we want to map one of our page levels so it can be
+	// modified with a lower level or new permissions. Then we'd have to map
+	// with impunity. Sooo the solution is to map the current level with
+	// impunity and map the level beyond that with no impunity (I know this is
+	// horrible). The only other solution I can come up with is having a
+	// temporary address outside the virtual address of the highest page level
+	// and temporarily mapping the page levels we want to modify to that
+	// address.
+	// void map_page_with_no_impunity(RootPageLevel& pd, uintptr_t virt,
+	// uintptr_t phys);
 
 	static RootPageLevel *s_kernel_page_directory;
 
@@ -96,8 +106,8 @@ class Paging {
 	friend struct PageLevel;
 	friend struct LovelyPageLevel;
 
-	RootPageLevel* m_safe_pgl;
-	Paging(size_t total_memory, const KernelBootInfo& kbootinfo);
+	RootPageLevel *m_safe_pgl;
+	Paging(size_t total_memory, const KernelBootInfo &kbootinfo);
 	// A safe area of memory reserved for copying pages
 	uint8_t *m_safe_area;
 	PageFrameAllocator *m_allocator;
@@ -107,22 +117,18 @@ class Paging {
 // Helper, this sucks
 struct PageSkellington {
 	PageSkellington() = default;
-	//PageSkellington(const PageSkellington&) = delete;
+	// PageSkellington(const PageSkellington&) = delete;
 
-	inline bool is_mapped() const {
-		return (pdata & PAEPageFlags::Present);
+	inline bool is_mapped() const { return (pdata & PAEPageFlags::Present); }
+
+	inline bool is_user() const { return (pdata & PAEPageFlags::User); }
+
+	PageLevel *level() const {
+		return reinterpret_cast<PageLevel *>(pdata & PAGE_ADDRESS_MASK);
 	}
 
-	inline bool is_user() const {
-		return (pdata & PAEPageFlags::User);
-	}
-
-	PageLevel* level() const {
-		return reinterpret_cast<PageLevel*>(pdata & PAGE_ADDRESS_MASK);
-	}
-
-	LovelyPageLevel* fetch();
-	void commit(LovelyPageLevel& level);
+	LovelyPageLevel *fetch();
+	void commit(LovelyPageLevel &level);
 
 	inline uintptr_t addr() const {
 		return static_cast<uintptr_t>(pdata & PAGE_ADDRESS_MASK);
@@ -150,10 +156,11 @@ static_assert(sizeof(PageSkellington) == 8);
 struct PageLevel {
 	MALLOC_NEW_MUST_BE_PAGE_ALIGNED;
 
-	inline PageLevel* map() const {
-		auto map_page = Paging::the()->m_safe_area+PAGE_SIZE;
-		Paging::the()->map_page_assume(*(RootPageLevel*)get_cr3(), (uintptr_t)map_page, (uintptr_t)this);
-		return (PageLevel*)map_page;
+	inline PageLevel *map() const {
+		auto map_page = Paging::the()->m_safe_area + PAGE_SIZE;
+		Paging::the()->map_page_assume(*(RootPageLevel *)get_cr3(),
+									   (uintptr_t)map_page, (uintptr_t)this);
+		return (PageLevel *)map_page;
 	}
 
 	PageSkellington entries[512];
@@ -161,10 +168,11 @@ struct PageLevel {
 
 // Without the malloc constraint
 struct LovelyPageLevel {
-	inline PageLevel* map() const {
-		auto map_page = Paging::the()->m_safe_area+PAGE_SIZE;
-		Paging::the()->map_page_assume(*(RootPageLevel*)get_cr3(), (uintptr_t)map_page, (uintptr_t)this);
-		return (PageLevel*)map_page;
+	inline PageLevel *map() const {
+		auto map_page = Paging::the()->m_safe_area + PAGE_SIZE;
+		Paging::the()->map_page_assume(*(RootPageLevel *)get_cr3(),
+									   (uintptr_t)map_page, (uintptr_t)this);
+		return (PageLevel *)map_page;
 	}
 
 	PageSkellington entries[512];

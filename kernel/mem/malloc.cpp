@@ -30,8 +30,8 @@ void kmalloc_temp_init() {
 
 #ifdef __i386__
 void kmalloc_init() {
-	s_alloc_base = Paging::page_align(reinterpret_cast<uintptr_t>(&_kernel_end) +
-									  (2 * PAGE_SIZE));
+	s_alloc_base = Paging::page_align(
+		reinterpret_cast<uintptr_t>(&_kernel_end) + (2 * PAGE_SIZE));
 	s_mem_nbm = new NBitmap((5000 * KB) / k_allocation_block_size);
 
 	for (uintptr_t i = 0; i < 5000 * KB; i += k_allocation_block_size) {
@@ -40,7 +40,8 @@ void kmalloc_init() {
 		}
 	}
 
-	for (uintptr_t i = Paging::page_align(0xC03FF000 - Paging::s_pf_allocator_end);
+	for (uintptr_t i =
+			 Paging::page_align(0xC03FF000 - Paging::s_pf_allocator_end);
 		 i < Paging::page_align(0xC03FF000 - Paging::s_pf_allocator_end) +
 				 (PAGE_SIZE * 10);
 		 i += PAGE_SIZE) {
@@ -57,7 +58,7 @@ void kmalloc_init() {
 static void *allocate_block_temp(uintptr_t blocks_needed) {
 	assert(blocks_needed > 0);
 	s_mem_offset += blocks_needed * k_allocation_block_size;
-	printk("mem left: %x\n", s_mem_end-s_mem_offset);
+	printk("mem left: %x\n", s_mem_end - s_mem_offset);
 	assert(s_mem_offset < s_mem_end);
 	return reinterpret_cast<void *>(s_mem_offset);
 }
@@ -91,10 +92,10 @@ void *kmalloc(size_t size) {
 #endif
 
 	if (s_use_actual_allocator) {
-		void* block = actual_malloc(size);
+		void *block = actual_malloc(size);
 		memset((char *)block, 0, size);
 		return block;
-	} 
+	}
 
 	size_t blocks_needed = size / k_allocation_block_size;
 	if (size % k_allocation_block_size != 0) {
@@ -115,9 +116,10 @@ void *kmalloc(size_t size) {
 void *kmalloc_aligned(size_t size, size_t alignment) {
 	(void)alignment;
 	// fallback because lazy
-	//if (!s_use_real_allocator)
-		//return kmalloc(size);
-	return allocate_block_temp((size+(k_allocation_block_size-1)) / k_allocation_block_size);
+	// if (!s_use_real_allocator)
+	// return kmalloc(size);
+	return allocate_block_temp((size + (k_allocation_block_size - 1)) /
+							   k_allocation_block_size);
 }
 
 void kfree(void *ptr) {

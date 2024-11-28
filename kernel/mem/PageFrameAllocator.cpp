@@ -30,7 +30,7 @@ size_t PageFrameAllocator::alloc_size(size_t memory_size) {
 }*/
 
 void PageFrameAllocator::mark_range(uintptr_t start, size_t end) {
-	printk("mark_range %x-%x\n", start, start+end);
+	printk("mark_range %x-%x\n", start, start + end);
 	if ((end / PAGE_SIZE) > m_pages) {
 		panic("Mark range area is larger than the amount of pages we have!");
 	}
@@ -70,7 +70,8 @@ size_t PageFrameAllocator::find_free_pages(size_t pages) {
 	for (size_t i = start; i < pages; i++) {
 		m_buddies[0]->set(i);
 		for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
-			if (((i * PAGE_SIZE) % (uintptr_t)(pow(2, buddy) * PAGE_SIZE)) == 0) {
+			if (((i * PAGE_SIZE) % (uintptr_t)(pow(2, buddy) * PAGE_SIZE)) ==
+				0) {
 				m_buddies[buddy]->set((i * PAGE_SIZE) /
 									  (pow(2, buddy) * PAGE_SIZE));
 			}
@@ -101,6 +102,6 @@ void PageFrameAllocator::release_page(size_t page) {
 	(void)page;
 
 	for (size_t buddy = 0; buddy < m_buddies.size(); buddy++) {
-		m_buddies[buddy]->unset((page/pow(2,buddy))*PAGE_SIZE);
+		m_buddies[buddy]->unset((page / pow(2, buddy)) * PAGE_SIZE);
 	}
 }

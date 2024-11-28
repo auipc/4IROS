@@ -1,13 +1,13 @@
 #include <kernel/Syscall.h>
+#include <kernel/arch/amd64/x64_sched_help.h>
 #include <kernel/mem/Paging.h>
-#include <kernel/vfs/vfs.h>
-#include <kernel/vfs/stddev.h>
-#include <kernel/shedule/proc.h>
 #include <kernel/printk.h>
+#include <kernel/shedule/proc.h>
+#include <kernel/vfs/stddev.h>
+#include <kernel/vfs/vfs.h>
 #include <priv/common.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <kernel/arch/amd64/x64_sched_help.h>
 
 namespace Syscall {
 
@@ -33,7 +33,7 @@ static void sys$exit(Process *current, int status) {
 	Process::sched(0);
 }
 
-static size_t sys$fork(Process *current, SyscallReg* regs) {
+static size_t sys$fork(Process *current, SyscallReg *regs) {
 	Process *child = current->fork(regs);
 	child->next = current_process->next;
 	child->prev = current_process;
@@ -41,20 +41,23 @@ static size_t sys$fork(Process *current, SyscallReg* regs) {
 	return child->pid;
 }
 
-// FIXME If the NUL terminator is missing we could end up accidentally reading kernel memory 
-// if it directly bordered userspace memory. We should probably turn on the write protect bit in CR0 so we don't 
-// overwrite read only user memory.
-static bool verify_buffer(RootPageLevel *pd, uintptr_t buffer_addr, size_t size) {
+// FIXME If the NUL terminator is missing we could end up accidentally reading
+// kernel memory if it directly bordered userspace memory. We should probably
+// turn on the write protect bit in CR0 so we don't overwrite read only user
+// memory.
+static bool verify_buffer(RootPageLevel *pd, uintptr_t buffer_addr,
+						  size_t size) {
 	uintptr_t start_addr = buffer_addr - (buffer_addr % PAGE_SIZE);
 
-	for (uintptr_t i = start_addr; i < size + (PAGE_SIZE-1); i += PAGE_SIZE) {
-		if (pd->get_page_flags(buffer_addr + i) & (PAEPageFlags::Present | PAEPageFlags::User))
+	for (uintptr_t i = start_addr; i < size + (PAGE_SIZE - 1); i += PAGE_SIZE) {
+		if (pd->get_page_flags(buffer_addr + i) &
+			(PAEPageFlags::Present | PAEPageFlags::User))
 			return false;
 	}
 	return true;
 }
 
-FileHandle* stdin_filehandle;
+FileHandle *stdin_filehandle;
 
 // FIXME: Two processes can share the same VFSNode which causes problems (i.e.
 // processes might snipe values from the keyboard buffer and the value is lost
@@ -77,10 +80,10 @@ static int sys$read(Process *current, int fd, const char *buffer,
 
 	current->block_on_handle(fh);
 	uintptr_t rip = get_rip();
-	//printk("Read Handle %x\n", fh);
+	// printk("Read Handle %x\n", fh);
 	if (fh->check_blocked()) {
-		uint64_t* sp;
-		asm volatile("mov %%rsp, %0":"=a"(sp):);
+		uint64_t *sp;
+		asm volatile("mov %%rsp, %0" : "=a"(sp) :);
 		x64_syscall_block_help(sp, rip);
 	}
 
@@ -111,8 +114,8 @@ static int sys$read(Process *current, int fd, const char *buffer,
 	return fh->read((void *)buffer, count);
 }
 
-static size_t sys$write(Process *current, uint32_t handle, uintptr_t buffer_addr,
-						size_t length) {
+static size_t sys$write(Process *current, uint32_t handle,
+						uintptr_t buffer_addr, size_t length) {
 	(void)handle;
 	auto current_pd = current->root_page_level();
 
@@ -127,7 +130,7 @@ static size_t sys$write(Process *current, uint32_t handle, uintptr_t buffer_addr
 	}
 
 	if (handle == 0) {
-		//printk("Write Handle %x\n", current->m_file_handles[handle]);
+		// printk("Write Handle %x\n", current->m_file_handles[handle]);
 		if (!stdin_filehandle)
 			stdin_filehandle = new FileHandle(new StdDev(false));
 		stdin_filehandle->write(reinterpret_cast<void *>(buffer_addr), length);
@@ -141,7 +144,8 @@ static size_t sys$write(Process *current, uint32_t handle, uintptr_t buffer_addr
 
 static int sys$open(Process *current, const char *buffer, int flags) {
 	(void)flags;
-	if (!verify_buffer(current->root_page_level(), (uintptr_t)buffer, PAGE_SIZE))
+	if (!verify_buffer(current->root_page_level(), (uintptr_t)buffer,
+					   PAGE_SIZE))
 		return -1;
 
 	auto path = VFS::the().parse_path(buffer);
@@ -154,7 +158,7 @@ static int sys$open(Process *current, const char *buffer, int flags) {
 	return fd;
 }
 
-static int sys$lseek(Process* current, int fd, off_t offset, int whence) {
+static int sys$lseek(Process *current, int fd, off_t offset, int whence) {
 	if ((size_t)fd > (current->m_file_handles.size() - 1))
 		return -1;
 
@@ -181,13 +185,16 @@ static void *sys$mmap(Process *current, void *address, size_t length) {
 			return nullptr;
 
 		uintptr_t free_page = Paging::the()->allocator()->find_free_page();
-		Paging::the()->map_page(*current_pd, page, free_page, PAEPageFlags::User | PAEPageFlags::Present | PAEPageFlags::Write);
+		Paging::the()->map_page(*current_pd, page, free_page,
+								PAEPageFlags::User | PAEPageFlags::Present |
+									PAEPageFlags::Write);
 	}
 
 	return address;
 }
 
-static size_t sys$exec(Process *current, const char *buffer, const char** argv) {
+static size_t sys$exec(Process *current, const char *buffer,
+					   const char **argv) {
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)buffer, 255))
 		return -1;
 
@@ -195,7 +202,8 @@ static size_t sys$exec(Process *current, const char *buffer, const char** argv) 
 
 	size_t argc = 0;
 	if (argv) {
-		while (argv[argc++]);
+		while (argv[argc++])
+			;
 		argc--;
 	}
 
@@ -203,7 +211,8 @@ static size_t sys$exec(Process *current, const char *buffer, const char** argv) 
 
 	// Lazily just kill the process, copy the pid, and file descriptors.
 	auto proc = Process::create_user(buffer, argc, argv);
-	if (!proc) return -1;
+	if (!proc)
+		return -1;
 	auto next = current->next;
 	auto prev = current->prev;
 
@@ -218,18 +227,16 @@ static size_t sys$exec(Process *current, const char *buffer, const char** argv) 
 	return 0;
 }
 
-extern "C" void sched_sled(uintptr_t rsp) {
-	Process::sched(rsp);
-}
+extern "C" void sched_sled(uintptr_t rsp) { Process::sched(rsp); }
 
 static int sys$sleep(Process *current, size_t ms) {
-	Process* proc = current;
+	Process *proc = current;
 	proc->block_on_sleep(ms);
 	uintptr_t rip = get_rip();
 	asm volatile("sti");
 	if (proc->state() == ProState::Blocked) {
-		uint64_t* sp;
-		asm volatile("mov %%rsp, %0":"=a"(sp):);
+		uint64_t *sp;
+		asm volatile("mov %%rsp, %0" : "=a"(sp) :);
 		x64_syscall_block_help(sp, rip);
 	}
 	asm volatile("cli");
@@ -242,10 +249,11 @@ static int sys$waitpid(Process *current, pid_t pid, int *wstatus, int options) {
 	assert(pid > 0);
 	(void)options;
 
-	Process* proc = current;
+	Process *proc = current;
 
 	asm volatile("sti");
-	while ((proc->next || proc->state() == ProState::Dead) && proc->pid != pid) {
+	while ((proc->next || proc->state() == ProState::Dead) &&
+		   proc->pid != pid) {
 		proc = proc->next;
 	}
 	asm volatile("cli");
@@ -253,25 +261,25 @@ static int sys$waitpid(Process *current, pid_t pid, int *wstatus, int options) {
 	current->block_on_proc(proc);
 	uintptr_t rip = get_rip();
 	if (proc->state() == ProState::Running) {
-		uint64_t* sp;
-		asm volatile("mov %%rsp, %0":"=a"(sp):);
+		uint64_t *sp;
+		asm volatile("mov %%rsp, %0" : "=a"(sp) :);
 		x64_syscall_block_help(sp, rip);
 	}
-	auto current_pgl = (PageLevel*)get_cr3();
+	auto current_pgl = (PageLevel *)get_cr3();
 	Paging::switch_page_directory(current->root_page_level());
 	*wstatus = proc->exit_code;
 	Paging::switch_page_directory(current_pgl);
 	return pid;
 }
 
-void handler(SyscallReg* regs) {
-	//auto current_pgl = (PageLevel*)get_cr3();
-	//Paging::switch_page_directory(Paging::the()->kernel_root_directory());
+void handler(SyscallReg *regs) {
+	// auto current_pgl = (PageLevel*)get_cr3();
+	// Paging::switch_page_directory(Paging::the()->kernel_root_directory());
 
 	// :)
 	decltype(regs->rax) return_value = 0;
 	decltype(regs->rax) syscall_no = regs->rax;
-	Process* current = current_process;
+	Process *current = current_process;
 
 	switch (syscall_no) {
 	case SYS_EXIT: {
@@ -295,8 +303,8 @@ void handler(SyscallReg* regs) {
 	} break;
 	case SYS_LSEEK: {
 		return_value = sys$lseek(current, static_cast<int>(regs->rbx),
-								static_cast<off_t>(regs->rdx),
-								static_cast<int>(regs->rdi));
+								 static_cast<off_t>(regs->rdx),
+								 static_cast<int>(regs->rdi));
 	} break;
 	case SYS_MMAP: {
 		return_value = reinterpret_cast<size_t>(
@@ -304,7 +312,8 @@ void handler(SyscallReg* regs) {
 	} break;
 	case SYS_EXEC: {
 		return_value =
-			sys$exec(current, reinterpret_cast<const char *>(regs->rbx), reinterpret_cast<const char **>(regs->rdx));
+			sys$exec(current, reinterpret_cast<const char *>(regs->rbx),
+					 reinterpret_cast<const char **>(regs->rdx));
 	} break;
 	case SYS_WAITPID: {
 		return_value = static_cast<size_t>(sys$waitpid(
@@ -312,8 +321,8 @@ void handler(SyscallReg* regs) {
 			reinterpret_cast<int *>(regs->rdx), static_cast<int>(regs->rdi)));
 	} break;
 	case SYS_SLEEP: {
-		return_value = static_cast<size_t>(sys$sleep(
-			current, static_cast<size_t>(regs->rbx)));
+		return_value = static_cast<size_t>(
+			sys$sleep(current, static_cast<size_t>(regs->rbx)));
 	} break;
 	default:
 		printk("Unknown syscall %d\n", syscall_no);
@@ -321,8 +330,9 @@ void handler(SyscallReg* regs) {
 	}
 
 	regs->rax = return_value;
-	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data, (uint32_t)((uintptr_t)&ksyscall_data>>32));
-	//Paging::switch_page_directory(current_pgl);
+	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
+			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
+	// Paging::switch_page_directory(current_pgl);
 #if 0
 	Process *current = Scheduler::the()->current();
 
@@ -370,6 +380,4 @@ void handler(SyscallReg* regs) {
 
 } // namespace Syscall
 
-extern "C" void syscall_proxy(SyscallReg* regs) {
-	Syscall::handler(regs);
-}
+extern "C" void syscall_proxy(SyscallReg *regs) { Syscall::handler(regs); }

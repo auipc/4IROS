@@ -10,9 +10,7 @@ class VFSNode {
 	VFSNode(const char *m_name);
 	~VFSNode();
 	VFSNode(VFSNode &) = delete;
-	virtual void init() {
-		m_initialized = true;
-	}
+	virtual void init() { m_initialized = true; }
 	virtual inline bool is_directory() { return true; }
 	virtual inline bool is_initialized() { return m_initialized; };
 
@@ -54,18 +52,14 @@ class VFSNode {
 
 	virtual size_t position() { return m_position; }
 
-	virtual void push(VFSNode *node) { 
+	virtual void push(VFSNode *node) {
 		assert(node);
-		m_nodes.push(node); 
+		m_nodes.push(node);
 	}
 
-	virtual Vec<VFSNode*>& nodes() {
-		return m_nodes;
-	}
+	virtual Vec<VFSNode *> &nodes() { return m_nodes; }
 
-	virtual VFSNode* mounted_filesystem() {
-		return m_mounted_filesystem;
-	}
+	virtual VFSNode *mounted_filesystem() { return m_mounted_filesystem; }
 
 	// FIXME: File size should be able to exceed integer width.
 	virtual size_t size() { return 0; }

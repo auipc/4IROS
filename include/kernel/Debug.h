@@ -1,11 +1,11 @@
 #pragma once
-#include <kernel/printk.h>
 #include <kernel/arch/amd64/kernel.h>
+#include <kernel/printk.h>
 
 namespace Debug {
-void parse_symtab(const char* buffer, size_t length);
-SymTab* resolve_symbol(uintptr_t addr);
-void stack_trace(uint64_t* rbp=nullptr);
+void parse_symtab(const char *buffer, size_t length);
+SymTab *resolve_symbol(uintptr_t addr);
+void stack_trace(uint64_t *rbp = nullptr);
 
 void print_type(char);
 void print_type(const char *);

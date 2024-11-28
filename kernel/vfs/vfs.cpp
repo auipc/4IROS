@@ -151,7 +151,7 @@ VFSNode *VFS::open(Vec<const char *> &name) {
 	VFSNode *node = m_root_vfs_node->traverse(name);
 	if (!node)
 		return nullptr;
-	node->init(); 
+	node->init();
 	return node;
 }
 

@@ -14,18 +14,21 @@ enum EFlags {
 
 struct InterruptReg {
 	// Us
-	uint64_t rax, rbx, rcx, rdx, rsi, rdi, r15, r14, r13, r12, r11, r10, r9, r8, rbp/*, rsp*/;
+	uint64_t rax, rbx, rcx, rdx, rsi, rdi, r15, r14, r13, r12, r11, r10, r9, r8,
+		rbp /*, rsp*/;
 	// Sys
 	uint64_t rip, cs, eflags, rsp, ss;
 } PACKED;
 
 struct SyscallReg {
-	uint64_t rax, rbx, rcx, rdx, rsi, rdi, r15, r14, r13, r12, r11, r10, r9, r8, rbp/*, rsp*/;
+	uint64_t rax, rbx, rcx, rdx, rsi, rdi, r15, r14, r13, r12, r11, r10, r9, r8,
+		rbp /*, rsp*/;
 } PACKED;
 
 struct ExceptReg {
 	// Us
-	uint64_t rax, rbx, rcx, rdx, rsi, rdi, r15, r14, r13, r12, r11, r10, r9, r8, rbp/*, rsp*/;
+	uint64_t rax, rbx, rcx, rdx, rsi, rdi, r15, r14, r13, r12, r11, r10, r9, r8,
+		rbp /*, rsp*/;
 	// Sys
 	uint64_t error, rip, cs, eflags;
 } PACKED;
@@ -39,20 +42,21 @@ inline uint64_t get_cr2() {
 inline bool interrupts_enabled() {
 	uint64_t eflags = 0;
 	asm volatile("pushf\n"
-		     "pop %0":"=a"(eflags));
-	return eflags & (1<<9);
+				 "pop %0"
+				 : "=a"(eflags));
+	return eflags & (1 << 9);
 }
 
 enum PAEPageFlags : uint64_t {
 	Present = 1,
-	Write = 1<<1,
-	User = 1<<2,
-	PWT = 1<<3,
-	CacheDisable = 1<<4,
-	Accessed = 1<<5,
-	Dirty = 1ull<<6ull,
-	Global = 1ull<<8ull,
-	ExecuteDisable = 1ull<<63ull,
+	Write = 1 << 1,
+	User = 1 << 2,
+	PWT = 1 << 3,
+	CacheDisable = 1 << 4,
+	Accessed = 1 << 5,
+	Dirty = 1ull << 6ull,
+	Global = 1ull << 8ull,
+	ExecuteDisable = 1ull << 63ull,
 };
 
 struct TSS {
@@ -67,8 +71,7 @@ struct TSS {
 } PACKED;
 
 inline void write_msr(uint32_t msr, uint32_t low, uint32_t high) {
-	asm volatile("wrmsr"::"c"(msr), "a"(low), "d"(high));
+	asm volatile("wrmsr" ::"c"(msr), "a"(low), "d"(high));
 }
-
 
 static_assert(sizeof(TSS) == 104);
