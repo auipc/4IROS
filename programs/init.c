@@ -8,7 +8,7 @@ int main() {
 	printf("===Fork===\n");
 	int pid = 0;
 	if (!(pid = fork())) {
-		exec("term");
+		execvp("term", NULL);
 		while (1)
 			;
 	}

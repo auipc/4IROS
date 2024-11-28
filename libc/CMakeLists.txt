@@ -1,8 +1,3 @@
-set(LIBC_CRT0_SRCS
-	crt0.c
-	unistd.c
-)
-
 set(LIBC_SRCS
 	unistd.c
 	stdio.c
@@ -21,12 +16,12 @@ set(LIBK_SRCS
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
+# FIXME C not CXX
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error")
 set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -fPIE")
 
-add_library(crt0 STATIC ${LIBC_CRT0_SRCS})
-set_target_properties(crt0 PROPERTIES PREFIX "" SUFFIX ".o")
-target_include_directories(crt0 PRIVATE .)
+add_subdirectory(runtime)
+
 add_library(c STATIC ${LIBC_SRCS})
 target_include_directories(c PRIVATE .)
 add_definitions(-DLIBK)

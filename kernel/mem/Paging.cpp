@@ -6,6 +6,14 @@
 #include <kernel/arch/amd64/x86_64.h>
 #include <string.h>
 
+//#define TEMP_ZONE_1 (((1ull<<42ull)-1ull)-(PAGE_SIZE*8ull))
+#define TEMP_ZONE_1 ((1ull<<40ull))
+
+/* The paging interface will use a mutate and commit pattern.
+ * When a page level is read, it'll be fetched from physical memory through the virtual address TEMP_ZONE_X, then the required modifications will be made and TEMP_ZONE_X will 
+ * be remapped with the physical address pointing to the physical location of the page level and committed.
+ */
+
 // #define DEBUG_PAGING
 
 //extern "C" PageLevel boot_page_directory;
@@ -49,13 +57,9 @@ Paging::Paging(size_t total_memory, const KernelBootInfo& kbootinfo) {
 	// PageFrameAllocator structures
 	m_allocator = new PageFrameAllocator(total_memory);
 	m_allocator->mark_range(0x0, 0xFFFFF+kstart+ksz+0x00100000+100*KB);
-	printk("lol %x\n", 0xFFFFF+kstart+ksz+0x00100000+100*KB);
 	//m_allocator->mark_range(kstart, ksz);
 	// I forgor the size of the bootloader help
 	//m_allocator->mark_range(0x00100000, 100*KB);
-
-	// Safe area to map and edit pages
-	m_safe_area = (uint8_t*)kmalloc_aligned(PAGE_SIZE * 2, PAGE_SIZE);
 }
 
 Paging::~Paging() { delete m_allocator; }
@@ -138,14 +142,13 @@ void Paging::mark_sub(PageLevel& plv, uint64_t flags) {
 #endif
 
 // FIXME when permissions are conflicting, the lesser strict permission.
-void Paging::map_page(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags) {
+void Paging::map_page_temp(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags) {
 	auto current_pgl = (RootPageLevel*)get_cr3();
 	switch_page_directory(m_safe_pgl);
 	auto& pdpt = pd.entries[(virt>>39)&0x1ff];
 	uint64_t cast_flags = flags & (PAEPageFlags::User | PAEPageFlags::Write | PAEPageFlags::ExecuteDisable);
 
 	if (!pdpt.is_mapped()) {
-		printk("vvvv %x\n", (virt>>39)&0x1ff);
 		create_page_level(pdpt);
 		pdpt.pdata |= pdpt.flags() | flags;
 	}
@@ -176,15 +179,114 @@ void Paging::map_page(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_
 	switch_page_directory(current_pgl);
 }
 
+extern bool s_use_actual_allocator;
+// FIXME when permissions are conflicting, the lesser strict permission.
+void Paging::map_page(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags) {
+	if (s_use_actual_allocator) {
+		auto& pdpt = pd.entries[(virt>>39)&0x1ff];
+		uint64_t cast_flags = flags & (PAEPageFlags::User | PAEPageFlags::Write | PAEPageFlags::ExecuteDisable);
+
+		if (!pdpt.is_mapped()) {
+			create_page_level(pdpt);
+			pdpt.pdata |= pdpt.flags() | flags;
+		}
+
+		pdpt.pdata |= pdpt.flags() | cast_flags;
+
+		LovelyPageLevel* pdpte_lvl = pdpt.fetch();
+		auto& pdpte = pdpte_lvl->entries[(virt>>30)&0x1ff];
+		if (!pdpte.is_mapped()) {
+			pdpte.set_addr(m_allocator->find_free_page());
+			pdpte.pdata |= pdpt.flags() | flags;
+		}
+
+		pdpte.pdata |= pdpte.flags() | cast_flags;
+
+		LovelyPageLevel* pdt_lvl = pdpte.fetch();
+		auto& pdt = pdt_lvl->entries[(virt>>21)&0x1ff];
+		if (!pdt.is_mapped()) {
+			pdt.set_addr(m_allocator->find_free_page());
+			pdt.pdata |= pdpt.flags() | flags;
+		}
+
+		pdt.pdata |= pdt.flags() | cast_flags;
+
+		LovelyPageLevel* pt_lvl = pdt.fetch();
+		auto& pt = pt_lvl->entries[(virt>>12)&0x1ff];
+		pt.pdata = phys | flags;
+		pdt.commit(*pt_lvl);
+		kfree(pt_lvl);
+
+		pdpte.commit(*pdt_lvl);
+		pdpt.commit(*pdpte_lvl);
+		kfree(pdt_lvl);
+		kfree(pdpte_lvl);
+		// FIXME INVLPG isn't working and I'm too lazy to figure it out
+		//asm volatile("mov %0, %%cr3"::"a"(get_cr3()));
+	} else {
+		auto& pdpt = pd.entries[(virt>>39)&0x1ff];
+		uint64_t cast_flags = flags & (PAEPageFlags::User | PAEPageFlags::Write | PAEPageFlags::ExecuteDisable);
+
+		if (!pdpt.is_mapped()) {
+			create_page_level(pdpt);
+			pdpt.pdata |= pdpt.flags() | flags;
+		}
+
+		pdpt.pdata |= pdpt.flags() | cast_flags;
+
+		auto& pdpte = pdpt.level()->entries[(virt>>30)&0x1ff];
+		if (!pdpte.is_mapped()) {
+			create_page_level(pdpte);
+			pdpte.pdata |= pdpt.flags() | flags;
+		}
+
+		pdpte.pdata |= pdpte.flags() | cast_flags;
+
+		auto& pdt = pdpte.level()->entries[(virt>>21)&0x1ff];
+		if (!pdt.is_mapped()) {
+			create_page_level(pdt);
+			pdt.pdata |= pdpt.flags() | flags;
+		}
+
+		pdt.pdata |= pdt.flags() | cast_flags;
+
+		auto& pt = pdt.level()->entries[(virt>>12)&0x1ff];
+		pt.pdata = phys | flags;
+
+		// FIXME INVLPG isn't working and I'm too lazy to figure it out
+		//asm volatile("mov %0, %%cr3"::"a"(get_cr3()));
+	}
+	asm volatile("invlpg %0"::"m"(virt));
+}
+
 uintptr_t RootPageLevel::get_page_flags(uintptr_t addr) {
 	auto& pdpt = entries[addr>>39];
 	if (!pdpt.is_mapped()) return 0;
-	auto& pdpte = pdpt.level()->entries[addr>>30];
+	auto pdpte_lvl = pdpt.fetch();
+	auto& pdpte = pdpte_lvl->entries[addr>>30];
 	if (!pdpte.is_mapped()) return 0;
-	auto& pdt = pdpte.level()->entries[addr>>21];
+	auto pdt_lvl = pdpte.fetch();
+	auto& pdt = pdt_lvl->entries[addr>>21];
 	if (!pdt.is_mapped()) return 0;
-	auto& pt = pdt.level()->entries[addr>>12];
-	return pt.flags();
+	auto pt_lvl = pdt.fetch();
+	auto& pt = pt_lvl->entries[addr>>12];
+	auto flags = pt.flags();
+	kfree(pdpte_lvl);
+	kfree(pdt_lvl);
+	kfree(pt_lvl);
+	return flags;
+}
+
+LovelyPageLevel* PageSkellington::fetch() {
+	LovelyPageLevel* level = (LovelyPageLevel*)kmalloc(sizeof(LovelyPageLevel));
+	Paging::the()->map_page_temp(*(RootPageLevel*)get_cr3(), TEMP_ZONE_1, addr());
+	memcpy(level, (void*)TEMP_ZONE_1, sizeof(LovelyPageLevel));
+	return level;
+}
+
+void PageSkellington::commit(LovelyPageLevel& level) {
+	Paging::the()->map_page_temp(*(RootPageLevel*)get_cr3(), TEMP_ZONE_1, addr());
+	memcpy((void*)TEMP_ZONE_1, &level, sizeof(PageLevel));
 }
 
 char* temp_area[6] = {};
@@ -222,6 +324,7 @@ RootPageLevel* Paging::clone(const RootPageLevel& pml4) {
 }
 
 RootPageLevel* Paging::clone_for_fork(const RootPageLevel& pml4, bool just_copy) {
+	printk("==Clone Begin==\n");
 	auto root_page = m_allocator->find_free_page();
 	//auto current_pgl = (RootPageLevel*)get_cr3();
 	map_page(*(RootPageLevel*)get_cr3(), root_page, root_page);
@@ -233,7 +336,7 @@ RootPageLevel* Paging::clone_for_fork(const RootPageLevel& pml4, bool just_copy)
 		auto& root_pdpt = root_pd->entries[i];
 		auto pdpt = pml4.entries[i];
 		if (!pdpt.is_mapped()) continue;
-		if (!pdpt.is_user() && !just_copy) {
+		if ((!pdpt.is_user() && !just_copy) || i == 2) {
 			root_pdpt.pdata = pdpt.pdata;
 			continue;
 		}
@@ -255,31 +358,49 @@ RootPageLevel* Paging::clone_for_fork(const RootPageLevel& pml4, bool just_copy)
 
 			if (!root_pdpte.is_mapped()) {
 				root_pdpte.copy_flags(pdpte.pdata);
-				create_page_level(root_pdpte);
+				root_pdpte.set_addr(m_allocator->find_free_page());
 			}
 
 			for (int k = 0; k < 512; k++) {
-				auto& root_pdt = root_pdpte.level()->entries[k];
-				auto pdt = pdpte.level()->entries[k];
-				if (!pdt.is_mapped()) continue;
+				LovelyPageLevel* root_pdt_lvl = root_pdpte.fetch();
+				auto& root_pdt = root_pdt_lvl->entries[k];
+				LovelyPageLevel* pdt_lvl = pdpte.fetch();
+				auto pdt = pdt_lvl->entries[k];
+				if (!pdt.is_mapped()) {
+					kfree(pdt_lvl);
+					kfree(root_pdt_lvl);
+					continue;
+				}
 
 				if (!pdt.is_user()) {
 					root_pdt.pdata = pdt.pdata;
+					root_pdpte.commit(*root_pdt_lvl);
+					kfree(pdt_lvl);
+					kfree(root_pdt_lvl);
 					continue;
 				}
 
 				if (!root_pdt.is_mapped()) {
 					root_pdt.copy_flags(pdt.pdata);
-					create_page_level(root_pdt);
+					root_pdt.set_addr(m_allocator->find_free_page());
 				}
 
 				for (int l = 0; l < 512; l++) {
-					auto& root_pt = root_pdt.level()->entries[l];
-					auto pt = pdt.level()->entries[l];
-					if (!pt.is_mapped()) continue;
+					LovelyPageLevel* root_pt_lvl = root_pdt.fetch();
+					auto& root_pt = root_pt_lvl->entries[l];
+					LovelyPageLevel* pt_lvl = pdt.fetch();
+					auto pt = pt_lvl->entries[l];
+					if (!pt.is_mapped()) {
+						kfree(pt_lvl);
+						kfree(root_pt_lvl);
+						continue;
+					}
 
 					if (!pt.is_user()) {
 						root_pt.pdata = pt.pdata;
+						root_pdt.commit(*root_pt_lvl);
+						kfree(pt_lvl);
+						kfree(root_pt_lvl);
 						continue;
 					}
 
@@ -291,12 +412,20 @@ RootPageLevel* Paging::clone_for_fork(const RootPageLevel& pml4, bool just_copy)
 
 					root_pt.copy_flags(pt.pdata);
 					root_pt.set_addr(free_page);
+
+					root_pdt.commit(*root_pt_lvl);
+					kfree(pt_lvl);
+					kfree(root_pt_lvl);
 				}
+				root_pdpte.commit(*root_pdt_lvl);
+				kfree(pdt_lvl);
+				kfree(root_pdt_lvl);
 			}
 		}
 		//panic("wow");
 	}
 
+	printk("==Clone End==\n");
 	return root_pd;
 }
 
@@ -306,6 +435,7 @@ void Paging::setup(size_t total_memory, const KernelBootInfo& kbootinfo) {
 	}
 	s_instance = new Paging(total_memory, kbootinfo);
 	Paging::the()->m_safe_pgl = (RootPageLevel*)get_cr3();
+	Paging::the()->map_page_temp(*(RootPageLevel*)get_cr3(), TEMP_ZONE_1, 0);
 	s_kernel_page_directory = Paging::the()->clone(*(RootPageLevel*)get_cr3());
 	switch_page_directory(s_kernel_page_directory);
 	printk("Clone done\n");

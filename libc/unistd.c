@@ -41,9 +41,9 @@ _Noreturn void exit(int status) {
 			     //"syscall" :: "a"(SYS_EXIT), "b"((uint64_t)status):"rcx", "r11", "rdi");
 }
 
-int exec(const char *path) {
+int execvp(const char *path, const char** argv) {
 	int r = 0;
-	asm volatile("syscall" : "=a"(r) : "a"(SYS_EXEC), "b"(path) : "rcx", "r11", "memory");
+	asm volatile("syscall" : "=a"(r) : "a"(SYS_EXEC), "b"(path), "d"(argv) : "rcx", "r11", "memory");
 	return r;
 }
 
@@ -56,5 +56,11 @@ int waitpid(pid_t pid, int *wstatus, int options) {
 void* mmap(void *address, size_t length) {
 	void* r = 0;
 	asm volatile("syscall" : "=a"(r) : "a"(SYS_MMAP), "b"(address), "d"(length) : "rcx", "r11", "memory");
+	return r;
+}
+
+int msleep(uint64_t ms) {
+	int r = 0;
+	asm volatile("syscall" : "=a"(r) : "a"(SYS_SLEEP), "b"(ms) : "rcx", "r11", "memory");
 	return r;
 }

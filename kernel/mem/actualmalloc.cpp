@@ -53,7 +53,6 @@ static void* actual_malloc_find_free(size_t size) {
 			//panic("Hgelp\n");
 			auto next_node = new ((void*)next_addr) SlowLinkedList();
 			next_node->free = true;
-			//printk("New node %x\n",next_addr);
 			current_node->next = next_node;
 		}
 #ifdef DEBUG_CANARY
@@ -63,8 +62,8 @@ static void* actual_malloc_find_free(size_t size) {
 		assert(current_node->dbg_canary == 0xDEAD);
 #endif
 		assert(current_node->size);
-		next_addr += sizeof(SlowLinkedList);
 		current_node = current_node->next;
+		next_addr += sizeof(SlowLinkedList);
 	}
 
 	current_node->free = false;
@@ -97,13 +96,12 @@ void actual_free(void* addr) {
 	// Better to err on the side of caution
 	last_node = nullptr;
 	if (!current_node) return;
-
-	memset((char*)addr, 0, current_node->size);
 	if (!current_node->next) {
-		//last_node = prev_node;
 		prev_node->next = nullptr;
 		return;
 	}
+
+	memset((char*)addr, 0, current_node->size);
 
 	current_node->free = true;
 }

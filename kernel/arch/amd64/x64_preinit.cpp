@@ -213,8 +213,7 @@ uint64_t to_virt(uint64_t addr) {
 //#define VIRT_MASK_ADDR(x,y) (x + (((virt>>y))&0x1ffull))
 
 uintptr_t get_page_map(uint64_t virt) {
-	PageLevel* pml4 = 0;
-	asm volatile("mov %%cr3, %%rax":"=a"(pml4):);
+	RootPageLevel* pml4 = (RootPageLevel*)get_cr3();
 	auto p1 = pml4->entries[(virt>>39)&0x1ff].level();
 	auto p2 = p1->entries[(virt>>30)&0x1ff].level();
 	auto p3 = p2->entries[(virt>>21)&0x1ff].level();
@@ -224,8 +223,7 @@ uintptr_t get_page_map(uint64_t virt) {
 
 void simp_map_page(uint64_t virt, uint64_t phys) {
 	printk("Map %x\n", virt);
-	uint64_t* pml4 = 0;
-	asm volatile("mov %%cr3, %%rax":"=a"(pml4):);
+	uint64_t* pml4 = (uint64_t*)get_cr3();
 	uint64_t* pdpte = (uint64_t*)VIRT_MASK(pml4, 39);//(*(pml4 + ((virt>>39)&0x1ff))&~4095);
 	if (!pdpte) {
 		panic("PDPTE is null");
@@ -245,13 +243,6 @@ void simp_map_page(uint64_t virt, uint64_t phys) {
 	}
 
 	uint64_t* pte = (uint64_t*)VIRT_MASK_ADDR((uint64_t*)to_virt(*pt & ~4095ull), 12);
-
-#if 0
-	if (*pte != *((uint64_t*)VIRT_MASK_ADDR((*pt & ~4095ull), 12))) {
-		panic("Mismatch");
-	}
-#endif
-
 
 	*pte = phys&~4095;
 	*pte |= 3;
@@ -399,7 +390,7 @@ extern "C" void tss_interrupt() {
 }
 
 extern "C" void pf_interrupt(ExceptReg& eregs) {
-	uint64_t fault_addr = get_cr2();
+	uintptr_t fault_addr = get_cr2();
 	printk("Unrecoverable %s page fault caused by ", (eregs.error&4) ? "user" : "kernel");
 	if (eregs.error & 2) {
 		printk("write to ");
@@ -413,11 +404,22 @@ extern "C" void pf_interrupt(ExceptReg& eregs) {
 	} else {
 		printk("non-present page");
 	}
-	printk(" located at address 0x%x RIP 0x%x\n", fault_addr, eregs.rip);
-	Debug::stack_trace();
-	panic("Page Fault");
+	if (!(eregs.error&4)) {
+		printk(" located at address 0x%x RIP 0x%x\n", fault_addr, eregs.rip);
+		Debug::stack_trace((uint64_t*)eregs.rbp);
+		panic("Page Fault");
+	}
+
+	int fault_succ = Process::resolve_cow(fault_addr);
+	if (!fault_succ) {
+		panic("\nCouldn't resolve user CoW!");
+	}
+
+	printk("\n");
 }
 
+extern uint64_t global_waiter_time;
+#if 0
 static uint64_t ms_elapsed = 0;
 void sleep(const uint64_t ms_time) {
 	uint64_t sleep_comp = 0;
@@ -427,11 +429,19 @@ void sleep(const uint64_t ms_time) {
 	}
 	return;
 }
+#endif
 
+// femptoseconds per tick
+// (https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf#page=11)
 static uint64_t fp_per_tick = 0;
 uint64_t tick_counter = 0;
+#define HPET0_TICK_COUNT 0xB00B15
+
+uint64_t global_waiter_time = 0;
 
 extern "C" void timer_interrupt(InterruptReg* regs) {
+	global_waiter_time = (tick_counter*HPET0_TICK_COUNT*fp_per_tick)/1000000000000;
+	tick_counter++;
 	/*
 #ifndef TEST_TIMER
 	if (!mt_enable) goto end; 
@@ -588,7 +598,7 @@ extern "C" [[noreturn]] void kernel_main();
 	fp_per_tick = *(uint64_t*)(hpet->address.address)>>32;
 
 	// Comparator
-	*(uint64_t*)(hpet->address.address+0x108) = 0xB00B15;
+	*(uint64_t*)(hpet->address.address+0x108) = HPET0_TICK_COUNT;
 
 	//sleep(5000);
 	printk("Sleep 5s\n");

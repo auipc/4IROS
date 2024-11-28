@@ -22,3 +22,5 @@ struct SymTab {
 	size_t size;
 	const char* func_name;
 };
+
+extern uint64_t global_waiter_time;

@@ -35,7 +35,6 @@ INode *Ext2FileSystem::read_inode(size_t index) {
 	m_block_dev->seek((bgd.start_block_inode) * block_size);
 	m_block_dev->seek_cur(block_group_inode_idx * 128);
 	INode *node = new INode();
-	printk("Inode pos %x\n",m_block_dev->position());
 	m_block_dev->read((char *)node, sizeof(INode));
 	// assert(node->type == 0x41ed);
 	return node;
@@ -50,10 +49,6 @@ void Ext2FileSystem::read_singly(INode &inode, size_t singly_position, void* out
 	uint32_t* singly_blocks = new uint32_t[256];
 	seek_block(singly_position);
 	m_block_dev->read((char *)singly_blocks, sizeof(uint32_t) * 256);
-	// Blocks with the value zero could be "sparse" files?
-	/*if (!singly_blocks[block_idx]) {
-		return false;
-	}*/
 
 	m_block_dev->seek((singly_blocks[block_idx] * block_size) +
 					  (position % block_size));
@@ -174,6 +169,9 @@ void Ext2FileSystem::init() {
 	block_size = block.log2_block_size > 0
 					 ? ((uint32_t)block.log2_block_size) << 10
 					 : block_size;
+	if (block_size != 1024) {
+		panic("Unsupported ext2 block size!");
+	}
 
 	printk("MAGIC %x\n", block.ext2_sig);
 

@@ -25,9 +25,10 @@ static const char scancode_ascii_caps[] = {
 	'B', 'N', 'M',	'<',  '>',	'?', 0,	  0,   0,	' '};
 
 int main() {
+	printf("Term\n");
 	int shell_pid = 0;
 	if (!(shell_pid = fork())) {
-		exec("shell");
+		execvp("shell", NULL);
 		while(1);
 	}
 
@@ -50,10 +51,10 @@ int main() {
 
 				if (!use_upper) {
 					printf("%c", scancode_ascii[buf[i + 1]]);
-					//write(0, &scancode_ascii[buf[i + 1]], 1);
+					write(0, &scancode_ascii[buf[i + 1]], 1);
 				} else {
 					printf("%c", scancode_ascii_upper[buf[i + 1]]);
-					//write(0, &scancode_ascii_upper[buf[i + 1]], 1);
+					write(0, &scancode_ascii_upper[buf[i + 1]], 1);
 				}
 			}
 		}

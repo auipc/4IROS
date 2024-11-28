@@ -6,8 +6,10 @@
 #include <kernel/util/Vec.h>
 #include <stdint.h>
 #include <kernel/arch/amd64/x86_64.h>
+#include <kernel/Debug.h>
 
 struct PageLevel;
+struct LovelyPageLevel;
 struct RootPageLevel;
 struct PageSkellington;
 
@@ -76,6 +78,7 @@ class Paging {
 
 	void unmap_page(RootPageLevel& pd, uintptr_t virt);
 	void map_page_assume(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
+	void map_page_temp(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
 	void map_page(RootPageLevel& pd, uintptr_t virt, uintptr_t phys, uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
 	void create_page_level(PageSkellington& lvl);
 	// Allows for the mapping a page without a proper way to address it later. 
@@ -91,6 +94,7 @@ class Paging {
 
   private:
 	friend struct PageLevel;
+	friend struct LovelyPageLevel;
 
 	RootPageLevel* m_safe_pgl;
 	Paging(size_t total_memory, const KernelBootInfo& kbootinfo);
@@ -113,9 +117,12 @@ struct PageSkellington {
 		return (pdata & PAEPageFlags::User);
 	}
 
-	inline PageLevel* level() const {
+	PageLevel* level() const {
 		return reinterpret_cast<PageLevel*>(pdata & PAGE_ADDRESS_MASK);
 	}
+
+	LovelyPageLevel* fetch();
+	void commit(LovelyPageLevel& level);
 
 	inline uintptr_t addr() const {
 		return static_cast<uintptr_t>(pdata & PAGE_ADDRESS_MASK);
@@ -151,6 +158,17 @@ struct PageLevel {
 
 	PageSkellington entries[512];
 } __attribute__((packed)) __attribute__((aligned(PAGE_SIZE)));
+
+// Without the malloc constraint
+struct LovelyPageLevel {
+	inline PageLevel* map() const {
+		auto map_page = Paging::the()->m_safe_area+PAGE_SIZE;
+		Paging::the()->map_page_assume(*(RootPageLevel*)get_cr3(), (uintptr_t)map_page, (uintptr_t)this);
+		return (PageLevel*)map_page;
+	}
+
+	PageSkellington entries[512];
+} __attribute__((packed));
 
 struct RootPageLevel : PageLevel {
 	uintptr_t get_page_flags(uintptr_t addr);

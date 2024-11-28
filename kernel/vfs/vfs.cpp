@@ -43,12 +43,19 @@ int FileHandle::read(void *buffer, size_t size) {
 	assert(m_node);
 	// FIXME: This is a race condition waiting to happen!
 	// m_node->seek(m_position);
-	return m_node->read(buffer, size);
+	m_node->seek(m_position);
+	int res = m_node->read(buffer, size);
+	m_position = m_node->position();
+	return res;
 }
 
 int FileHandle::write(void *buffer, size_t size) {
 	assert(m_node);
-	return m_node->write(buffer, size);
+	// FIXME: This is a race condition waiting to happen!
+	m_node->seek(m_position);
+	int res = m_node->write(buffer, size);
+	m_position = m_node->position();
+	return res;
 }
 
 int FileHandle::seek(int64_t offset, SeekMode origin) {

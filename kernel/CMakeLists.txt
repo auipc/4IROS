@@ -21,6 +21,7 @@ set(SRCS
 	main.cpp
 	ubsan.cpp
 	vfs/vfs.cpp
+	vfs/stddev.cpp
 	vfs/block/ata.cpp
 	vfs/fs/ext2.cpp
         mem/malloc.cpp

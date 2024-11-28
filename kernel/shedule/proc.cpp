@@ -1,38 +1,13 @@
 #include <kernel/shedule/proc.h>
 #include <kernel/vfs/vfs.h>
+#include <kernel/vfs/stddev.h>
 #include <kernel/unix/ELF.h>
 #include <kernel/arch/amd64/x64_sched_help.h>
 
-#define KSTACK_SIZE (4096)
+#define KSTACK_SIZE (4096*6)
 Process* current_process = nullptr;
 extern TSS tss;
 uint64_t s_pid = 0;
-
-class StdinNode final : public VFSNode {
-public:
-	StdinNode() {
-		VFSNode();
-	}
-
-	virtual int write(void* buffer, size_t size) override {
-		for (size_t i = 0; i < size; i++) {
-			m_buffer.push(((char*)buffer)[i]);
-		}
-		return size;
-	}
-
-	virtual int read(void* buffer, size_t size) override {
-		memcpy(buffer, m_buffer.data()+m_position, size);
-		return size;
-	}
-
-	virtual bool check_blocked() override {
-		return m_position >= m_buffer.size();
-	}
-
-private:
-	Vec<char> m_buffer;
-};
 
 class StdioNode final : public VFSNode {
   public:
@@ -52,7 +27,7 @@ class StdioNode final : public VFSNode {
 Process::Process()
 	: pid(s_pid++)
 {
-	m_file_handles.push(new FileHandle(new StdinNode()));
+	m_file_handles.push(new FileHandle(new StdDev(false)));
 	m_file_handles.push(new FileHandle(new StdioNode()));
 	m_file_handles.push(new FileHandle(new StdioNode()));
 }
@@ -90,6 +65,11 @@ void Process::reentry() {
 	x64_switch((void*)current_process->m_kern_stack_top,(uint64_t)current_process->m_pglv);
 }
 
+int Process::resolve_cow(uintptr_t fault_addr) {
+	(void)fault_addr;
+	return 0;
+}
+
 Process* Process::create(void* func_ptr) {
 	Process* proc = new Process();
 	//auto current_pd = (RootPageLevel*)get_cr3();
@@ -110,10 +90,12 @@ Process* Process::create(void* func_ptr) {
 	return proc;
 }
 
-Process* Process::create_user(const char* path) {
+Process* Process::create_user(const char* path, size_t argc, const char** argv) {
+	(void)argv;
 	Process* proc = new Process();
 	auto path_vec = VFS::the().parse_path(path);
 	auto exec_file = VFS::the().open(path_vec);
+	if (!exec_file) return nullptr;
 	auto file_sz = exec_file->size();
 	char* buffer = new char[file_sz];
 	exec_file->read(buffer, file_sz);
@@ -121,6 +103,7 @@ Process* Process::create_user(const char* path) {
 	const ELFSectionHeader64* esecheads = reinterpret_cast<const ELFSectionHeader64*>(buffer + ehead->phtable);
 
 	auto current_pd = (RootPageLevel*)get_cr3();
+	Paging::switch_page_directory(Paging::the()->kernel_root_directory());
 	RootPageLevel* pgl = Paging::the()->clone_for_fork(*(RootPageLevel*)current_pd, true);
 	Paging::the()->switch_page_directory(pgl);
 
@@ -154,6 +137,28 @@ Process* Process::create_user(const char* path) {
 		uintptr_t stack_page = Paging::the()->allocator()->find_free_page();
 		Paging::the()->map_page(*pgl, stack_begin+i, stack_page, PAEPageFlags::User | PAEPageFlags::Write | PAEPageFlags::Present);
 	}
+
+	size_t argv_ptr_size = sizeof(uint64_t)*argc;
+	stack_end -= 8;
+
+	stack_end -= argv_ptr_size;
+	for (size_t i = 0; i < argc; i++) {
+		stack_end -= strlen(argv[i])+1;
+	}
+	uintptr_t argv_begin = stack_end;
+	uintptr_t argv_ptr = argv_begin+argv_ptr_size;
+	for (size_t i = 0; i < argc; i++) {
+		*(uint64_t*)(argv_begin+(sizeof(uint64_t)*i)) = argv_ptr;
+		memcpy((void*)argv_ptr, argv[i], strlen(argv[i]));
+		argv_ptr += strlen(argv[i])+1;
+	}
+	stack_end -= stack_end%8;
+
+	stack_end -= 8;
+	*(uint64_t*)stack_end = argv_begin;
+	stack_end -= 8;
+	*(uint64_t*)stack_end = argc;
+
 	uint64_t* stp = x64_create_user_task_stack((uint64_t*)kstack_end, (uintptr_t)(ehead->entry), (uint64_t*)stack_end);
 
 	proc->m_pglv = pgl;
@@ -172,7 +177,6 @@ Process* Process::fork(SyscallReg* regs) {
 	(void)regs;
 	uintptr_t kstack_begin = (uintptr_t)kmalloc(KSTACK_SIZE);
 	uint64_t* kstack_end = (uint64_t*)(kstack_begin+KSTACK_SIZE);
-	uint64_t* copy_stack_end = (uint64_t*)regs;
 	//Process* new_proc = new Process(this);
 	Process* new_proc = new Process();
 	new_proc->m_pglv = Paging::the()->clone_for_fork(*m_pglv);
@@ -194,25 +198,53 @@ Process* Process::fork(SyscallReg* regs) {
 	kstack_end--;
 	*kstack_end = regs->rbp;
 
-	// Skip over RAX and RBP
-	copy_stack_end += 2;
-	for (int i = 0; i < 13; i++) {
-		kstack_end--;
-		*kstack_end = *copy_stack_end;
-		copy_stack_end++;
-	}
+	kstack_end--;
+	*kstack_end = regs->r8;
+	kstack_end--;
+	*kstack_end = regs->r9;
+	kstack_end--;
+	*kstack_end = regs->r10;
+	kstack_end--;
+	*kstack_end = regs->r11;
+	kstack_end--;
+	*kstack_end = regs->r12;
+	kstack_end--;
+	*kstack_end = regs->r13;
+	kstack_end--;
+	*kstack_end = regs->r14;
+	kstack_end--;
+	*kstack_end = regs->r15;
+	kstack_end--;
+	*kstack_end = regs->rdi;
+	kstack_end--;
+	*kstack_end = regs->rsi;
+	kstack_end--;
+	*kstack_end = regs->rdx;
+	kstack_end--;
+	*kstack_end = regs->rcx;
+	kstack_end--;
+	*kstack_end = regs->rbx;
 	// RAX
 	kstack_end--;
 	*kstack_end = 0;
 
 	new_proc->m_kern_stack_bot = kstack_begin;
 	new_proc->m_kern_stack_top = (uintptr_t)kstack_end;
+	for (size_t i = 0; i < m_file_handles.size(); i++) {
+		new_proc->m_file_handles.push(m_file_handles[i]);
+	}
 	return new_proc;
 }
 
 void Process::block_on_proc(Process* p) {
 	m_blocker.blocked_on = Blocker::ProcessBlock;
 	m_blocker.blocked_process = p;
+	m_state = ProState::Blocked;
+}
+
+void Process::block_on_sleep(size_t ms) {
+	m_blocker.blocked_on = Blocker::SleepBlock;
+	m_blocker.sleep_waiter_ms = global_waiter_time+ms;
 	m_state = ProState::Blocked;
 }
 
@@ -226,6 +258,12 @@ void Process::poll_is_blocked() {
 	switch (m_blocker.blocked_on) {
 		case Blocker::ProcessBlock:
 			if (m_blocker.blocked_process->m_state == ProState::Dead) {
+				m_state = ProState::Running;
+			}
+			break;
+		case Blocker::SleepBlock:
+			// Oh, waiter. Check, please.
+			if (global_waiter_time >= m_blocker.sleep_waiter_ms) {
 				m_state = ProState::Running;
 			}
 			break;

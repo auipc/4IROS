@@ -58,9 +58,9 @@ static bool is_port_keyboard(uint8_t port) {
 extern "C" void write_eoi();
 
 extern "C" void ps2kbd_interrupt() {
-	printk("ps2\n");
 	uint8_t scan = inb(0x60);
 	if (!PS2Keyboard::s_initialized) {
+		printk("ps2 b4 init\n");
 		write_eoi();
 		return;
 	}

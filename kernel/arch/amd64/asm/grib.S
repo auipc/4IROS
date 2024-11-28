@@ -78,7 +78,7 @@ x64_create_kernel_task_stack:
 x64_create_user_task_stack:
 	cli
 	// Switch stack
-	movq %rsp, %rcx
+	movq %rsp, %r10
 	movq %rdi, %rsp
 
 	// For RETURN-TO-OUTER-PRIVILEGE-LEVEL, something something RPL.
@@ -118,7 +118,7 @@ x64_create_user_task_stack:
 	pushq $0
 	movq %rsp, %rax
 	// Back again
-	mov %rcx, %rsp
+	mov %r10, %rsp
 	// Returns the stack
 	ret
 

@@ -49,30 +49,44 @@ void handle_cmd(const char *buf, size_t buf_sz) {
 		}
 	}
 
-	if (!(pid = fork())) {
-		exit(exec(buf));
+	for (int i = 0; i < sizeof(s_builtins) / sizeof(s_builtins[0]); i++) {
+		if (!strcmp(s_builtins[i].name, argv[0])) {
+			s_builtins[i].func(argc, argv);
+			return;
+		}
 	}
 
-	/*
-	for (int i = 0; i < argc; i++) {
-		printf("%s \n", argv[i]);
-	}*/
+
+	printf("Hello argv %s", argv[0]);
+	if (!(pid = fork())) {
+		exit(execvp(argv[0], argv));
+	}
 
 	waitpid(pid, &status, 0);
 	if (status) {
-		for (int i = 0; i < sizeof(s_builtins) / sizeof(s_builtins[0]); i++) {
-			if (!strcmp(s_builtins[i].name, argv[0])) {
-				s_builtins[i].func(argc, argv);
-				return;
-			}
-		}
 		printf("Not found\n");
 	}
 
 	// FIXME: free args
 }
 
+void parse_autorun() {
+	int autorun_fd = open("autorun", 0);
+	int sz = lseek(autorun_fd, 0, SEEK_END);
+	lseek(autorun_fd, 0, SEEK_SET);
+	char* autorun_buf = (char*)malloc(sz);
+	read(autorun_fd, autorun_buf, sz);
+	for (int i = 0; i < sz; i++) {
+		if (autorun_buf[i] == '\n') {
+			handle_cmd(autorun_buf, i-1);
+		}
+	}
+}
+
 int main() {
+	*(uint64_t*)(0x0) = 0x493;
+	parse_autorun();
+	printf("Shell\n");
 	char* buf = (char*)malloc(4096);
 	size_t buf_sz = 0;
 	printf(">");

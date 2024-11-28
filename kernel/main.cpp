@@ -36,22 +36,6 @@ void test_fs() {
 	assert(zero_file == 0);
 }
 
-uint16_t endswap16(uint16_t n) {
-	uint8_t* b = reinterpret_cast<uint8_t*>(&n);
-	uint8_t t = b[1];
-	b[1] = b[0];
-	b[0] = t;
-	return n;
-}
-
-uint32_t endswap32(uint32_t n) {
-	uint16_t* b = reinterpret_cast<uint16_t*>(&n);
-	uint16_t t = endswap16(b[1]);
-	b[1] = endswap16(b[0]);
-	b[0] = t;
-	return n;
-}
-
 template <class T> constexpr T abs(const T &a) {
 	return a > 0 ? a : -a;
 }
@@ -223,9 +207,9 @@ extern "C" [[noreturn]] void kernel_main() {
 	kbd->init(); 
 
 	VFS::the().get_dev_fs()->push(new BochsFramebuffer());
-	printk("ps2\n");
-	VFS::the().get_dev_fs()->push(new PS2Keyboard());
+	//printk("ps2\n");
 
+#if 0
 	// Read generated symtab file
 	auto pth = VFS::the().parse_path("symtab");
 	auto symtab_file = VFS::the().open(pth);
@@ -238,8 +222,8 @@ extern "C" [[noreturn]] void kernel_main() {
 	} else {
 		printk("Warning!!! Symtab file missing\n");
 	}
+#endif
 
-	// FIXME if I put this after create_user task switches fail
 	Process* proc = Process::create_user("init");
 	proc->next = proc;
 	proc->prev = proc;

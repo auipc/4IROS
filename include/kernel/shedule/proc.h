@@ -12,10 +12,12 @@ class Process;
 struct Blocker {
 	enum {
 		ProcessBlock,
+		SleepBlock,
 		FileIOBlock
 	} blocked_on;
 	union {
 		Process* blocked_process;
+		uint64_t sleep_waiter_ms;
 		FileHandle* blocked_handle;
 	};
 };
@@ -32,8 +34,9 @@ public:
 	Process(Process* p);
 	static void sched(uintptr_t rsp);
 	static void reentry();
+	static int resolve_cow(uintptr_t fault_addr);
 	static Process* create(void* func_ptr);
-	static Process* create_user(const char* path);
+	static Process* create_user(const char* path, size_t argc=0, const char** argv=NULL);
 	inline void kill() {
 		m_state = ProState::Dead;
 	}
@@ -53,9 +56,11 @@ public:
 	}
 
 	void block_on_proc(Process* p);
+	void block_on_sleep(size_t ms);
 	void block_on_handle(FileHandle* handle);
 	void poll_is_blocked();
 
+	int exit_code;
 	uint64_t pid;
 	Process* next;
 	Process* prev;
