@@ -29,4 +29,5 @@ class Bitmap {
 	static constexpr size_t s_bits_per_container =
 		8 * sizeof(bitmap_container_t);
 	size_t m_containers;
+	size_t m_last_position = 0;
 };

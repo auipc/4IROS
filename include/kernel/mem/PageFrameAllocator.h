@@ -11,6 +11,7 @@ class PageFrameAllocator {
 	void mark_range(uintptr_t start, size_t end);
 	size_t find_free_page();
 	size_t find_free_pages(size_t pages);
+	bool pertains(size_t page);
 	void release_page(size_t page);
 	static size_t alloc_size(size_t memory_size);
 

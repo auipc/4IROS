@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+int abs(int x);
 double fabs(double x);
 double sqrt(double x);
 double floor(double x);

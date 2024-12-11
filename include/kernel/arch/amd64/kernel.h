@@ -23,4 +23,19 @@ struct SymTab {
 	const char *func_name;
 };
 
+
+inline uint64_t rdtsc() {
+	union {
+		struct {
+			uint32_t p1;
+			uint32_t p2;
+		};
+		uint64_t counter;
+	} tsc = {};
+	asm volatile("rdtsc":"=a"(tsc.p1), "=d"(tsc.p2):);
+	return tsc.counter;
+}
+
+
+void ioapic_set_ioredir_val(uint8_t index, const uint64_t value);
 extern uint64_t global_waiter_time;

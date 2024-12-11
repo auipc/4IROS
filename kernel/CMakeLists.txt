@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 project(4IROS C CXX ASM)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcmodel=kernel -fPIE")

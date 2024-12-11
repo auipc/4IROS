@@ -14,6 +14,7 @@
 #include <kernel/util/Spinlock.h>
 #include <kernel/util/Vec.h>
 #include <kernel/vfs/vfs.h>
+#include <kernel/util/HashTable.h>
 //#define STB_TRUETYPE_IMPLEMENTATION
 //#include <stb_truetype.h>
 
@@ -35,8 +36,6 @@ void test_fs() {
 	zero_file->read(&zero_value, sizeof(uint8_t) * 1);
 	assert(zero_file == 0);
 }
-
-template <class T> constexpr T abs(const T &a) { return a > 0 ? a : -a; }
 
 template <class T> constexpr T min(const T &a, const T &b) {
 	return a < b ? a : b;
@@ -224,17 +223,7 @@ extern "C" [[noreturn]] void kernel_main() {
 	}
 #endif
 
-	Process *proc = Process::create_user("init");
-	proc->next = proc;
-	proc->prev = proc;
-	current_process = proc;
-
-	ksyscall_data.stack = proc->kern_stack_top();
-	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
-			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
-	tss.rsp[0] = proc->kern_stack_top();
-	x64_switch((void *)proc->kern_stack_top(),
-			   (uint64_t)proc->root_page_level());
+	Process::init();
 	panic("Task switch failed somehow???\n");
 	while (1)
 		;

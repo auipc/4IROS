@@ -7,7 +7,9 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/util/Vec.h>
 #include <stdint.h>
+#include <kernel/util/HashTable.h>
 
+struct CoWInfo;
 struct PageLevel;
 struct LovelyPageLevel;
 struct RootPageLevel;
@@ -37,6 +39,8 @@ class Paging {
 	RootPageLevel *clone_for_fork(const RootPageLevel &,
 								  bool just_copy = false);
 
+	RootPageLevel *clone_for_fork_shallow_cow(RootPageLevel &pml4, HashTable<CoWInfo>* table, bool just_copy = false);
+
 	inline static RootPageLevel *kernel_root_directory() {
 		// This shouldn't be null
 		assert(s_kernel_page_directory != nullptr);
@@ -57,8 +61,10 @@ class Paging {
 		return address & ~(PAGE_SIZE - 1);
 	}
 
+	void test(RootPageLevel& owner, RootPageLevel& dest_pd, uintptr_t fault_addr);
 	bool resolve_fault(PageLevel *pd, size_t fault_addr);
 
+	void release(RootPageLevel& page_level);
 	static Paging *the();
 	static void *pf_allocator(size_t size);
 
@@ -85,6 +91,7 @@ class Paging {
 	void map_page(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
 				  uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
 	void create_page_level(PageSkellington &lvl);
+	void resolve_cow_fault(RootPageLevel& owner_pd, RootPageLevel& dest_pd, uintptr_t fault_addr);
 	// Allows for the mapping a page without a proper way to address it later.
 	// For example, if we want to map one of our page levels so it can be
 	// modified with a lower level or new permissions. Then we'd have to map
@@ -128,6 +135,7 @@ struct PageSkellington {
 	}
 
 	LovelyPageLevel *fetch();
+	LovelyPageLevel *fetch_pool();
 	void commit(LovelyPageLevel &level);
 
 	inline uintptr_t addr() const {

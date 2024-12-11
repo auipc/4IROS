@@ -16,7 +16,7 @@ void BochsFramebuffer::init() {
 	}
 
 	*(uint16_t *)(FRAMEBUFFER_CONFIG_ADDR + 8) = 0x40 | 1;
-	memset((char *)FRAMEBUFFER_ADDR, 0, xres * yres * 4);
+	//memset((char *)FRAMEBUFFER_ADDR, 0, xres * yres * 4);
 }
 
 int BochsFramebuffer::write(void *buffer, size_t size) {

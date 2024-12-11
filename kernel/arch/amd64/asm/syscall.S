@@ -43,7 +43,15 @@ syscall_entry:
 	mov %rsp, %gs:8
 	mov %gs:0, %rsp
 	pushregs
+	mov %gs:16, %rax
+	mov (%rax), %rax
+	fxsave (%rax)
+	swapgs
 	call syscall_proxy
+	swapgs
+	mov %gs:16, %rax
+	mov (%rax), %rax
+	fxrstor (%rax)
 	popregs
 	mov %gs:8, %rsp
 	swapgs

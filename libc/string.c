@@ -43,10 +43,10 @@ void itoa(uint64_t n, char *buf, int base) {
 
 	buf[i++] = '\0';
 	do {
-		if ((n%base) < 10)
-			buf[i++] = '0'+(n%base);
+		if ((n % base) < 10)
+			buf[i++] = '0' + (n % base);
 		else
-			buf[i++] = 'a'+((n-10)%base);
+			buf[i++] = 'a' + ((n - 10) % base);
 		n /= (uint64_t)base;
 	} while (n);
 

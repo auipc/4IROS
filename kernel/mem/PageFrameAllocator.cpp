@@ -32,7 +32,7 @@ size_t PageFrameAllocator::alloc_size(size_t memory_size) {
 void PageFrameAllocator::mark_range(uintptr_t start, size_t end) {
 	printk("mark_range %x-%x\n", start, start + end);
 	if ((end / PAGE_SIZE) > m_pages) {
-		panic("Mark range area is larger than the amount of pages we have!");
+		panic("Mark range size is too large!");
 	}
 
 	for (uintptr_t i = start; i < end; i += PAGE_SIZE) {
@@ -60,20 +60,18 @@ size_t PageFrameAllocator::find_free_page() {
 	return address;
 }
 
-// FIXME have a way to request non contigous memory
 size_t PageFrameAllocator::find_free_pages(size_t pages) {
 	assert(pages > 0);
-	size_t container = largest_container(pages * PAGE_SIZE);
+	size_t container = largest_container(pages);
 
-	size_t start = m_buddies[container]->scan_no_set(1);
+	size_t start = m_buddies[container]->scan(pages);
 
 	for (size_t i = start; i < pages; i++) {
 		m_buddies[0]->set(i);
 		for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
-			if (((i * PAGE_SIZE) % (uintptr_t)(pow(2, buddy) * PAGE_SIZE)) ==
-				0) {
-				m_buddies[buddy]->set((i * PAGE_SIZE) /
-									  (pow(2, buddy) * PAGE_SIZE));
+			size_t buddy_alignment = ((1<<buddy)-1);
+			if (((i*PAGE_SIZE) & buddy_alignment) == 0) {
+				m_buddies[buddy]->set((i) / (1<<buddy));
 			}
 		}
 	}
@@ -81,9 +79,14 @@ size_t PageFrameAllocator::find_free_pages(size_t pages) {
 	return (start * PAGE_SIZE);
 }
 
-int abs(int a) { return a > 0 ? a : -a; }
-
 size_t PageFrameAllocator::largest_container(size_t size) {
+#if 0
+	size_t container = __builtin_clzll(size);
+	if (container > m_buddies.size()) {
+		return m_buddies.size()-1;
+	}
+#else
+	
 	int container = 0;
 	int min = abs(size - (pow(2, container) * PAGE_SIZE));
 	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
@@ -94,14 +97,25 @@ size_t PageFrameAllocator::largest_container(size_t size) {
 			container = buddy;
 		}
 	}
+#endif
 
 	return container;
 }
 
-void PageFrameAllocator::release_page(size_t page) {
-	(void)page;
+bool PageFrameAllocator::pertains(size_t page) {
+	if (page > m_pages) return false;
+	if (!m_buddies[0]->get(page)) return false;
+	return true;
+}
 
-	for (size_t buddy = 0; buddy < m_buddies.size(); buddy++) {
-		m_buddies[buddy]->unset((page / pow(2, buddy)) * PAGE_SIZE);
+void PageFrameAllocator::release_page(size_t page) {
+	size_t page_idx = page/PAGE_SIZE;
+	if (!pertains(page_idx)) return;
+	m_buddies[0]->unset(page_idx);
+	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
+		size_t buddy_alignment = ((1<<buddy)-1);
+		if ((page_idx & buddy_alignment) == 0) {
+			m_buddies[buddy]->set(page_idx/buddy_alignment);
+		}
 	}
 }

@@ -20,7 +20,7 @@ off_t lseek(int fd, off_t offset, int whence);
 _Noreturn void exit(int status);
 int execvp(const char *path, const char **argv);
 int waitpid(pid_t pid, int *wstatus, int options);
-void* mmap(void *address, size_t length);
+void *mmap(void *address, size_t length);
 int msleep(uint64_t ms);
 
 #ifdef __cplusplus

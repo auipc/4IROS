@@ -21,14 +21,12 @@ size_t strlen(const char *str);
 #endif
 
 #ifdef __cplusplus
-template <typename T> 
-void* memcpy(T* dest, const void *src, size_t size){ 
-	return memcpy((void*)dest, src, size);
+template <typename T> void *memcpy(T *dest, const void *src, size_t size) {
+	return memcpy((void *)dest, src, size);
 }
 
-template <typename T> 
-void memset(T* buffer, char value, size_t size){ 
-	return memset((char*)buffer, value, size);
+template <typename T> void memset(T *buffer, char value, size_t size) {
+	return memset((char *)buffer, value, size);
 }
 #endif
 #endif

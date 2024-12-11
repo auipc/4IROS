@@ -41,6 +41,14 @@ template <typename T> class Vec {
 
 	T *data() { return container; }
 
+	T *begin() {
+		return &container[0];
+	}
+
+	T *end() {
+		return &container[m_size-1];
+	}
+
 	inline size_t size() { return m_size; }
 
 	void push(T entry) {
@@ -91,6 +99,11 @@ template <typename T> class Vec {
 			if (flag == BranchFlags::Break)
 				break;
 		}
+	}
+
+	void clear() {
+		m_size = 0;
+		delete container;
 	}
 
   private:

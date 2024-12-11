@@ -1,7 +1,5 @@
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <unistd.h>
 
-int main() { 
-	return 0; 
-}
+int main() { return 0; }

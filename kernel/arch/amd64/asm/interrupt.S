@@ -17,9 +17,17 @@
 	pushq %rbx
 	pushq %rax
 	movq %rsp, %rdi
+	swapgs
+	mov %gs:16, %rax
+	mov (%rax), %rax
+	fxsave (%rax)
 .endm
 
 .macro popregs
+	mov %gs:16, %rax
+	mov (%rax), %rax
+	fxrstor (%rax)
+	swapgs
 	popq %rax
 	popq %rbx
 	popq %rcx
@@ -161,8 +169,8 @@ interrupt_78_begin:
 	iretq
 
 
-.global interrupt_85_begin
-interrupt_85_begin:
+.global interrupt_48_begin
+interrupt_48_begin:
 	cli
 	pushregs
 	call timer_interrupt

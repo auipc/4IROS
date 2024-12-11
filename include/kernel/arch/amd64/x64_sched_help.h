@@ -1,5 +1,8 @@
 #pragma once
+#include <stdint.h>
 
+
+extern "C" void initialize_fpu(void* region);
 // void x64_switch_save(void* src_stack, void* dest_stack, uint64_t dest_cr3);
 extern "C" [[noreturn]] void x64_switch(void *dest_stack, uint64_t dest_cr3);
 extern "C" [[noreturn]] void x64_switch_fake();

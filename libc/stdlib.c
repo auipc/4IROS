@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
+#if 0
 typedef struct _BTreeNode {
 	struct BTreeNode* left;
 	struct BTreeNode* right;
@@ -37,3 +39,4 @@ void *malloc(size_t size) {
 void free(void* addr) {
 	(void)addr;
 }
+#endif

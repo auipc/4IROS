@@ -135,13 +135,20 @@ void kfree(void *ptr) {
 #endif
 }
 
-void *operator new(size_t size) { return kmalloc(size); }
+void *operator new(size_t size) { 
+	// FIXME kmalloc_really_aligned is broken while kmalloc_aligned isn't :(
+	if (s_use_actual_allocator)
+		return kmalloc_really_aligned(size, 16); 
+	return kmalloc(size);
+}
+void *operator new(size_t size, size_t align) { return kmalloc_really_aligned(size, align); }
+void *operator new(size_t size, unsigned int align) { return kmalloc_really_aligned(size, align); }
 
 void *operator new[](size_t size) { return kmalloc(size); }
 
 void operator delete(void *p) { kfree(p); }
-void operator delete(void *p, unsigned long) { kfree(p); }
+void operator delete(void *p, size_t) { kfree(p); }
 void operator delete(void *p, unsigned int) { kfree(p); }
 void operator delete[](void *p) { kfree(p); }
-void operator delete[](void *p, unsigned long) { kfree(p); }
+void operator delete[](void *p, size_t) { kfree(p); }
 void operator delete[](void *p, unsigned int) { kfree(p); }

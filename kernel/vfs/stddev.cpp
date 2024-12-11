@@ -3,6 +3,7 @@
 
 StdDev::StdDev(bool echo) : VFSNode(), m_echo(echo) {
 	m_buffer = new char[m_buffer_sz];
+	memset(m_buffer, 0, sizeof(char)*m_buffer_sz);
 }
 
 // FIXME: Blocking is such a nightmare.
@@ -19,7 +20,7 @@ int StdDev::read(void *buffer, size_t size) {
 		return -1;
 	}
 
-	size_t size_read = (size_avail > size) ? size_avail : size;
+	size_t size_read = (size_avail > size) ? size : size_avail;
 	memcpy(buffer, m_buffer + m_position, size_read);
 	m_position += size_read;
 	return size_read;

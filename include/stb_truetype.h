@@ -473,7 +473,7 @@ int main(int arg, char **argv)
    #endif
 
    #ifndef STBTT_assert
-   #define STBTT_assert(x) 
+   #define STBTT_assert(x)
    #endif
 
    #ifndef STBTT_strlen
@@ -2729,8 +2729,7 @@ STBTT_DEF void stbtt_GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo *font, int g
    } else {
       // move to integral bboxes (treating pixels as little squares, what pixels get touched)?
       if (ix0) *ix0 = STBTT_ifloor( x0 * scale_x + shift_x);
-      // FIXME remove this
-      if (iy0) *iy0 = STBTT_ifloor(-y1 * scale_y + shift_y)-1;
+      if (iy0) *iy0 = STBTT_ifloor(-y1 * scale_y + shift_y);
       if (ix1) *ix1 = STBTT_iceil ( x1 * scale_x + shift_x);
       if (iy1) *iy1 = STBTT_iceil (-y0 * scale_y + shift_y);
    }
@@ -3041,7 +3040,6 @@ static void stbtt__handle_clipped_edge(float *scanline, int x, stbtt__active_edg
       y1 = e->ey;
    }
 
-#if 0
    if (x0 == x)
       STBTT_assert(x1 <= x+1);
    else if (x0 == x+1)
@@ -3052,14 +3050,13 @@ static void stbtt__handle_clipped_edge(float *scanline, int x, stbtt__active_edg
       STBTT_assert(x1 >= x+1);
    else
       STBTT_assert(x1 >= x && x1 <= x+1);
-#endif
 
    if (x0 <= x && x1 <= x)
       scanline[x] += e->direction * (y1-y0);
    else if (x0 >= x+1 && x1 >= x+1)
       ;
    else {
-      //STBTT_assert(x0 >= x && x0 <= x+1 && x1 >= x && x1 <= x+1);
+      STBTT_assert(x0 >= x && x0 <= x+1 && x1 >= x && x1 <= x+1);
       scanline[x] += e->direction * (y1-y0) * (1-((x0-x)+(x1-x))/2); // coverage = 1 - average x position
    }
 }

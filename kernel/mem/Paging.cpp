@@ -3,6 +3,8 @@
 #include <kernel/mem/PageFrameAllocator.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
+#include <kernel/shedule/proc.h>
+#include <kernel/util/Pool.h>
 #include <kernel/printk.h>
 #include <string.h>
 
@@ -27,15 +29,7 @@ Paging *Paging::the() { return s_instance; }
 
 size_t Paging::s_pf_allocator_base = 0;
 size_t Paging::s_pf_allocator_end = 0;
-
-// A tiny allocator for allocating the space we need to keep track of all
-// memory. This is static and will never change.
-void *Paging::pf_allocator(size_t size) {
-	void *addr = reinterpret_cast<void *>(s_pf_allocator_base);
-	s_pf_allocator_base += size;
-	assert(s_pf_allocator_end >= s_pf_allocator_base);
-	return addr;
-}
+Pool<LovelyPageLevel>* m_lovely_pool = nullptr;
 
 Paging::Paging(size_t total_memory, const KernelBootInfo &kbootinfo) {
 	static const size_t kstart = reinterpret_cast<size_t>(kbootinfo.kmap_start);
@@ -228,12 +222,12 @@ void Paging::map_page(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
 		auto &pt = pt_lvl->entries[(virt >> 12) & 0x1ff];
 		pt.pdata = phys | flags;
 		pdt.commit(*pt_lvl);
-		kfree(pt_lvl);
+		delete pt_lvl;
 
 		pdpte.commit(*pdt_lvl);
 		pdpt.commit(*pdpte_lvl);
-		kfree(pdt_lvl);
-		kfree(pdpte_lvl);
+		delete pdt_lvl;
+		delete pdpte_lvl;
 		// FIXME INVLPG isn't working and I'm too lazy to figure it out
 		// asm volatile("mov %0, %%cr3"::"a"(get_cr3()));
 	} else {
@@ -289,15 +283,25 @@ uintptr_t RootPageLevel::get_page_flags(uintptr_t addr) {
 	auto pt_lvl = pdt.fetch();
 	auto &pt = pt_lvl->entries[addr >> 12];
 	auto flags = pt.flags();
-	kfree(pdpte_lvl);
-	kfree(pdt_lvl);
-	kfree(pt_lvl);
+	delete pdpte_lvl;
+	delete pdt_lvl;
+	delete pt_lvl;
 	return flags;
 }
 
+LovelyPageLevel *PageSkellington::fetch_pool() {
+	if (!m_lovely_pool) {
+		m_lovely_pool = new Pool<LovelyPageLevel>(80);
+	}
+	LovelyPageLevel *level = m_lovely_pool->get();
+	Paging::the()->map_page_temp(*(RootPageLevel *)get_cr3(), TEMP_ZONE_1,
+								 addr());
+	memcpy(level, (void *)TEMP_ZONE_1, sizeof(LovelyPageLevel));
+	return level;
+}
+
 LovelyPageLevel *PageSkellington::fetch() {
-	LovelyPageLevel *level =
-		(LovelyPageLevel *)kmalloc(sizeof(LovelyPageLevel));
+	LovelyPageLevel *level = new LovelyPageLevel();
 	Paging::the()->map_page_temp(*(RootPageLevel *)get_cr3(), TEMP_ZONE_1,
 								 addr());
 	memcpy(level, (void *)TEMP_ZONE_1, sizeof(LovelyPageLevel));
@@ -310,9 +314,21 @@ void PageSkellington::commit(LovelyPageLevel &level) {
 	memcpy((void *)TEMP_ZONE_1, &level, sizeof(PageLevel));
 }
 
+uintptr_t page_map(uint64_t virt) {
+	RootPageLevel *pml4 = (RootPageLevel *)get_cr3();
+	auto p1_lvl = pml4->entries[(virt >> 39) & 0x1ff].fetch();
+	auto p2_lvl = p1_lvl->entries[(virt >> 30) & 0x1ff].fetch();
+	auto p3_lvl = p2_lvl->entries[(virt >> 21) & 0x1ff].fetch();
+	auto p4 = p3_lvl->entries[(virt >> 12) & 0x1ff].addr();
+	kfree(p1_lvl);
+	kfree(p2_lvl);
+	kfree(p3_lvl);
+	return p4;
+}
+
 char *temp_area[6] = {};
 RootPageLevel *Paging::clone(const RootPageLevel &pml4) {
-	auto root_page = m_allocator->find_free_page();
+	auto root_page = page_map((uint64_t)kmalloc_aligned(4096, 4096));
 	// auto current_pgl = (RootPageLevel*)get_cr3();
 	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
 	// switch_page_directory(m_safe_pgl);
@@ -347,8 +363,7 @@ RootPageLevel *Paging::clone(const RootPageLevel &pml4) {
 
 RootPageLevel *Paging::clone_for_fork(const RootPageLevel &pml4,
 									  bool just_copy) {
-	printk("==Clone Begin==\n");
-	auto root_page = m_allocator->find_free_page();
+	auto root_page = page_map((uint64_t)kmalloc_really_aligned(4096, 4096));
 	// auto current_pgl = (RootPageLevel*)get_cr3();
 	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
 	// switch_page_directory(m_safe_pgl);
@@ -392,6 +407,189 @@ RootPageLevel *Paging::clone_for_fork(const RootPageLevel &pml4,
 				LovelyPageLevel *pdt_lvl = pdpte.fetch();
 				auto pdt = pdt_lvl->entries[k];
 				if (!pdt.is_mapped()) {
+					delete pdt_lvl;
+					delete root_pdt_lvl;
+					continue;
+				}
+
+				if (!pdt.is_user()) {
+					root_pdt.pdata = pdt.pdata;
+					root_pdpte.commit(*root_pdt_lvl);
+					delete pdt_lvl;
+					delete root_pdt_lvl;
+					continue;
+				}
+
+				if (!root_pdt.is_mapped()) {
+					root_pdt.copy_flags(pdt.pdata);
+					root_pdt.set_addr(m_allocator->find_free_page());
+				}
+
+				for (int l = 0; l < 512; l++) {
+					LovelyPageLevel *root_pt_lvl = root_pdt.fetch();
+					auto &root_pt = root_pt_lvl->entries[l];
+					LovelyPageLevel *pt_lvl = pdt.fetch();
+					auto pt = pt_lvl->entries[l];
+					if (!pt.is_mapped()) {
+						delete pt_lvl;
+						delete root_pt_lvl;
+						continue;
+					}
+
+					if (!pt.is_user()) {
+						root_pt.pdata = pt.pdata;
+						root_pdt.commit(*root_pt_lvl);
+						delete pt_lvl;
+						delete root_pt_lvl;
+						continue;
+					}
+
+					auto free_page = m_allocator->find_free_page();
+
+					map_page(*(RootPageLevel *)get_cr3(),
+							 (uintptr_t)temp_area[0], pt.addr());
+					map_page(*(RootPageLevel *)get_cr3(),
+							 (uintptr_t)temp_area[1], free_page);
+					memcpy((void *)temp_area[1], (void *)temp_area[0],
+						   sizeof(char) * PAGE_SIZE);
+
+					root_pt.copy_flags(pt.pdata);
+					root_pt.set_addr(free_page);
+
+					root_pdt.commit(*root_pt_lvl);
+					delete pt_lvl;
+					delete root_pt_lvl;
+				}
+				root_pdpte.commit(*root_pdt_lvl);
+				delete pdt_lvl;
+				delete root_pdt_lvl;
+			}
+		}
+		// panic("wow");
+	}
+
+	return root_pd;
+}
+
+RootPageLevel *Paging::clone_for_fork_shallow_cow(RootPageLevel &pml4, HashTable<CoWInfo>* table, 
+									  bool just_copy) {
+	(void)just_copy;
+	auto root_page = m_allocator->find_free_page();
+	auto root_pd = new ((void *)root_page) RootPageLevel();
+
+	for (int i = 0; i < 512; i++) {
+		auto &root_pdpt = root_pd->entries[i];
+		auto pdpt = pml4.entries[i];
+		if (!pdpt.is_mapped())
+			continue;
+		if (!pdpt.is_user()) {
+			root_pdpt.pdata = pdpt.pdata;
+			continue;
+		}
+		// TODO copy
+		if (!root_pdpt.is_mapped()) {
+			root_pdpt.pdata = pdpt.pdata;
+			create_page_level(root_pdpt);
+		}
+
+		for (int j = 0; j < 512; j++) {
+			auto &root_pdpte = root_pdpt.level()->entries[j];
+			auto pdpte = pdpt.level()->entries[j];
+			if (!pdpte.is_mapped())
+				continue;
+
+			if (!pdpte.is_user()) {
+				root_pdpte.pdata = pdpte.pdata;
+				continue;
+			}
+
+			if (!root_pdpte.is_mapped()) {
+				root_pdpte.copy_flags(pdpte.pdata);
+				root_pdpte.set_addr(m_allocator->find_free_page());
+			}
+
+			for (int k = 0; k < 512; k++) {
+				LovelyPageLevel *root_pdt_lvl = root_pdpte.fetch();
+				auto &root_pdt = root_pdt_lvl->entries[k];
+				LovelyPageLevel *pdt_lvl = pdpte.fetch();
+				auto pdt = pdt_lvl->entries[k];
+				if (!pdt.is_mapped()) {
+					delete pdt_lvl;
+					delete root_pdt_lvl;
+					continue;
+				}
+
+				if (!pdt.is_user()) {
+					root_pdt.pdata = pdt.pdata;
+					root_pdpte.commit(*root_pdt_lvl);
+					delete pdt_lvl;
+					delete root_pdt_lvl;
+					continue;
+				}
+
+				if (!root_pdt.is_mapped()) {
+					root_pdt.copy_flags(pdt.pdata);
+					root_pdt.set_addr(m_allocator->find_free_page());
+				}
+
+				for (int l = 0; l < 512; l++) {
+					LovelyPageLevel *root_pt_lvl = root_pdt.fetch();
+					auto &root_pt = root_pt_lvl->entries[l];
+					LovelyPageLevel *pt_lvl = pdt.fetch();
+					auto pt = pt_lvl->entries[l];
+					if (!pt.is_mapped()) {
+						delete pt_lvl;
+						delete root_pt_lvl;
+						continue;
+					}
+
+					if (!pt.is_user()) {
+						root_pt.pdata = pt.pdata;
+						root_pdt.commit(*root_pt_lvl);
+						delete pt_lvl;
+						delete root_pt_lvl;
+						continue;
+					}
+
+					if (pt.pdata & PAEPageFlags::Write) {
+						table->push(((uint64_t)i<<39)|((uint64_t)j<<30)|((uint64_t)k<<21)|((uint64_t)l<<12), CoWInfo{root_pd, &pml4});
+						pt.pdata &= ~(PAEPageFlags::Write);
+						root_pt.pdata = pt.pdata;
+					}
+
+					root_pdt.commit(*root_pt_lvl);
+					delete pt_lvl;
+					delete root_pt_lvl;
+				}
+				root_pdpte.commit(*root_pdt_lvl);
+				delete pdt_lvl;
+				delete root_pdt_lvl;
+			}
+		}
+
+#if 0
+		for (int j = 0; j < 12; j++) {
+			auto root_pdpte = root_pdpt.level()->entries[j];
+			auto pdpte = pdpt.level()->entries[j];
+			if (!pdpte.is_mapped())
+				continue;
+
+			if (!pdpte.is_user()) {
+				root_pdpte.pdata = pdpte.pdata;
+				continue;
+			}
+
+			if (!root_pdpte.is_mapped()) {
+				root_pdpte.copy_flags(pdpte.pdata);
+				create_page_level(root_pdpte);
+			}
+
+			for (int k = 0; k < 512; k++) {
+				LovelyPageLevel *root_pdt_lvl = root_pdpte.fetch();
+				auto &root_pdt = root_pdt_lvl->entries[k];
+				LovelyPageLevel *pdt_lvl = pdpte.fetch();
+				auto pdt = pdt_lvl->entries[k];
+				if (!pdt.is_mapped()) {
 					kfree(pdt_lvl);
 					kfree(root_pdt_lvl);
 					continue;
@@ -406,8 +604,10 @@ RootPageLevel *Paging::clone_for_fork(const RootPageLevel &pml4,
 				}
 
 				if (!root_pdt.is_mapped()) {
-					root_pdt.copy_flags(pdt.pdata);
-					root_pdt.set_addr(m_allocator->find_free_page());
+					pdt.pdata &= ~PAEPageFlags::Write;
+					root_pdt.pdata = pdt.pdata;
+					//root_pdt.copy_flags(pdt.pdata);
+					//root_pdt.set_addr(m_allocator->find_free_page());
 				}
 
 				for (int l = 0; l < 512; l++) {
@@ -429,17 +629,11 @@ RootPageLevel *Paging::clone_for_fork(const RootPageLevel &pml4,
 						continue;
 					}
 
-					auto free_page = m_allocator->find_free_page();
-
-					map_page(*(RootPageLevel *)get_cr3(),
-							 (uintptr_t)temp_area[0], pt.addr());
-					map_page(*(RootPageLevel *)get_cr3(),
-							 (uintptr_t)temp_area[1], free_page);
-					memcpy((void *)temp_area[1], (void *)temp_area[0],
-						   sizeof(char) * PAGE_SIZE);
-
-					root_pt.copy_flags(pt.pdata);
-					root_pt.set_addr(free_page);
+					if (pt.pdata & PAEPageFlags::Write) {
+						table->push(((uint64_t)i<<39)|(j<<30)|(k<<21)|(l<<12), CoWInfo{root_pd, &pml4});
+						pt.pdata &= ~(PAEPageFlags::Write);
+						root_pt.pdata = pt.pdata;
+					}
 
 					root_pdt.commit(*root_pt_lvl);
 					kfree(pt_lvl);
@@ -450,11 +644,145 @@ RootPageLevel *Paging::clone_for_fork(const RootPageLevel &pml4,
 				kfree(root_pdt_lvl);
 			}
 		}
+#endif
 		// panic("wow");
 	}
 
-	printk("==Clone End==\n");
 	return root_pd;
+}
+
+void Paging::release(RootPageLevel& page_level) {
+	for (int i = 0; i < 512; i++) {
+		auto pdpt = page_level.entries[i];
+		if (!pdpt.is_mapped() || !pdpt.is_user())
+			continue;
+
+		bool pdpt_contains_kernel_page = false;
+		for (int j = 0; j < 512; j++) {
+			auto pdpte = pdpt.level()->entries[j];
+			if (!pdpte.is_mapped())
+				continue;
+			if (!pdpte.is_user()) {
+				pdpt_contains_kernel_page = true;
+				continue;
+			}
+
+			bool pdpte_contains_kernel_page = false;
+			for (int k = 0; k < 512; k++) {
+				LovelyPageLevel *pdt_lvl = pdpte.fetch();
+				auto pdt = pdt_lvl->entries[k];
+				if (!pdt.is_mapped()) {
+					delete pdt_lvl;
+					continue;
+				}
+
+				if (!pdt.is_user()) {
+					delete pdt_lvl;
+					pdpte_contains_kernel_page = true;
+					continue;
+				}
+
+				for (int l = 0; l < 512; l++) {
+					LovelyPageLevel *pt_lvl = pdt.fetch();
+					auto pt = pt_lvl->entries[l];
+					if (!pt.is_mapped()) {
+						delete pt_lvl;
+						continue;
+					}
+
+					if (!pt.is_user()) {
+						delete pt_lvl;
+						continue;
+					}
+
+					m_allocator->release_page(pt.addr());
+
+					delete pt_lvl;
+				}
+				delete pdt_lvl;
+				m_allocator->release_page(pdt.addr());
+			}
+			if (!pdpte_contains_kernel_page)
+				m_allocator->release_page(pdpte.addr());
+		}
+		if (!pdpt_contains_kernel_page)
+			m_allocator->release_page(pdpt.addr());
+	}
+}
+
+void Paging::resolve_cow_fault(RootPageLevel& owner_pd, RootPageLevel& dest_pd, uintptr_t fault_addr) {
+	(void)owner_pd;
+	auto current_pgl = (RootPageLevel *)get_cr3();
+	switch_page_directory(m_safe_pgl);
+	auto &owner_pdpt = owner_pd.entries[(fault_addr >> 39) & 0x1ff];
+	auto owner_pdpte_f = owner_pdpt.fetch();
+	auto &owner_pdpte = owner_pdpte_f->entries[(fault_addr >> 30) & 0x1ff];
+	auto owner_pdpt_f = owner_pdpte.fetch();
+	auto &owner_pdt = owner_pdpt_f->entries[(fault_addr >> 21) & 0x1ff];
+	auto owner_pt_f = owner_pdt.fetch();
+	auto &owner_pt = owner_pt_f->entries[(fault_addr >> 12) & 0x1ff];
+
+	auto &pdpt = dest_pd.entries[(fault_addr >> 39) & 0x1ff];
+	if (owner_pdpt.addr() == pdpt.addr()) {
+		pdpt.pdata |= PAEPageFlags::Write;
+		owner_pdpt.pdata |= PAEPageFlags::Write;
+		pdpt.set_addr(m_allocator->find_free_page());
+		//create_page_level(pdpt);
+		Paging::the()->map_page_temp(*(RootPageLevel *)get_cr3(), TEMP_ZONE_1,
+									 pdpt.addr());
+		memcpy((void*)TEMP_ZONE_1, owner_pdpte_f, sizeof(LovelyPageLevel));
+	}
+
+	auto pdpte_f = pdpt.fetch();
+	auto &pdpte = pdpte_f->entries[(fault_addr >> 30) & 0x1ff];
+	auto pdpt_f = pdpte.fetch();
+	if (owner_pdpte.addr() == pdpte.addr()) {
+		pdpte.pdata |= PAEPageFlags::Write;
+		owner_pdpte.pdata |= PAEPageFlags::Write;
+		pdpte.set_addr(m_allocator->find_free_page());
+		//create_page_level(pdpte);
+		Paging::the()->map_page_temp(*(RootPageLevel *)get_cr3(), TEMP_ZONE_1,
+									 pdpte.addr());
+		memcpy((void*)TEMP_ZONE_1, owner_pdpt_f, sizeof(LovelyPageLevel));
+	}
+
+	auto &pdt = pdpt_f->entries[(fault_addr >> 21) & 0x1ff];
+	if (owner_pdt.addr() == pdt.addr()) {
+		pdt.pdata |= PAEPageFlags::Write;
+		owner_pdt.pdata |= PAEPageFlags::Write;
+		pdt.set_addr(m_allocator->find_free_page());
+		Paging::the()->map_page_temp(*(RootPageLevel *)get_cr3(), TEMP_ZONE_1,
+									 pdt.addr());
+		memcpy((void*)TEMP_ZONE_1, owner_pt_f, sizeof(LovelyPageLevel));
+	}
+	auto pt_f = pdt.fetch();
+	auto &pt = pt_f->entries[(fault_addr >> 12) & 0x1ff];
+	pt.pdata |= PAEPageFlags::Write;
+	auto free_page = m_allocator->find_free_page();
+
+	map_page(*(RootPageLevel *)get_cr3(),
+			 (uintptr_t)temp_area[0], owner_pt.addr());
+	map_page(*(RootPageLevel *)get_cr3(),
+			 (uintptr_t)temp_area[1], free_page);
+	memcpy((void *)temp_area[1], (void *)temp_area[0],
+		   sizeof(char) * PAGE_SIZE);
+
+	pt.set_addr(free_page);
+	owner_pt.pdata |= PAEPageFlags::Write;
+	owner_pdt.commit(*owner_pt_f);
+	owner_pdpte.commit(*owner_pdpt_f);
+	owner_pdpt.commit(*owner_pdpte_f);
+	pdt.commit(*pt_f);
+	pdpte.commit(*pdpt_f);
+	pdpt.commit(*pdpte_f);
+
+	delete pdpte_f;
+	delete pdpt_f;
+	delete pt_f;
+	delete owner_pdpte_f;
+	delete owner_pdpt_f;
+	delete owner_pt_f;
+	switch_page_directory(current_pgl);
 }
 
 void Paging::setup(size_t total_memory, const KernelBootInfo &kbootinfo) {
@@ -466,5 +794,4 @@ void Paging::setup(size_t total_memory, const KernelBootInfo &kbootinfo) {
 	Paging::the()->map_page_temp(*(RootPageLevel *)get_cr3(), TEMP_ZONE_1, 0);
 	s_kernel_page_directory = Paging::the()->clone(*(RootPageLevel *)get_cr3());
 	switch_page_directory(s_kernel_page_directory);
-	printk("Clone done\n");
 }

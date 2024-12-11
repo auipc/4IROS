@@ -2,62 +2,113 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
+#include <stdlib.h>
+#define STB_TRUETYPE_IMPLEMENTATION
+#include <stb_truetype.h>
 
-static const char scancode_ascii[] = {
-	0,	 0,	  '1',	'2',  '3',	'4', '5', '6', '7', '8', '9', '0',
-	'-', '=', '\b', '\t', 'q',	'w', 'e', 'r', 't', 'y', 'u', 'i',
-	'o', 'p', '[',	']',  '\n', 0,	 'a', 's', 'd', 'f', 'g', 'h',
-	'j', 'k', 'l',	';',  '"',	'`', 0,	  '|', 'z', 'x', 'c', 'v',
-	'b', 'n', 'm',	',',  '.',	'/', 0,	  0,   0,	' '};
-
-static const char scancode_ascii_upper[] = {
-	0,	 0,	  '!',	'@',  '#',	'$', '%', '^', '&', '*', '(', ')',
-	'_', '+', '\b', '\t', 'Q',	'W', 'E', 'R', 'T', 'Y', 'U', 'I',
-	'O', 'P', '{',	'}',  '\n', 0,	 'A', 'S', 'D', 'F', 'G', 'H',
-	'J', 'K', 'L',	':',  '"',	'~', 0,	  '|', 'Z', 'X', 'C', 'V',
-	'B', 'N', 'M',	'<',  '>',	'?', 0,	  0,   0,	' '};
-
-static const char scancode_ascii_caps[] = {
-	0,	 0,	  '!',	'@',  '#',	'$', '%', '^', '&', '*', '(', ')',
-	'_', '+', '\b', '\t', 'Q',	'W', 'E', 'R', 'T', 'Y', 'U', 'I',
-	'O', 'P', '{',	'}',  '\n', 0,	 'A', 'S', 'D', 'F', 'G', 'H',
-	'J', 'K', 'L',	':',  '"',	'~', 0,	  '|', 'Z', 'X', 'C', 'V',
-	'B', 'N', 'M',	'<',  '>',	'?', 0,	  0,   0,	' '};
-
-int main() {
-	printf("Term\n");
-	int shell_pid = 0;
-	if (!(shell_pid = fork())) {
-		execvp("shell", NULL);
-		while(1);
+static const uint16_t xres = 1280;
+static const uint16_t yres = 800;
+static const int SPACING = 10;
+void render_text(uint32_t* display_buffer, int bochs_fd, char* text, size_t text_sz, stbtt_fontinfo* font) {
+	int i,j,ascent, descent,baseline, lineGap;
+	float scale, xpos=2; // leave a little padding in case the character extends left
+			
+	int yline = 0;
+	int f_x0, f_y0, f_x1, f_y1;
+	stbtt_GetFontBoundingBox(font, &f_x0, &f_y0, &f_x1, &f_y1);
+	scale = stbtt_ScaleForPixelHeight(font, 50);
+	stbtt_GetFontVMetrics(font, &ascent,&descent,lineGap);
+	baseline = (int) (f_y1*scale);
+	for (int x = 0; x < xres; x++) {
+		display_buffer[((int)baseline*xres)+x+(int)xpos] = (1<<16)-1;
 	}
 
-	printf("shell %d\n", shell_pid);
+	for (int ch = 0; ch < text_sz; ch++) {
+		if (text[ch] == '\n') {
+			xpos = 0;
+			yline += (ascent*scale)-(descent*scale)+(lineGap*scale);
+			continue;
+		}
 
-	int fd = open("/dev/keyboard", 0);
-	if (fd < 0) return 1;
-	uint8_t use_upper = 0;
+		int x0, y0, x1, y1;
+		int advance,lsb,height,width,xoff,yoff;
+		float x_shift = xpos - (float) floor(xpos);
+		stbtt_GetCodepointHMetrics(font, text[ch], &advance, &lsb);
+		stbtt_GetCodepointBox(font, text[ch], &x0, &y0, &x1, &y1);
+		unsigned char* char_buf = stbtt_GetCodepointBitmap(font, scale, scale, text[ch], &width, &height, &xoff, &yoff);
+		// note that this stomps the old data, so where character boxes overlap (e.g. 'lj') it's wrong
+		// because this API is really for baking character bitmaps into textures. if you want to render
+		// a sequence of characters, you really need to render each bitmap to a temp buffer, then
+		// "alpha blend" that into the working buffer
 
-	while (1) {
-		char buf[2];
-		size_t size_read = read(fd, buf, 2);
-		for (int i = 0; i < size_read; i += 2) {
-			if (buf[i + 1] == 42)
-				use_upper = !buf[i];
-
-			if (!buf[i] && sizeof(scancode_ascii) > buf[i + 1]) {
-				if (!scancode_ascii[buf[i + 1]])
-					continue;
-
-				if (!use_upper) {
-					printf("%c", scancode_ascii[buf[i + 1]]);
-					write(0, &scancode_ascii[buf[i + 1]], 1);
-				} else {
-					printf("%c", scancode_ascii_upper[buf[i + 1]]);
-					write(0, &scancode_ascii_upper[buf[i + 1]], 1);
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
+				if (char_buf[y*width+x]) {
+					int ypos = (yline+y+baseline-height)-(y0*scale);
+					display_buffer[(ypos*xres)+x+(int)xpos] = (1<<24)-1;
 				}
 			}
 		}
+
+
+		xpos += (advance * scale);
+		if (text[ch+1])
+			xpos += scale*stbtt_GetCodepointKernAdvance(font, text[ch],text[ch+1]);
+
+		STBTT_free(char_buf, font->userdata);
+	}
+
+	lseek(bochs_fd, 0, SEEK_SET);
+	write(bochs_fd, display_buffer, xres*yres*4);
+}
+
+asm("lolfdsjkldf:");
+asm("movq $0xfffffffffffff00b, %rax");
+asm("movq $0xfffffffffffff001,  %rbx");
+asm("movq $0xfffffffffffff002,  %rcx");
+asm("movq $0xfffffffffffff003,  %rdx");
+asm("movq $0xfffffffffffff004,  %rdi");
+asm("movq $0xfffffffffffff005,  %rsi");
+asm("jmp lolfdsjkldf");
+
+extern void lolfdsjkldf();
+
+int main() {
+	char* text = (char*)malloc(0x1000);
+	size_t text_sz = 0;
+	uint32_t* display_buffer = (uint32_t*)malloc(sizeof(uint32_t)*xres*yres);
+
+	int bochs_fd = open("/dev/bochs", 0);
+	if (bochs_fd < 0)
+		return 1;
+
+	int font_fd = open("jetbrains.ttf", 0);
+	size_t font_sz = lseek(font_fd, 0, SEEK_END);
+	lseek(font_fd, 0, SEEK_SET);
+	uint8_t* ttf_buffer = malloc(font_sz);
+	//printf("%x\n", ttf_buffer);
+	read(font_fd, ttf_buffer, font_sz);
+	stbtt_fontinfo font;
+	if(!stbtt_InitFont(&font, ttf_buffer, stbtt_GetFontOffsetForIndex(ttf_buffer,0))) {
+		printf("Failure\n");
+		return 1;
+	}
+
+	int shell_pid = 0;
+	// FIXME this fork obliterates the CoW table for the subsequent fork, somehow.
+	if (!(shell_pid = fork())) {
+		execvp("shell", NULL);
+		//execvp("farbview", NULL);
+		while (1)
+			;
+	}
+
+	while (1) {
+		char c = 0;
+		size_t size_read = read(1, &c, 1);
+		text[text_sz++] = c;
+		render_text(display_buffer, bochs_fd, text, text_sz, &font);
 	}
 
 	return 0;

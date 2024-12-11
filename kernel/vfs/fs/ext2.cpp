@@ -62,14 +62,11 @@ void Ext2FileSystem::read_singly(INode &inode, size_t singly_position,
 
 uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 										 size_t position) {
-	printk("block_size %d\n", block_size);
 	size_t actual_size = (size > inode.size_low) ? inode.size_low : size;
 	size_t size_to_read = actual_size;
 	size_t block_idx = position / block_size;
 	size_t output_ptr = 0;
 
-	printk("size_to_read %d ? inode.size_low %d\n", size_to_read,
-		   inode.size_low);
 	uint32_t *doubly_blocks = nullptr;
 	while (size_to_read) {
 		switch (block_idx) {

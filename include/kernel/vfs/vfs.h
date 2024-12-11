@@ -80,7 +80,11 @@ enum SeekMode { SEEK_SET = 0, SEEK_CUR = 1, SEEK_END = 2 };
 class FileHandle {
   public:
 	FileHandle(VFSNode *node);
-	FileHandle(FileHandle &) = delete;
+	FileHandle(FileHandle& handle) 
+		: m_position(handle.m_position)
+		, m_node(handle.m_node)
+	{
+	}
 	int read(void *buffer, size_t size);
 	int write(void *buffer, size_t size);
 	int seek(int64_t offset, SeekMode origin);

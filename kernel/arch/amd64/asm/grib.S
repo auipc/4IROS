@@ -1,9 +1,25 @@
+.global initialize_fpu
+initialize_fpu:
+	fninit
+	fxsave (%rdi)
+	ret
+
 .global x64_switch
 x64_switch:
 	cli
 
 	movq %rsi, %cr3
 	movq %rdi, %rsp
+
+	pushq %rax
+	call write_eoi
+	popq %rax
+
+	swapgs
+	mov %gs:16, %rax
+	mov (%rax), %rax
+	fxrstor (%rax)
+	swapgs
 
 	popq %rax
 	popq %rbx
@@ -20,13 +36,6 @@ x64_switch:
 	popq %r9
 	popq %r8
 	popq %rbp
-	/*pushq $0x202
-	pushq $0x08
-	pushq $0x0*/
-	// FIXME this updates more registers than just rax p sure lol
-	pushq %rax
-	call write_eoi
-	popq %rax
 	iretq
 	//pushq $0x0
 	#iretq
@@ -138,6 +147,12 @@ x64_syscall_block_help:
 	pushq $0x08
 	// rip
 	pushq %rsi
+
+	swapgs
+	mov %gs:16, %rax
+	mov (%rax), %rax
+	fxrstor (%rax)
+	swapgs
 
 	// General registers
 	// RBP?
