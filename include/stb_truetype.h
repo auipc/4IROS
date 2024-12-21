@@ -5428,7 +5428,7 @@ stbtt__CompareUTF8toUTF16_bigendian_prefix(stbtt_uint8 *s1, stbtt_int32 len1,
 				return -1;
 			if (s1[i++] != 0x80 + ((c >> 6) & 0x3f))
 				return -1;
-			if (s1[i++] != 0x80 + ((c)&0x3f))
+			if (s1[i++] != 0x80 + ((c) & 0x3f))
 				return -1;
 			s2 += 2; // plus another 2 below
 			len2 -= 2;
@@ -5441,7 +5441,7 @@ stbtt__CompareUTF8toUTF16_bigendian_prefix(stbtt_uint8 *s1, stbtt_int32 len1,
 				return -1;
 			if (s1[i++] != 0x80 + ((ch >> 6) & 0x3f))
 				return -1;
-			if (s1[i++] != 0x80 + ((ch)&0x3f))
+			if (s1[i++] != 0x80 + ((ch) & 0x3f))
 				return -1;
 		}
 		s2 += 2;
