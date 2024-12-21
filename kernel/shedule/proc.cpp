@@ -65,7 +65,7 @@ void Process::sched(uintptr_t rsp) {
 		current_process->m_kern_stack_top = rsp;
 		current_process->m_saved_user_stack_ksyscall = ksyscall_data.user_stack;
 	}
-	Process* old = current_process;
+	Process *old = current_process;
 	ioapic_set_ioredir_val(21, 1 << 16);
 	asm volatile("sti");
 	do {
@@ -108,26 +108,30 @@ void Process::reentry() {
 			   (uint64_t)current_process->m_pglv);
 }
 
-void Process::collapse_cow() {
-}
+void Process::collapse_cow() {}
 
-void Process::resolve_cow_recurse(RootPageLevel* level, Process* current, uintptr_t fault_addr) {
-	if (!current) return;
-	CoWInfo* inf = current->cow_table->get(fault_addr);
-	if (!inf) return;
-	Paging::the()->resolve_cow_fault(*level, *current->root_page_level(), fault_addr, true);
+void Process::resolve_cow_recurse(RootPageLevel *level, Process *current,
+								  uintptr_t fault_addr) {
+	if (!current)
+		return;
+	CoWInfo *inf = current->cow_table->get(fault_addr);
+	if (!inf)
+		return;
+	Paging::the()->resolve_cow_fault(*level, *current->root_page_level(),
+									 fault_addr, true);
 	current->cow_table->remove(fault_addr);
 	for (size_t i = 0; i < current->m_children.size(); i++) {
 		resolve_cow_recurse(level, current->m_children[i], fault_addr);
 	}
 }
 
-int Process::resolve_cow(Process* current, uintptr_t fault_addr) {
-	RootPageLevel* pglv = current->root_page_level();
+int Process::resolve_cow(Process *current, uintptr_t fault_addr) {
+	RootPageLevel *pglv = current->root_page_level();
 	printk("%x %d\n", fault_addr, current->pid);
-	CoWInfo* inf = current->cow_table->get(fault_addr);
+	CoWInfo *inf = current->cow_table->get(fault_addr);
 	printk("%x\n", inf);
-	if (!inf) return 0;
+	if (!inf)
+		return 0;
 	if (inf->owner == pglv) {
 		for (size_t i = 0; i < current->m_children.size(); i++) {
 			resolve_cow_recurse(pglv, current->m_children[i], fault_addr);
@@ -214,7 +218,7 @@ Process *Process::create_user(const char *path, size_t argc,
 		Paging::the()->map_page(*pgl, stack_begin + i, stack_page,
 								PAEPageFlags::User | PAEPageFlags::Write |
 									PAEPageFlags::Present);
-		memset((char*)(stack_begin+i), 0, PAGE_SIZE);
+		memset((char *)(stack_begin + i), 0, PAGE_SIZE);
 	}
 
 	size_t argv_ptr_size = sizeof(uint64_t) * argc;
@@ -260,7 +264,8 @@ Process *Process::fork(SyscallReg *regs) {
 	Process *new_proc = new Process();
 	new_proc->m_parent = this;
 	m_children.push(this);
-	new_proc->m_pglv = Paging::the()->clone_for_fork_shallow_cow(*m_pglv, cow_table, new_proc->cow_table);
+	new_proc->m_pglv = Paging::the()->clone_for_fork_shallow_cow(
+		*m_pglv, cow_table, new_proc->cow_table);
 
 	new_proc->m_stack_bot = m_stack_bot;
 	new_proc->m_stack_top = (uintptr_t)ksyscall_data.user_stack;

@@ -1,6 +1,6 @@
+#include <kernel/minmax.h>
 #include <kernel/util/ism.h>
 #include <kernel/vfs/fs/ext2.h>
-#include <kernel/minmax.h>
 
 uint32_t block_size = 1024;
 
@@ -41,9 +41,10 @@ void Ext2FileSystem::seek_block(size_t block_addr) {
 	m_block_dev->seek(block_addr * block_size);
 }
 
-void Ext2FileSystem::read_singly(uint32_t* singly_blocks, INode &inode, size_t singly_position,
-								 void *out, size_t block_idx,
-								 size_t size_to_read, size_t position) {
+void Ext2FileSystem::read_singly(uint32_t *singly_blocks, INode &inode,
+								 size_t singly_position, void *out,
+								 size_t block_idx, size_t size_to_read,
+								 size_t position) {
 	if (!inode.sibp)
 		panic("No sibp\n");
 	if (!singly_blocks) {
@@ -58,22 +59,27 @@ void Ext2FileSystem::read_singly(uint32_t* singly_blocks, INode &inode, size_t s
 }
 
 void Ext2FileSystem::read_indirect_singly(INode &inode, size_t singly_position,
-								 void *out, size_t block_idx,
-								 size_t size_to_read, size_t position) {
-	uint32_t* singly_blocks = new uint32_t[256];
-	read_singly(singly_blocks, inode, singly_position, out, block_idx, size_to_read, position);
+										  void *out, size_t block_idx,
+										  size_t size_to_read,
+										  size_t position) {
+	uint32_t *singly_blocks = new uint32_t[256];
+	read_singly(singly_blocks, inode, singly_position, out, block_idx,
+				size_to_read, position);
 	delete[] singly_blocks;
 }
-
 
 uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 										 size_t position) {
 	size_t actual_size = (size > inode.size_low) ? inode.size_low : size;
-	size_t size_to_read = actual_size+(block_size-(actual_size%block_size));//actual_size;
+	size_t size_to_read =
+		actual_size + (block_size - (actual_size % block_size)); // actual_size;
 	size_t block_idx = position / block_size;
 	size_t output_ptr = 0;
-	// FIXME Temporary fix for a bug involving directly copying to the output buffer. Something goes wrong when the position isn't aligned by 1024 bytes.
-	char* temp_buf = new char[size_to_read+(block_size-(size_to_read%block_size))];
+	// FIXME Temporary fix for a bug involving directly copying to the output
+	// buffer. Something goes wrong when the position isn't aligned by 1024
+	// bytes.
+	char *temp_buf =
+		new char[size_to_read + (block_size - (size_to_read % block_size))];
 
 	uint32_t *singly_blocks = nullptr;
 	uint32_t *doubly_blocks = nullptr;
@@ -89,8 +95,8 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 		// contained in this indirect block.
 		case 12 ... 267: {
 			read_singly(singly_blocks, inode, inode.sibp,
-						(void *)((uintptr_t)temp_buf + output_ptr), block_idx - 12,
-						size_to_read, 0);
+						(void *)((uintptr_t)temp_buf + output_ptr),
+						block_idx - 12, size_to_read, 0);
 		} break;
 		case 268 ... 65803: {
 			if (!inode.dibp)
@@ -103,21 +109,21 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 			}
 			// printk("dbl %x\n", doubly_blocks[(block_idx-268)/256]);
 			read_indirect_singly(inode, doubly_blocks[(block_idx - 268) / 256],
-						(void *)((uintptr_t)temp_buf + output_ptr),
-						(block_idx - 268) % 256, size_to_read, 0);
+								 (void *)((uintptr_t)temp_buf + output_ptr),
+								 (block_idx - 268) % 256, size_to_read, 0);
 		} break;
 		default:
 			printk("%d\n", block_idx);
 			panic("Help\n");
 			break;
 		}
-		output_ptr += block_size;// - (position % block_size);
+		output_ptr += block_size; // - (position % block_size);
 		// position += min(size_to_read, (size_t)block_size);
 		size_to_read -= min(size_to_read, (size_t)block_size);
 		block_idx++;
 	}
 
-	memcpy(out, ((char*)temp_buf)+(position%block_size), actual_size);
+	memcpy(out, ((char *)temp_buf) + (position % block_size), actual_size);
 
 #if 0
 	while (size_to_read) {
@@ -255,7 +261,7 @@ VFSNode *Ext2FileSystem::traverse_internal(INode *cur_inode,
 		if (!strcmp(dir_entries[i].name, path[path_index])) {
 			auto inode = read_inode(dir_entries[i].entry.inode);
 			if (inode->type & EXT2_DIR) {
-				return traverse_internal(inode, path, path_index+1);
+				return traverse_internal(inode, path, path_index + 1);
 			}
 			return new Ext2Entry(this, dir_entries[i].name, move(inode));
 		}

@@ -11,9 +11,7 @@ typedef struct {
 	builtin_ptr_t func;
 } builtin_t;
 
-void builtin_exit(int argc, char **argv) {
-	exit(0);
-}
+void builtin_exit(int argc, char **argv) { exit(0); }
 
 void builtin_echo(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
@@ -24,27 +22,28 @@ void builtin_echo(int argc, char **argv) {
 	printf("\n");
 }
 
-static const builtin_t s_builtins[] = {{"echo", &builtin_echo}, {"exit", &builtin_exit}};
+static const builtin_t s_builtins[] = {{"echo", &builtin_echo},
+									   {"exit", &builtin_exit}};
 
 void handle_cmd(char *buf, size_t buf_sz) {
 	pid_t pid = 0;
 	int status = 0;
 	if (buf_sz <= 1)
 		return;
-	char **argv = malloc(sizeof(char*)*1);
+	char **argv = malloc(sizeof(char *) * 1);
 
 	size_t argc = 0, i = 0, last_bound = 0;
 	for (; i < buf_sz; i++) {
 		if (buf[i] == ' ') {
 			buf[i] = '\0';
 			argv[argc++] = &buf[last_bound];
-			argv = realloc(argv, sizeof(char*)*(argc+1));
-			last_bound = i+1;
+			argv = realloc(argv, sizeof(char *) * (argc + 1));
+			last_bound = i + 1;
 		}
 	}
 	buf[i] = '\0';
 	argv[argc++] = &buf[last_bound];
-	last_bound = i+1;
+	last_bound = i + 1;
 	argv[argc] = 0;
 	for (int i = 0; i < sizeof(s_builtins) / sizeof(s_builtins[0]); i++) {
 		if (!strcmp(s_builtins[i].name, argv[0])) {
@@ -86,11 +85,13 @@ int main() {
 	size_t buf_sz = 0;
 	printf("~>");
 	while (1) {
-		if ((buf_sz+1) >= 0x1000) continue;
+		if ((buf_sz + 1) >= 0x1000)
+			continue;
 		int sz = read(0, buf + buf_sz, 1);
-		if (!sz) continue;
+		if (!sz)
+			continue;
 		buf_sz++;
-		if (buf[buf_sz-1] == '\b') {
+		if (buf[buf_sz - 1] == '\b') {
 			if (buf_sz > 1) {
 				buf[buf_sz] = '\0';
 				buf[buf_sz - 1] = '\0';
@@ -98,8 +99,8 @@ int main() {
 			}
 			continue;
 		}
-		if (buf[buf_sz-1] == '\n') {
-			buf[buf_sz-1] = '\0';
+		if (buf[buf_sz - 1] == '\n') {
+			buf[buf_sz - 1] = '\0';
 			handle_cmd(buf, buf_sz);
 			buf_sz = 0;
 			printf("~>");

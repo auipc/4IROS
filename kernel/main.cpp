@@ -15,8 +15,8 @@
 #include <kernel/util/Spinlock.h>
 #include <kernel/util/Vec.h>
 #include <kernel/vfs/vfs.h>
-//#define STB_TRUETYPE_IMPLEMENTATION
-//#include <stb_truetype.h>
+// #define STB_TRUETYPE_IMPLEMENTATION
+// #include <stb_truetype.h>
 
 #if 0
 extern "C" void syscall_interrupt_handler();
@@ -216,7 +216,7 @@ extern "C" [[noreturn]] void kernel_main() {
 		printk("Warning!!! Symtab file missing\n");
 	} else {
 		auto symtab_sz = symtab_file->size();
-		char* sym_buf = new char[symtab_sz];
+		char *sym_buf = new char[symtab_sz];
 		symtab_file->read(sym_buf, symtab_sz);
 		Debug::parse_symtab(sym_buf, symtab_sz);
 		delete[] sym_buf;

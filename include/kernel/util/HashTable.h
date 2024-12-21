@@ -202,9 +202,7 @@ template <typename T> class HashTable {
 		return &b->val;
 	}
 
-	uint64_t size() {
-		return m_container_size;
-	}
+	uint64_t size() { return m_container_size; }
 
   private:
 	struct Bucket {

@@ -1,4 +1,4 @@
-//#define TEST_TIMER
+// #define TEST_TIMER
 #include <kernel/Debug.h>
 #include <kernel/arch/amd64/kernel.h>
 #include <kernel/arch/amd64/x64_sched_help.h>
@@ -54,29 +54,31 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 #define INTEXT(no) extern "C" void interrupt_##no##_begin();
 
 #define INT(no)                                                                \
-	assert((uint64_t)&interrupt_##no##_begin <= BIT48_MAX);                    \
+	assert((uint64_t) & interrupt_##no##_begin <= BIT48_MAX);                  \
 	idtgate[no].present = 1;                                                   \
 	/* remove me?*/                                                            \
 	/*idtgate[no].ist = 1;*/                                                   \
 	idtgate[no].segment = 0x8;                                                 \
 	idtgate[no].type = (no < 0x10) ? 0xe : 0xf;                                \
-	idtgate[no].offset_lo = (uint64_t)&interrupt_##no##_begin & 0xFFFF;        \
+	idtgate[no].offset_lo = (uint64_t) & interrupt_##no##_begin & 0xFFFF;      \
 	idtgate[no].offset_mid =                                                   \
-		((uint64_t)&interrupt_##no##_begin >> 16) & 0xFFFF;                    \
-	idtgate[no].offset_hi = ((uint64_t)&interrupt_##no##_begin >> 32) & 0xFFFF;
+		((uint64_t) & interrupt_##no##_begin >> 16) & 0xFFFF;                  \
+	idtgate[no].offset_hi =                                                    \
+		((uint64_t) & interrupt_##no##_begin >> 32) & 0xFFFF;
 
 #define INT_IST1(no)                                                           \
-	assert((uint64_t)&interrupt_##no##_begin <= BIT48_MAX);                    \
+	assert((uint64_t) & interrupt_##no##_begin <= BIT48_MAX);                  \
 	idtgate[no].present = 1;                                                   \
 	/* remove me?*/                                                            \
 	/*idtgate[no].ist = 1;*/                                                   \
 	idtgate[no].segment = 0x8;                                                 \
 	idtgate[no].type = (no < 0x10) ? 0xe : 0xf;                                \
 	idtgate[no].ist = 1;                                                       \
-	idtgate[no].offset_lo = (uint64_t)&interrupt_##no##_begin & 0xFFFF;        \
+	idtgate[no].offset_lo = (uint64_t) & interrupt_##no##_begin & 0xFFFF;      \
 	idtgate[no].offset_mid =                                                   \
-		((uint64_t)&interrupt_##no##_begin >> 16) & 0xFFFF;                    \
-	idtgate[no].offset_hi = ((uint64_t)&interrupt_##no##_begin >> 32) & 0xFFFF;
+		((uint64_t) & interrupt_##no##_begin >> 16) & 0xFFFF;                  \
+	idtgate[no].offset_hi =                                                    \
+		((uint64_t) & interrupt_##no##_begin >> 32) & 0xFFFF;
 
 INTEXT(0);
 INTEXT(5);
@@ -223,7 +225,7 @@ uint64_t to_virt(uint64_t addr) {
 
 #define VIRT_MASK(x, y) ((*(x + ((virt >> y) & 0x1ffull))) & ~4095ull)
 #define VIRT_MASK_ADDR(x, y) (x + (((virt >> y)) & 0x1ffull))
-//#define VIRT_MASK_ADDR(x,y) (x + (((virt>>y))&0x1ffull))
+// #define VIRT_MASK_ADDR(x,y) (x + (((virt>>y))&0x1ffull))
 
 __attribute__((optnone)) uintptr_t get_page_map(uint64_t virt) {
 	RootPageLevel *pml4 = (RootPageLevel *)get_cr3();
@@ -434,8 +436,9 @@ extern "C" void pf_interrupt(ExceptReg &eregs) {
 	printk("rax %x rbx %x rcx %x rdx %x cs %x\n", eregs.rax, eregs.rbx,
 		   eregs.rcx, eregs.rdx, eregs.cs);
 	printk("current_process pid %d\n", current_process->pid);
-	printk("%x\n",fault_addr & ~(PAGE_SIZE - 1));
-	int fault_succ = Process::resolve_cow(current_process, fault_addr & ~(PAGE_SIZE - 1));
+	printk("%x\n", fault_addr & ~(PAGE_SIZE - 1));
+	int fault_succ =
+		Process::resolve_cow(current_process, fault_addr & ~(PAGE_SIZE - 1));
 	if (!fault_succ) {
 		panic("AHHHH");
 		current_process->kill();
@@ -460,7 +463,7 @@ void sleep(const uint64_t ms_time) {
 // (https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf#page=11)
 static uint64_t fp_per_tick = 0;
 uint64_t tick_counter = 0;
-//#define HPET0_TICK_COUNT 0xB00B15
+// #define HPET0_TICK_COUNT 0xB00B15
 #define HPET0_TICK_COUNT 0xA00B15
 
 uint64_t global_waiter_time = 0;
@@ -660,7 +663,8 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	}
 	actual_malloc_init((void *)base, 20 * MB);
 
-	nested_interrupt_stack = (void*)(((uint64_t)kmalloc_really_aligned(PAGE_SIZE,16))+PAGE_SIZE);
+	nested_interrupt_stack =
+		(void *)(((uint64_t)kmalloc_really_aligned(PAGE_SIZE, 16)) + PAGE_SIZE);
 	tss.ist[0] = (uint32_t)(uint64_t)nested_interrupt_stack;
 	tss.ist[1] = (uint32_t)((uint64_t)nested_interrupt_stack >> 32);
 	info("tss.ist[0] %x\n", nested_interrupt_stack);

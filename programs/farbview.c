@@ -46,8 +46,8 @@ uint64_t rdtsc() {
 int main(int argc, const char **argv) {
 	int fd = open("/dev/bochs", 0);
 
-	//uint16_t xres = 1280;
-	//uint16_t yres = 800;
+	// uint16_t xres = 1280;
+	// uint16_t yres = 800;
 	uint16_t xres = 1024;
 	uint16_t yres = 768;
 	uint32_t *display_buffer =
@@ -66,7 +66,7 @@ int main(int argc, const char **argv) {
 	char *image_buffer =
 		stbi_load_from_memory(buf, sz, &width, &height, &channels, 3);
 	volatile uint64_t tsc_1 = rdtsc();
-	
+
 	height = (height > yres) ? yres : height;
 	width = (width > xres) ? xres : width;
 

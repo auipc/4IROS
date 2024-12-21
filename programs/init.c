@@ -1,9 +1,9 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <errno.h>
 
 static const char scancode_ascii[] = {
 	0,	 0,	  '1',	'2',  '3',	'4', '5', '6', '7', '8', '9', '0',
@@ -26,20 +26,20 @@ static const char scancode_ascii_caps[] = {
 	'J', 'K', 'L',	':',  '"',	'~', 0,	  '|', 'Z', 'X', 'C', 'V',
 	'B', 'N', 'M',	'<',  '>',	'?', 0,	  0,   0,	' '};
 
-
 int main() {
 	int pid = 0;
-	char* buf = (char*)mmap((void*)0x990000, 4096); //[2]
+	char *buf = (char *)mmap((void *)0x990000, 4096); //[2]
 	if (!(pid = fork())) {
 		execvp("farbview", NULL);
-		//char* argv[] = {"frotz", "TRINITY.DAT", 0};
-		//execvp("frotz", argv);
-		while (1);
+		// char* argv[] = {"frotz", "TRINITY.DAT", 0};
+		// execvp("frotz", argv);
+		while (1)
+			;
 	}
 
-	//waitpid(pid, NULL, 0);
+	// waitpid(pid, NULL, 0);
 	int fd = open("/dev/keyboard", 0);
-	//printf("%d\n", errno);
+	// printf("%d\n", errno);
 	if (fd < 0)
 		return 1;
 	uint8_t use_upper = 0;

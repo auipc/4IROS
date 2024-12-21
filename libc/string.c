@@ -1,67 +1,68 @@
-#include <string.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-const char* strrchr(const char* str, int character) {
-	char* last = NULL;
+const char *strrchr(const char *str, int character) {
+	char *last = NULL;
 	do {
-		if (*str == character) last = str;
+		if (*str == character)
+			last = str;
 	} while (*(str++));
 	return last;
 }
 
 #ifndef LIBK
-char* strdup(const char* s) {
+char *strdup(const char *s) {
 	size_t s_sz = strlen(s);
-	char* m = (char*)malloc(s_sz);
+	char *m = (char *)malloc(s_sz);
 	memcpy(m, s, s_sz);
 	return m;
 }
 
-char* strndup(const char* s, size_t n) {
-	char* m = (char*)malloc(n+1);
+char *strndup(const char *s, size_t n) {
+	char *m = (char *)malloc(n + 1);
 	memcpy(m, s, n);
 	m[n] = '\0';
 	return m;
 }
 #endif
 
-char* strerror(int errnum) {
-	return NULL;
-}
+char *strerror(int errnum) { return NULL; }
 
-const char* strchr(const char* str, int character) {
+const char *strchr(const char *str, int character) {
 	for (size_t i = 0; i < strlen(str); i++) {
-		if (str[i] == character) return &str[i];
+		if (str[i] == character)
+			return &str[i];
 	}
 
 	return NULL;
 }
 
-char* strncat(char* destination, const char* source, size_t num) {
+char *strncat(char *destination, const char *source, size_t num) {
 	size_t dst_sz = strlen(destination);
 	size_t src_sz = strlen(source);
 	size_t sz = ((src_sz > num) ? num : src_sz);
 	memcpy(&destination[dst_sz], source, sz);
-	destination[dst_sz+sz] = '\0';
+	destination[dst_sz + sz] = '\0';
 	return destination;
 }
 
-char* strcat(char* destination, const char* source) {
-	memcpy(&destination[strlen(destination)], source, strlen(source)+1);
+char *strcat(char *destination, const char *source) {
+	memcpy(&destination[strlen(destination)], source, strlen(source) + 1);
 	return destination;
 }
 
-char* strcpy(char* destination, const char* source) {
-	while((*(destination++) = *(source++)));
+char *strcpy(char *destination, const char *source) {
+	while ((*(destination++) = *(source++)))
+		;
 	return destination;
 }
 
-char* strncpy(char* destination, const char* source, size_t n) {
+char *strncpy(char *destination, const char *source, size_t n) {
 	if (n == 0)
 		return (0);
 
@@ -90,7 +91,7 @@ int strncasecmp(const char *s1, const char *s2, size_t n) {
 	if (n == 0)
 		return (0);
 	do {
-		if ((*s1 != *s2++) && (abs(*s1-(*(s2-1)))!=32))
+		if ((*s1 != *s2++) && (abs(*s1 - (*(s2 - 1))) != 32))
 			return (*(unsigned char *)s1 - *(unsigned char *)--s2);
 		if (*s1++ == 0)
 			break;
@@ -106,7 +107,7 @@ int strcmp(const char *s1, const char *s2) {
 }
 
 int strcasecmp(const char *s1, const char *s2) {
-	while ((*s1 == *s2++) || abs(*s1-(*(s2-1)))==32)
+	while ((*s1 == *s2++) || abs(*s1 - (*(s2 - 1))) == 32)
 		if (*s1++ == 0)
 			return (0);
 	return (*(unsigned char *)s1 - *(unsigned char *)--s2);
@@ -120,10 +121,11 @@ void memset(char *buffer, char value, size_t size) {
 
 #ifndef LIBK
 void *memmove(void *s1, const void *s2, size_t n) {
-	if (s1 == s2) return s1;
+	if (s1 == s2)
+		return s1;
 
 	// FIXME
-	char* m = (char*)alloca(n);
+	char *m = (char *)alloca(n);
 	memcpy(m, s2, n);
 	memcpy(s1, m, n);
 	return s1;
@@ -159,7 +161,7 @@ void itoa(uint64_t n, char *buf, int base) {
 	}
 }
 
-int atoi(const char* str) {
+int atoi(const char *str) {
 	size_t n = 0;
 	while (*str) {
 		if (*str > '9' || *str < '0') {
@@ -181,10 +183,10 @@ size_t strlen(const char *str) {
 	return str - start;
 }
 
-char* next = NULL;
+char *next = NULL;
 
-char *strtok(char* s1, const char* s2) {
-	char* p = s1 ? s1 : next;
+char *strtok(char *s1, const char *s2) {
+	char *p = s1 ? s1 : next;
 	for (int i = 0; i < strlen(p); i++) {
 		for (int j = 0; j < strlen(s2); j++) {
 			if (p[i] == s2[j]) {
@@ -194,7 +196,8 @@ char *strtok(char* s1, const char* s2) {
 			}
 		}
 	}
-	if (s1) return s1;
+	if (s1)
+		return s1;
 	return NULL;
 }
 

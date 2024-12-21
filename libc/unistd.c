@@ -107,6 +107,4 @@ int msleep(uint64_t ms) {
 	return r;
 }
 
-int usleep(uint64_t us) {
-	return msleep(us/1000);
-}
+int usleep(uint64_t us) { return msleep(us / 1000); }

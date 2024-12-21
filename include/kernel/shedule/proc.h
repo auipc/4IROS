@@ -10,7 +10,7 @@
 
 class Process;
 struct CoWInfo {
-	RootPageLevel* owner;
+	RootPageLevel *owner;
 };
 
 extern KSyscallData ksyscall_data;
@@ -39,8 +39,9 @@ class Process {
 	static void sched(uintptr_t rsp);
 	static void reentry();
 	void collapse_cow();
-	static void resolve_cow_recurse(RootPageLevel* level, Process* current, uintptr_t fault_addr);
-	static int resolve_cow(Process* current, uintptr_t fault_addr);
+	static void resolve_cow_recurse(RootPageLevel *level, Process *current,
+									uintptr_t fault_addr);
+	static int resolve_cow(Process *current, uintptr_t fault_addr);
 
 	static void kill_process(Process *p);
 	static Process *create(void *func_ptr);

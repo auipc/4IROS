@@ -40,7 +40,8 @@ class Paging {
 								  bool just_copy = false);
 
 	RootPageLevel *clone_for_fork_shallow_cow(RootPageLevel &pml4,
-											  HashTable<CoWInfo>* owner_table, HashTable<CoWInfo> *table,
+											  HashTable<CoWInfo> *owner_table,
+											  HashTable<CoWInfo> *table,
 											  bool just_copy = false);
 
 	inline static RootPageLevel *kernel_root_directory() {
@@ -95,7 +96,7 @@ class Paging {
 				  uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
 	void create_page_level(PageSkellington &lvl);
 	void resolve_cow_fault(RootPageLevel &owner_pd, RootPageLevel &dest_pd,
-						   uintptr_t fault_addr, bool owner_initiated=false);
+						   uintptr_t fault_addr, bool owner_initiated = false);
 	// Allows for the mapping a page without a proper way to address it later.
 	// For example, if we want to map one of our page levels so it can be
 	// modified with a lower level or new permissions. Then we'd have to map

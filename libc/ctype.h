@@ -1,8 +1,8 @@
 #ifndef _LIBC_CTYPE_H
 #define _LIBC_CTYPE_H
 #pragma once
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif

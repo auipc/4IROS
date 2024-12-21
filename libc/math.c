@@ -82,6 +82,7 @@ double fmod(double x, double y) { return __builtin_fmod(x, y); }
 
 double ceil(double x) {
 	int64_t y = x;
-	if (y == x) return x;
-	return y+1;
+	if (y == x)
+		return x;
+	return y + 1;
 }

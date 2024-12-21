@@ -1,16 +1,16 @@
 #include <errno.h>
 #include <kernel/Syscall.h>
 #include <kernel/arch/amd64/x64_sched_help.h>
+#include <kernel/arch/x86_common/IO.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/printk.h>
 #include <kernel/shedule/proc.h>
 #include <kernel/vfs/stddev.h>
 #include <kernel/vfs/vfs.h>
 #include <priv/common.h>
-#include <sys/types.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <kernel/arch/x86_common/IO.h>
 
 extern HashTable<Process *> *process_pid_map;
 namespace Syscall {
@@ -65,7 +65,7 @@ static size_t sys$fork(Process *current, SyscallReg *regs,
 // FIXME Make verify_buffer work with CoW
 static bool verify_buffer(RootPageLevel *pd, uintptr_t buffer_addr,
 						  size_t size) {
-	uintptr_t start_addr = buffer_addr & ~(PAGE_SIZE-1);
+	uintptr_t start_addr = buffer_addr & ~(PAGE_SIZE - 1);
 
 	for (uintptr_t i = start_addr; i < size + (PAGE_SIZE - 1); i += PAGE_SIZE) {
 		auto flags = pd->get_page_flags(buffer_addr + i);
@@ -75,22 +75,27 @@ static bool verify_buffer(RootPageLevel *pd, uintptr_t buffer_addr,
 	return true;
 }
 
-static bool verify_buffer_write(Process* current, RootPageLevel *pd, uintptr_t buffer_addr,
-						  size_t size) {
+static bool verify_buffer_write(Process *current, RootPageLevel *pd,
+								uintptr_t buffer_addr, size_t size) {
 	(void)current;
-	uintptr_t start_addr = buffer_addr & ~(PAGE_SIZE-1);
+	uintptr_t start_addr = buffer_addr & ~(PAGE_SIZE - 1);
 
-	for (uintptr_t addr = start_addr; addr < start_addr + size + (PAGE_SIZE - 1); addr += PAGE_SIZE) {
+	for (uintptr_t addr = start_addr;
+		 addr < start_addr + size + (PAGE_SIZE - 1); addr += PAGE_SIZE) {
 		auto flags = pd->get_page_flags(addr);
 
-		printk("%x %x %d %d %d %d\n", addr, current->cow_table->get(addr), flags, (flags & PAEPageFlags::Present) , (flags & PAEPageFlags::User) , (flags & PAEPageFlags::Write));
-		if (!(flags & PAEPageFlags::Present) || !(flags & PAEPageFlags::User) || !(flags & PAEPageFlags::Write)) {
-			if (!current->cow_table->get(addr)) 
+		printk("%x %x %d %d %d %d\n", addr, current->cow_table->get(addr),
+			   flags, (flags & PAEPageFlags::Present),
+			   (flags & PAEPageFlags::User), (flags & PAEPageFlags::Write));
+		if (!(flags & PAEPageFlags::Present) || !(flags & PAEPageFlags::User) ||
+			!(flags & PAEPageFlags::Write)) {
+			if (!current->cow_table->get(addr))
 				return false;
 		}
 	}
 
-	for (uintptr_t addr = start_addr; addr < size + (PAGE_SIZE - 1); addr += PAGE_SIZE) {
+	for (uintptr_t addr = start_addr; addr < size + (PAGE_SIZE - 1);
+		 addr += PAGE_SIZE) {
 		printk("reslve cow\n");
 		Process::resolve_cow(current, addr);
 	}
@@ -279,9 +284,9 @@ static size_t sys$exec(Process *current, const char *buffer, const char **argv,
 	if (argc) {
 		argv_copy = new char *[argc];
 		for (size_t i = 0; i < argc; i++) {
-			size_t arg_sz = strlen(argv[i])+1;
+			size_t arg_sz = strlen(argv[i]) + 1;
 			argv_copy[i] = new char[arg_sz];
-			argv_copy[i][arg_sz-1] = '\0';
+			argv_copy[i][arg_sz - 1] = '\0';
 			memcpy(argv_copy[i], argv[i], sizeof(char) * arg_sz);
 		}
 	}
@@ -301,8 +306,8 @@ static size_t sys$exec(Process *current, const char *buffer, const char **argv,
 	auto parent = current->parent();
 	auto pid = current->pid;
 	current->dont_goto_me = true;
-	//current->kill();
-	//printk("killing original %x\n", current->pid);
+	// current->kill();
+	// printk("killing original %x\n", current->pid);
 	current->collapse_cow();
 
 	for (size_t i = 0; i < current->m_file_handles.size(); i++) {
@@ -320,9 +325,7 @@ static size_t sys$exec(Process *current, const char *buffer, const char **argv,
 	return 0;
 }
 
-extern "C" void sched_sled(uintptr_t rsp) {
-	Process::sched(rsp);
-}
+extern "C" void sched_sled(uintptr_t rsp) { Process::sched(rsp); }
 
 static int sys$sleep(Process *current, size_t ms, [[maybe_unused]] int *errno) {
 	printk("block_help\n");
@@ -380,30 +383,33 @@ static int sys$waitpid(Process *current, pid_t pid, int *wstatus, int options,
 	return pid;
 }
 
-static int sys$gettimeofday(Process *current, timeval *tv, void*, [[maybe_unused]] int *errno) {
+static int sys$gettimeofday(Process *current, timeval *tv, void *,
+							[[maybe_unused]] int *errno) {
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)tv, PAGE_SIZE)) {
 		*errno = EFAULT;
 		return -1;
 	}
 	outb(0x70, 00);
 	uint8_t seconds_bcd = inb(0x71);
-	uint8_t seconds = (((seconds_bcd>>4)&0xf)*10)+(seconds_bcd&0xf);
+	uint8_t seconds = (((seconds_bcd >> 4) & 0xf) * 10) + (seconds_bcd & 0xf);
 	outb(0x70, 2);
 	uint8_t minutes_bcd = inb(0x71);
-	uint8_t minutes = (((minutes_bcd>>4)&0xf)*10)+(minutes_bcd&0xf);
+	uint8_t minutes = (((minutes_bcd >> 4) & 0xf) * 10) + (minutes_bcd & 0xf);
 	outb(0x70, 4);
 	uint8_t hour_bcd = inb(0x71);
-	uint8_t hour = (((hour_bcd>>4)&0xf)*10)+(hour_bcd&0xf);
+	uint8_t hour = (((hour_bcd >> 4) & 0xf) * 10) + (hour_bcd & 0xf);
 	outb(0x70, 7);
 	uint8_t day_bcd = inb(0x71);
-	uint8_t day = (((day_bcd>>4)&0xf)*10)+(day_bcd&0xf);
+	uint8_t day = (((day_bcd >> 4) & 0xf) * 10) + (day_bcd & 0xf);
 	outb(0x70, 8);
 	uint8_t month_bcd = inb(0x71);
-	uint8_t month = (((month_bcd>>4)&0xf)*10)+(month_bcd&0xf);
+	uint8_t month = (((month_bcd >> 4) & 0xf) * 10) + (month_bcd & 0xf);
 	outb(0x70, 9);
 	uint8_t years_bcd = inb(0x71);
-	int years = (((years_bcd>>4)&0xf)*10)+(years_bcd&0xf);
-	tv->tv_sec = ((29+years)*31556926)+((11+month)*2629743)+((day-1)*86400)+((hour+2)*3600)+((minutes+47)*60)+seconds;
+	int years = (((years_bcd >> 4) & 0xf) * 10) + (years_bcd & 0xf);
+	tv->tv_sec = ((29 + years) * 31556926) + ((11 + month) * 2629743) +
+				 ((day - 1) * 86400) + ((hour + 2) * 3600) +
+				 ((minutes + 47) * 60) + seconds;
 
 	return 0;
 }
@@ -468,7 +474,8 @@ void handler(SyscallReg *regs) {
 	} break;
 	case SYS_GETTIMEOFDAY: {
 		return_value = static_cast<size_t>(
-			sys$gettimeofday(current, reinterpret_cast<timeval*>(regs->rbx), reinterpret_cast<void*>(regs->rdx), &errno));
+			sys$gettimeofday(current, reinterpret_cast<timeval *>(regs->rbx),
+							 reinterpret_cast<void *>(regs->rdx), &errno));
 	} break;
 	default:
 		printk("Unknown syscall %d\n", syscall_no);

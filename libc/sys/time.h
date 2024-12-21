@@ -15,7 +15,7 @@ struct timeval {
 	suseconds_t tv_usec;
 };
 
-int gettimeofday(struct timeval* tv, void* tz);
+int gettimeofday(struct timeval *tv, void *tz);
 
 #ifdef __cplusplus
 };

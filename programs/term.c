@@ -22,7 +22,7 @@ typedef struct _Line {
 } Line;
 
 struct {
-	unsigned char * ptr;
+	unsigned char *ptr;
 	int width;
 	int height;
 	int xoff;
@@ -31,9 +31,7 @@ struct {
 int yline = 0;
 float xpos = 2; // leave a little padding in case the character extends left
 
-int min(int x, int y) {
-	return (x < y) ? x : y;
-}
+int min(int x, int y) { return (x < y) ? x : y; }
 
 #if 0
 int read_uncode_char(const char* buffer, size_t at, size_t sz) {
@@ -45,11 +43,13 @@ int read_uncode_char(const char* buffer, size_t at, size_t sz) {
 }
 #endif
 bool is_multibyte(char c) {
-	if (!(c & (1<<7))) return false;
+	if (!(c & (1 << 7)))
+		return false;
 	return true;
 }
 
-void render_char(Line* current_line, uint32_t *display_buffer, int bochs_fd, char text, stbtt_fontinfo *font, bool no_render) {
+void render_char(Line *current_line, uint32_t *display_buffer, int bochs_fd,
+				 char text, stbtt_fontinfo *font, bool no_render) {
 	int ascent, descent, baseline, lineGap;
 	float scale;
 
@@ -64,7 +64,8 @@ void render_char(Line* current_line, uint32_t *display_buffer, int bochs_fd, cha
 		yline += (ascent * scale) - (descent * scale) + (lineGap * scale);
 		if (yline >= yres) {
 			yline -= (ascent * scale) - (descent * scale) + (lineGap * scale);
-			//memset(display_buffer, 0, (((ascent * scale) - (descent * scale) + (lineGap * scale))*xres)*4);
+			// memset(display_buffer, 0, (((ascent * scale) - (descent * scale)
+			// + (lineGap * scale))*xres)*4);
 		}
 		return;
 	}
@@ -75,7 +76,7 @@ void render_char(Line* current_line, uint32_t *display_buffer, int bochs_fd, cha
 	stbtt_GetCodepointHMetrics(font, text, &advance, &lsb);
 	stbtt_GetCodepointBox(font, text, &x0, &y0, &x1, &y1);
 
-	if ((xpos+((x1-x0)*scale)) > xres) {
+	if ((xpos + ((x1 - x0) * scale)) > xres) {
 		xpos = 0;
 		yline += (ascent * scale) - (descent * scale) + (lineGap * scale);
 	}
@@ -84,7 +85,8 @@ void render_char(Line* current_line, uint32_t *display_buffer, int bochs_fd, cha
 
 	if (!char_buf) {
 		cache[text].ptr = stbtt_GetCodepointBitmap(
-			font, scale, scale, text, &cache[text].width, &cache[text].height, &cache[text].xoff, &cache[text].yoff);
+			font, scale, scale, text, &cache[text].width, &cache[text].height,
+			&cache[text].xoff, &cache[text].yoff);
 		char_buf = cache[text].ptr;
 	}
 	width = cache[text].width;
@@ -95,9 +97,14 @@ void render_char(Line* current_line, uint32_t *display_buffer, int bochs_fd, cha
 	current_line->bpsp_line_y = yline;
 	if (!current_line->rend_begin_y) {
 		current_line->rend_begin_y = (yline + baseline - height) - (y0 * scale);
-	} else current_line->rend_begin_y = min(current_line->rend_begin_y, (yline + baseline - height) - (y0 * scale));
+	} else
+		current_line->rend_begin_y =
+			min(current_line->rend_begin_y,
+				(yline + baseline - height) - (y0 * scale));
 
-	current_line->rend_extent_y = (current_line->rend_extent_y > height) ? current_line->rend_extent_y : height;
+	current_line->rend_extent_y = (current_line->rend_extent_y > height)
+									  ? current_line->rend_extent_y
+									  : height;
 
 	// note that this stomps the old data, so where character boxes overlap
 	// (e.g. 'lj') it's wrong because this API is really for baking
@@ -109,13 +116,14 @@ void render_char(Line* current_line, uint32_t *display_buffer, int bochs_fd, cha
 		for (int y = 0; y < height; y++) {
 			if (char_buf[y * width + x]) {
 				int ypos = (yline + y + baseline - height) - (y0 * scale);
-				if (((ypos * xres) + x + (int)xpos) >= (xres*yres) || ((ypos * xres) + x + (int)xpos) < 0) {
+				if (((ypos * xres) + x + (int)xpos) >= (xres * yres) ||
+					((ypos * xres) + x + (int)xpos) < 0) {
 					continue;
 				}
-				uint32_t r = char_buf[y*width+x]<<16;
-				uint32_t g = char_buf[y*width+x]<<8;
-				uint32_t b = char_buf[y*width+x];
-				display_buffer[(ypos * xres) + x + (int)xpos] = r|g|b;
+				uint32_t r = char_buf[y * width + x] << 16;
+				uint32_t g = char_buf[y * width + x] << 8;
+				uint32_t b = char_buf[y * width + x];
+				display_buffer[(ypos * xres) + x + (int)xpos] = r | g | b;
 			}
 		}
 	}
@@ -203,8 +211,8 @@ int main() {
 	size_t text_sz = 0;
 	char *text = (char *)malloc(text_alloc);
 	size_t line_alloc = 100;
-	Line *lines = (Line*)malloc(sizeof(Line)*line_alloc);
-	memset((char*)lines, 0, sizeof(Line)*line_alloc);
+	Line *lines = (Line *)malloc(sizeof(Line) * line_alloc);
+	memset((char *)lines, 0, sizeof(Line) * line_alloc);
 	uint32_t *display_buffer =
 		(uint32_t *)malloc(sizeof(uint32_t) * xres * yres);
 
@@ -241,11 +249,11 @@ int main() {
 			text_alloc += 0x1000;
 			text = realloc(text, text_alloc);
 		}
-		if ((line_index+1) > 50) {
+		if ((line_index + 1) > 50) {
 			line_alloc += 100;
-			lines = realloc(lines, sizeof(Line)*line_alloc);
+			lines = realloc(lines, sizeof(Line) * line_alloc);
 		}
-		Line* current_line = &lines[line_index];
+		Line *current_line = &lines[line_index];
 		char c = 0;
 		size_t size_read = read(1, &c, 1);
 #if 0
@@ -258,19 +266,25 @@ int main() {
 			fprintf(stderr, "Debug");
 		}
 #endif
-		//if (is_multibyte(c)) {
-		//}
+		// if (is_multibyte(c)) {
+		// }
 
 		if (c == '\b') {
 			text_sz--;
 			current_line->text_buf_end--;
 			xpos = 0;
 			yline = current_line->bpsp_line_y;
-			memset((char*)&display_buffer[current_line->rend_begin_y*xres], 0, ((current_line->rend_begin_y+current_line->rend_extent_y)*xres)*4);
+			memset((char *)&display_buffer[current_line->rend_begin_y * xres],
+				   0,
+				   ((current_line->rend_begin_y + current_line->rend_extent_y) *
+					xres) *
+					   4);
 			lseek(bochs_fd, 0, SEEK_SET);
 			write(bochs_fd, display_buffer, xres * yres * 4);
-			for (size_t i = current_line->text_buf_begin; i < current_line->text_buf_end; i++) {
-				render_char(current_line, display_buffer, bochs_fd, text[i], &font, false);
+			for (size_t i = current_line->text_buf_begin;
+				 i < current_line->text_buf_end; i++) {
+				render_char(current_line, display_buffer, bochs_fd, text[i],
+							&font, false);
 			}
 			continue;
 		} else
@@ -283,17 +297,19 @@ int main() {
 			current_line = &lines[line_index];
 			current_line->text_buf_begin = text_sz;
 			current_line->text_buf_end = text_sz;
-			if (yline >= (yres-140)) {
+			if (yline >= (yres - 140)) {
 				xpos = 0;
-				yline = 0;//lines[line_index-1].rend_begin_y;
+				yline = 0; // lines[line_index-1].rend_begin_y;
 				memset(display_buffer, 0, xres * yres * 4);
 				line_offset++;
 				for (size_t line = line_offset; line < line_index; line++) {
-					Line* redraw_line = &lines[line];
+					Line *redraw_line = &lines[line];
 					redraw_line->rend_begin_y = 0;
 					redraw_line->rend_extent_y = 0;
-					for (size_t i = redraw_line->text_buf_begin; i < redraw_line->text_buf_end; i++) {
-						render_char(redraw_line, display_buffer, bochs_fd, text[i], &font, true);
+					for (size_t i = redraw_line->text_buf_begin;
+						 i < redraw_line->text_buf_end; i++) {
+						render_char(redraw_line, display_buffer, bochs_fd,
+									text[i], &font, true);
 					}
 				}
 

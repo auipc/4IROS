@@ -11,7 +11,7 @@
 #include <kernel/util/Pool.h>
 #include <string.h>
 
-//#define TEMP_ZONE_1 (((1ull<<42ull)-1ull)-(PAGE_SIZE*8ull))
+// #define TEMP_ZONE_1 (((1ull<<42ull)-1ull)-(PAGE_SIZE*8ull))
 #define TEMP_ZONE_1 ((1ull << 40ull))
 
 /* The paging interface will use a mutate and commit pattern.
@@ -366,7 +366,7 @@ RootPageLevel *Paging::clone(const RootPageLevel &pml4) {
 
 RootPageLevel *Paging::clone_for_fork(const RootPageLevel &pml4,
 									  bool just_copy) {
-	void* virt = (void*)kmalloc_really_aligned(4096, 4096);
+	void *virt = (void *)kmalloc_really_aligned(4096, 4096);
 	auto root_page = page_map((uint64_t)virt);
 	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
 	auto root_pd = new (virt) RootPageLevel();
@@ -472,11 +472,12 @@ RootPageLevel *Paging::clone_for_fork(const RootPageLevel &pml4,
 	return root_pd;
 }
 
-RootPageLevel *Paging::clone_for_fork_shallow_cow(RootPageLevel &pml4,
-												HashTable<CoWInfo>* owner_table,  HashTable<CoWInfo> *table,
-												  bool just_copy) {
+RootPageLevel *
+Paging::clone_for_fork_shallow_cow(RootPageLevel &pml4,
+								   HashTable<CoWInfo> *owner_table,
+								   HashTable<CoWInfo> *table, bool just_copy) {
 	(void)just_copy;
-	void* virt = (void*)kmalloc_really_aligned(4096, 4096);
+	void *virt = (void *)kmalloc_really_aligned(4096, 4096);
 	auto root_page = page_map((uint64_t)virt);
 	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
 	auto root_pd = new (virt) RootPageLevel();
@@ -540,7 +541,7 @@ RootPageLevel *Paging::clone_for_fork_shallow_cow(RootPageLevel &pml4,
 					LovelyPageLevel *root_pt_lvl = root_pdt.fetch();
 					auto &root_pt = root_pt_lvl->entries[l];
 					LovelyPageLevel *pt_lvl = pdt.fetch();
-					auto& pt = pt_lvl->entries[l];
+					auto &pt = pt_lvl->entries[l];
 					if (!pt.is_mapped()) {
 						delete pt_lvl;
 						delete root_pt_lvl;
@@ -556,17 +557,17 @@ RootPageLevel *Paging::clone_for_fork_shallow_cow(RootPageLevel &pml4,
 					}
 
 					if (pt.pdata & PAEPageFlags::Write) {
-						owner_table->push(((uint64_t)i << 39) | ((uint64_t)j << 30) |
-										((uint64_t)k << 21) |
-										((uint64_t)l << 12),
-									CoWInfo{&pml4});
+						owner_table->push(
+							((uint64_t)i << 39) | ((uint64_t)j << 30) |
+								((uint64_t)k << 21) | ((uint64_t)l << 12),
+							CoWInfo{&pml4});
 						table->push(((uint64_t)i << 39) | ((uint64_t)j << 30) |
 										((uint64_t)k << 21) |
 										((uint64_t)l << 12),
 									CoWInfo{&pml4});
-						printk("%x\n", ((uint64_t)i << 39) | ((uint64_t)j << 30) |
-										((uint64_t)k << 21) |
-										((uint64_t)l << 12));
+						printk("%x\n",
+							   ((uint64_t)i << 39) | ((uint64_t)j << 30) |
+								   ((uint64_t)k << 21) | ((uint64_t)l << 12));
 						pt.pdata &= ~(PAEPageFlags::Write);
 						root_pt.pdata = pt.pdata;
 					} else {

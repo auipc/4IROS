@@ -20,8 +20,7 @@ int __cxa_guard_acquire(int64_t *) {
 	return 1;
 }
 
-void __cxa_guard_release(int64_t *) { /*cxa_spinlock.release();*/
-}
+void __cxa_guard_release(int64_t *) { /*cxa_spinlock.release();*/ }
 
 void __cxa_pure_virtual() {
 	// Do nothing or print an error message.

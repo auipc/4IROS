@@ -87,13 +87,9 @@ class FileHandle {
 	int seek(int64_t offset, SeekMode origin);
 	size_t tell();
 	bool check_blocked() { return m_node->check_blocked(); }
-	void block_if_required(size_t size) {
-		m_node->block_if_required(size);
-	}
+	void block_if_required(size_t size) { m_node->block_if_required(size); }
 
-	VFSNode* node() {
-		return m_node;
-	}
+	VFSNode *node() { return m_node; }
 
   private:
 	size_t m_position = 0;

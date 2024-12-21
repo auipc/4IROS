@@ -15,7 +15,7 @@ class StdDev : public VFSNode {
 	size_t m_bytes_written = 0;
 	char *m_buffer;
 	// FIXME
-	size_t m_buffer_sz = 4096*80;
+	size_t m_buffer_sz = 4096 * 80;
 	bool m_blocked = false;
 	bool m_echo;
 };
