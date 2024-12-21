@@ -2,14 +2,14 @@
 #include <kernel/arch/amd64/kernel.h>
 #include <kernel/arch/amd64/x86_64.h>
 #include <kernel/mem/Paging.h>
+#include <kernel/util/HashTable.h>
 #include <kernel/vfs/vfs.h>
 #include <stddef.h>
-#include <kernel/util/HashTable.h>
 
 #define STACK_SIZE 64 * KB
 
+class Process;
 struct CoWInfo {
-	RootPageLevel* dest;
 	RootPageLevel* owner;
 };
 
@@ -39,9 +39,10 @@ class Process {
 	static void sched(uintptr_t rsp);
 	static void reentry();
 	void collapse_cow();
-	static int resolve_cow(uintptr_t fault_addr);
+	static void resolve_cow_recurse(RootPageLevel* level, Process* current, uintptr_t fault_addr);
+	static int resolve_cow(Process* current, uintptr_t fault_addr);
 
-	static void kill_process(Process* p);
+	static void kill_process(Process *p);
 	static Process *create(void *func_ptr);
 	static Process *create_user(const char *path, size_t argc = 0,
 								const char **argv = NULL);
@@ -61,34 +62,31 @@ class Process {
 	void block_on_handle(FileHandle *handle);
 	void poll_is_blocked();
 
-	inline Process* parent() { return m_parent; }
-	inline void set_parent(Process* p) { 
-		m_parent = p; 
-	}
+	inline Process *parent() { return m_parent; }
+	inline void set_parent(Process *p) { m_parent = p; }
 
-	inline void add_child(Process* p) { 
-		m_children.push(p); 
-	}
+	inline void add_child(Process *p) { m_children.push(p); }
 
 	int exit_code;
 	uint64_t pid;
 	Process *next;
 	Process *prev;
 	Vec<FileHandle *> m_file_handles;
-	HashTable<CoWInfo>* cow_table;
+	HashTable<CoWInfo> *cow_table;
 	bool dont_goto_me = false;
 	uintptr_t m_actual_kern_stack_top;
 	uintptr_t m_kern_stack_top;
 	uintptr_t m_saved_user_stack_ksyscall;
+
   private:
-	Process* m_parent;
-	Vec<Process*> m_children;
+	Process *m_parent;
+	Vec<Process *> m_children;
 	Blocker m_blocker;
 	ProState m_state = ProState::Running;
 	uintptr_t m_stack_bot;
 	uintptr_t m_stack_top;
 	uintptr_t m_kern_stack_bot;
-	uint8_t* m_saved_fpu;
+	uint8_t *m_saved_fpu;
 	RootPageLevel *m_pglv;
 };
 

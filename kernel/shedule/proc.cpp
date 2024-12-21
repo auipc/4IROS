@@ -1,24 +1,26 @@
 #include <kernel/arch/amd64/x64_sched_help.h>
 #include <kernel/shedule/proc.h>
 #include <kernel/unix/ELF.h>
+#include <kernel/util/HashTable.h>
 #include <kernel/vfs/stddev.h>
 #include <kernel/vfs/vfs.h>
-#include <kernel/util/HashTable.h>
 
-#define KSTACK_SIZE (4096 * 6)
+#define KSTACK_SIZE (4096 * 10)
 Process *current_process = nullptr;
 extern TSS tss;
 uint64_t s_pid = 0;
 
-HashTable<Process*>* process_pid_map;
+HashTable<Process *> *process_pid_map;
 
 Process::Process() : pid(s_pid++) {
-	m_saved_fpu = (uint8_t*)kmalloc_really_aligned(512,16);
+	m_saved_fpu = (uint8_t *)kmalloc_really_aligned(512, 16);
 	m_file_handles.push(new FileHandle(new StdDev(false)));
 	m_file_handles.push(new FileHandle(new StdDev(true)));
 	m_file_handles.push(new FileHandle(new StdDev(true)));
 	if (!process_pid_map)
-		process_pid_map	= new HashTable<Process*>();
+		process_pid_map = new HashTable<Process *>();
+
+	cow_table = new HashTable<CoWInfo>();
 	process_pid_map->push(pid, this);
 	// FIXME clear FPU registers and state before calling this
 	initialize_fpu(m_saved_fpu);
@@ -26,6 +28,7 @@ Process::Process() : pid(s_pid++) {
 
 Process::Process(Process *p) : pid(s_pid++) {
 	m_file_handles = p->m_file_handles;
+	cow_table = new HashTable<CoWInfo>();
 }
 
 Process::~Process() {
@@ -43,13 +46,15 @@ void Process::init() {
 	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
 			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
 	tss.rsp[0] = proc->kern_stack_top();
-	ksyscall_data.fxsave_region = reinterpret_cast<uint8_t**>(&current_process->m_saved_fpu);
+	ksyscall_data.fxsave_region =
+		reinterpret_cast<uint8_t **>(&current_process->m_saved_fpu);
 	x64_switch((void *)proc->kern_stack_top(),
 			   (uint64_t)proc->root_page_level());
 }
 
-void Process::kill_process(Process* p) {
-	if (p->m_children.size()) panic("Woah\n");
+void Process::kill_process(Process *p) {
+	if (p->m_children.size())
+		panic("Woah\n");
 	delete p;
 }
 
@@ -60,6 +65,7 @@ void Process::sched(uintptr_t rsp) {
 		current_process->m_kern_stack_top = rsp;
 		current_process->m_saved_user_stack_ksyscall = ksyscall_data.user_stack;
 	}
+	Process* old = current_process;
 	ioapic_set_ioredir_val(21, 1 << 16);
 	asm volatile("sti");
 	do {
@@ -70,11 +76,16 @@ void Process::sched(uintptr_t rsp) {
 	} while (current_process->m_state != ProState::Running);
 	asm volatile("cli");
 	ioapic_set_ioredir_val(21, 48);
+	if (current_process == old) {
+		current_process = old;
+		return;
+	}
 
 	assert(current_process);
 	ksyscall_data.stack = current_process->m_actual_kern_stack_top;
 	ksyscall_data.user_stack = current_process->m_saved_user_stack_ksyscall;
-	ksyscall_data.fxsave_region = reinterpret_cast<uint8_t**>(&current_process->m_saved_fpu);
+	ksyscall_data.fxsave_region =
+		reinterpret_cast<uint8_t **>(&current_process->m_saved_fpu);
 	// FIXME remove this
 	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
 			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
@@ -87,7 +98,8 @@ void Process::reentry() {
 	assert(current_process);
 	ksyscall_data.stack = current_process->m_actual_kern_stack_top;
 	ksyscall_data.user_stack = current_process->m_saved_user_stack_ksyscall;
-	ksyscall_data.fxsave_region = reinterpret_cast<uint8_t**>(&current_process->m_saved_fpu);
+	ksyscall_data.fxsave_region =
+		reinterpret_cast<uint8_t **>(&current_process->m_saved_fpu);
 	// FIXME remove this
 	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
 			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
@@ -97,43 +109,35 @@ void Process::reentry() {
 }
 
 void Process::collapse_cow() {
-	if (!cow_table) {
-		printk("NO COW TABLE\n");
-		return;
-	}
-	Process* p = current_process;
-	p->cow_table->iterate([&](size_t key, CoWInfo* info) {
-		Paging::the()->resolve_cow_fault(*info->owner, *info->dest, key);
-		p->cow_table->remove(key);
-	});
 }
 
-int Process::resolve_cow(uintptr_t fault_addr) {
-	Process* current = current_process;
-	if (!current->cow_table) {
-		return 0;
+void Process::resolve_cow_recurse(RootPageLevel* level, Process* current, uintptr_t fault_addr) {
+	if (!current) return;
+	CoWInfo* inf = current->cow_table->get(fault_addr);
+	if (!inf) return;
+	Paging::the()->resolve_cow_fault(*level, *current->root_page_level(), fault_addr, true);
+	current->cow_table->remove(fault_addr);
+	for (size_t i = 0; i < current->m_children.size(); i++) {
+		resolve_cow_recurse(level, current->m_children[i], fault_addr);
 	}
-	//CoWInfo* res = current->cow_table->get(fault_addr);
-	Process* p = current_process;
-	//if (!res) {
-	while (p) {
-		if (!p->cow_table) break;
-		CoWInfo* res = p->cow_table->get(fault_addr);
-		if (res) {
-			Process* p2 = current_process;
-			Paging::the()->resolve_cow_fault(*res->owner, *res->dest, fault_addr);
-			while (p2 && p2 != p) {
-				Paging::the()->resolve_cow_fault(*res->owner, *p2->m_pglv, fault_addr);
-				p2 = p2->m_parent;
-			}
-			p->cow_table->remove(fault_addr);
-			break;
+}
+
+int Process::resolve_cow(Process* current, uintptr_t fault_addr) {
+	RootPageLevel* pglv = current->root_page_level();
+	printk("%x %d\n", fault_addr, current->pid);
+	CoWInfo* inf = current->cow_table->get(fault_addr);
+	printk("%x\n", inf);
+	if (!inf) return 0;
+	if (inf->owner == pglv) {
+		for (size_t i = 0; i < current->m_children.size(); i++) {
+			resolve_cow_recurse(pglv, current->m_children[i], fault_addr);
 		}
-		p = p->m_parent;
+		current->cow_table->remove(fault_addr);
+		return 1;
 	}
-	if (!p) return 0;
-	//}
-	printk("cow done: %x %x\n", fault_addr);
+
+	Paging::the()->resolve_cow_fault(*inf->owner, *pglv, fault_addr);
+	current->cow_table->remove(fault_addr);
 	return 1;
 }
 
@@ -174,8 +178,8 @@ Process *Process::create_user(const char *path, size_t argc,
 		reinterpret_cast<const ELFSectionHeader64 *>(buffer + ehead->phtable);
 
 	auto current_pd = (RootPageLevel *)get_cr3();
-	RootPageLevel *pgl =
-		Paging::the()->clone_for_fork(*(RootPageLevel *)Paging::the()->kernel_root_directory(), true);
+	RootPageLevel *pgl = Paging::the()->clone_for_fork(
+		*(RootPageLevel *)Paging::the()->kernel_root_directory(), true);
 	Paging::the()->switch_page_directory(pgl);
 
 	for (int i = 0; i < ehead->phnum; i++) {
@@ -210,11 +214,10 @@ Process *Process::create_user(const char *path, size_t argc,
 		Paging::the()->map_page(*pgl, stack_begin + i, stack_page,
 								PAEPageFlags::User | PAEPageFlags::Write |
 									PAEPageFlags::Present);
+		memset((char*)(stack_begin+i), 0, PAGE_SIZE);
 	}
 
 	size_t argv_ptr_size = sizeof(uint64_t) * argc;
-	stack_end -= 8;
-
 	stack_end -= argv_ptr_size;
 	for (size_t i = 0; i < argc; i++) {
 		stack_end -= strlen(argv[i]) + 1;
@@ -257,21 +260,7 @@ Process *Process::fork(SyscallReg *regs) {
 	Process *new_proc = new Process();
 	new_proc->m_parent = this;
 	m_children.push(this);
-	new_proc->cow_table = new HashTable<CoWInfo>();
-	new_proc->m_pglv = Paging::the()->clone_for_fork(*m_pglv);
-#if 0
-	// FIXME There's a bug with CoW and it's messing up the stack. pls remove l8r.
-	for (int i = 0; i < STACK_SIZE + PAGE_SIZE; i += PAGE_SIZE) {
-		CoWInfo* res = new_proc->cow_table->get(0x400000+i);
-		Paging::the()->resolve_cow_fault(*res->owner, *res->dest, 0x400000+i);
-	}
-	CoWInfo* res = new_proc->cow_table->get(0x501000);
-	Paging::the()->resolve_cow_fault(*res->owner, *res->dest, 0x501000);
-	if (!cow_table)
-		cow_table = new HashTable<CoWInfo>();
-
-	cow_table->copy(*new_proc->cow_table, true);
-#endif
+	new_proc->m_pglv = Paging::the()->clone_for_fork_shallow_cow(*m_pglv, cow_table, new_proc->cow_table);
 
 	new_proc->m_stack_bot = m_stack_bot;
 	new_proc->m_stack_top = (uintptr_t)ksyscall_data.user_stack;

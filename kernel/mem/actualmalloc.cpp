@@ -33,7 +33,7 @@ void actual_malloc_init(void *addr, size_t size) {
 	s_use_actual_allocator = true;
 }
 
-static void *actual_malloc_find_free(size_t size, size_t alignment=0) {
+static void *actual_malloc_find_free(size_t size, size_t alignment = 0) {
 	SlowLinkedList *selected_node = nullptr;
 	SlowLinkedList *current_node = mem_slow_linked_list;
 	uintptr_t next_addr = ((uintptr_t)alloc_base_addr);
@@ -41,11 +41,13 @@ static void *actual_malloc_find_free(size_t size, size_t alignment=0) {
 
 	do {
 		if (current_node->alignment > 1)
-			next_addr += current_node->alignment-(next_addr%current_node->alignment);
+			next_addr +=
+				current_node->alignment - (next_addr % current_node->alignment);
 
-		if (current_node->free && current_node->size >= size && current_node->alignment == alignment) {
+		if (current_node->free && current_node->size >= size &&
+			current_node->alignment == alignment) {
 			current_node->free = false;
-			memset((void*)next_addr, 0, current_node->size);
+			memset((void *)next_addr, 0, current_node->size);
 			return (void *)next_addr;
 		}
 
@@ -58,21 +60,20 @@ static void *actual_malloc_find_free(size_t size, size_t alignment=0) {
 		next_addr += sizeof(SlowLinkedList);
 	} while (current_node);
 
-	if ((next_addr + size) >=
-		((size_t)alloc_base_addr + alloc_base_size)) {
+	if ((next_addr + size) >= ((size_t)alloc_base_addr + alloc_base_size)) {
 		panic("OOM");
 	}
 
-	auto next_node = new ((void *)(next_addr-sizeof(SlowLinkedList))) SlowLinkedList();
+	auto next_node =
+		new ((void *)(next_addr - sizeof(SlowLinkedList))) SlowLinkedList();
 	if (alignment > 1)
-		next_addr += alignment-(next_addr%alignment);
+		next_addr += alignment - (next_addr % alignment);
 	selected_node->next = next_node;
 	selected_node->next->free = false;
 	selected_node->next->size = size;
 	selected_node->next->alignment = alignment;
-	memset((void*)next_addr, 0, size);
+	memset((void *)next_addr, 0, size);
 	return (void *)next_addr;
-
 }
 
 void *actual_malloc(size_t size) {
@@ -99,12 +100,14 @@ void actual_free(void *addr) {
 
 	do {
 		if (current_node->alignment > 1)
-			next_addr += current_node->alignment-(next_addr%current_node->alignment);
+			next_addr +=
+				current_node->alignment - (next_addr % current_node->alignment);
 
 		if (next_addr == (uintptr_t)addr) {
 			current_node->free = true;
-			memset((void*)addr, 0, current_node->size);
-			if (!current_node->next) prev_node->next = nullptr;
+			memset((void *)addr, 0, current_node->size);
+			if (!current_node->next)
+				prev_node->next = nullptr;
 			return;
 		}
 

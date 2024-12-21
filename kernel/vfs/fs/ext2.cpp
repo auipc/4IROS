@@ -1,9 +1,6 @@
 #include <kernel/util/ism.h>
 #include <kernel/vfs/fs/ext2.h>
-
-template <class T> constexpr T min(const T &a, const T &b) {
-	return a < b ? a : b;
-}
+#include <kernel/minmax.h>
 
 uint32_t block_size = 1024;
 
@@ -44,30 +41,85 @@ void Ext2FileSystem::seek_block(size_t block_addr) {
 	m_block_dev->seek(block_addr * block_size);
 }
 
-void Ext2FileSystem::read_singly(INode &inode, size_t singly_position,
+void Ext2FileSystem::read_singly(uint32_t* singly_blocks, INode &inode, size_t singly_position,
 								 void *out, size_t block_idx,
 								 size_t size_to_read, size_t position) {
 	if (!inode.sibp)
 		panic("No sibp\n");
-	uint32_t *singly_blocks = new uint32_t[256];
-	seek_block(singly_position);
-	m_block_dev->read((char *)singly_blocks, sizeof(uint32_t) * 256);
+	if (!singly_blocks) {
+		singly_blocks = new uint32_t[256];
+		seek_block(singly_position);
+		m_block_dev->read((char *)singly_blocks, sizeof(uint32_t) * 256);
+	}
 
 	m_block_dev->seek((singly_blocks[block_idx] * block_size) +
 					  (position % block_size));
 	m_block_dev->read((char *)out, min(size_to_read, (size_t)block_size));
-	delete[] singly_blocks;
-	// return true;
 }
+
+void Ext2FileSystem::read_indirect_singly(INode &inode, size_t singly_position,
+								 void *out, size_t block_idx,
+								 size_t size_to_read, size_t position) {
+	uint32_t* singly_blocks = new uint32_t[256];
+	read_singly(singly_blocks, inode, singly_position, out, block_idx, size_to_read, position);
+	delete[] singly_blocks;
+}
+
 
 uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 										 size_t position) {
 	size_t actual_size = (size > inode.size_low) ? inode.size_low : size;
-	size_t size_to_read = actual_size;
+	size_t size_to_read = actual_size+(block_size-(actual_size%block_size));//actual_size;
 	size_t block_idx = position / block_size;
 	size_t output_ptr = 0;
+	// FIXME Temporary fix for a bug involving directly copying to the output buffer. Something goes wrong when the position isn't aligned by 1024 bytes.
+	char* temp_buf = new char[size_to_read+(block_size-(size_to_read%block_size))];
 
+	uint32_t *singly_blocks = nullptr;
 	uint32_t *doubly_blocks = nullptr;
+	while (size_to_read) {
+		switch (block_idx) {
+		case 0 ... 11: {
+			seek_block(inode.dbp[block_idx]);
+			m_block_dev->seek((inode.dbp[block_idx] * block_size));
+			m_block_dev->read((char *)temp_buf + output_ptr, block_size);
+		} break;
+		// https://www.nongnu.org/ext2-doc/ext2.html
+		// With a 1KiB block size, blocks 13 to 268 of the file data are
+		// contained in this indirect block.
+		case 12 ... 267: {
+			read_singly(singly_blocks, inode, inode.sibp,
+						(void *)((uintptr_t)temp_buf + output_ptr), block_idx - 12,
+						size_to_read, 0);
+		} break;
+		case 268 ... 65803: {
+			if (!inode.dibp)
+				panic("No dibp\n");
+			if (!doubly_blocks) {
+				doubly_blocks = new uint32_t[256];
+				seek_block(inode.dibp);
+				m_block_dev->read((char *)doubly_blocks,
+								  sizeof(uint32_t) * 256);
+			}
+			// printk("dbl %x\n", doubly_blocks[(block_idx-268)/256]);
+			read_indirect_singly(inode, doubly_blocks[(block_idx - 268) / 256],
+						(void *)((uintptr_t)temp_buf + output_ptr),
+						(block_idx - 268) % 256, size_to_read, 0);
+		} break;
+		default:
+			printk("%d\n", block_idx);
+			panic("Help\n");
+			break;
+		}
+		output_ptr += block_size;// - (position % block_size);
+		// position += min(size_to_read, (size_t)block_size);
+		size_to_read -= min(size_to_read, (size_t)block_size);
+		block_idx++;
+	}
+
+	memcpy(out, ((char*)temp_buf)+(position%block_size), actual_size);
+
+#if 0
 	while (size_to_read) {
 		switch (block_idx) {
 		case 0 ... 11: {
@@ -85,6 +137,7 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 						(void *)((uintptr_t)out + output_ptr), block_idx - 12,
 						size_to_read, position);
 		} break;
+#if 0
 		case 268 ... 65803: {
 			if (!inode.dibp)
 				panic("No dibp\n");
@@ -99,6 +152,7 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 						(void *)((uintptr_t)out + output_ptr),
 						(block_idx - 268) % 256, size_to_read, position);
 		} break;
+#endif
 		default:
 			panic("Unsupported block index!\n");
 			break;
@@ -109,20 +163,13 @@ uint32_t Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 		size_to_read -= min(size_to_read, (size_t)block_size);
 		block_idx++;
 	}
+#endif
 
-	/*
-	if (size > 10000) {
-		for (size_t i = 0; i < size; i++)
-		{
-			printk("%x\n", &((uint8_t*)out)[i]);
-			printk("%x\n", ((uint8_t*)out)[i]);
-			printk("%d\n", i);
-			assert(((uint8_t*)out)[i] == 0xff);
-		}
-	}*/
-
+	if (singly_blocks)
+		delete[] singly_blocks;
 	if (doubly_blocks)
 		delete[] doubly_blocks;
+	delete[] temp_buf;
 	return actual_size;
 }
 
@@ -204,8 +251,12 @@ VFSNode *Ext2FileSystem::traverse_internal(INode *cur_inode,
 	// Ext2 directories always contain at least 2 directories (. and ..).
 	// I'd rather have the VFS layer handle these, so we skip over them.
 	for (size_t i = 2; i < dir_entries.size(); i++) {
+		printk("%s %s\n", dir_entries[i].name, path[path_index]);
 		if (!strcmp(dir_entries[i].name, path[path_index])) {
 			auto inode = read_inode(dir_entries[i].entry.inode);
+			if (inode->type & EXT2_DIR) {
+				return traverse_internal(inode, path, path_index+1);
+			}
 			return new Ext2Entry(this, dir_entries[i].name, move(inode));
 		}
 	}

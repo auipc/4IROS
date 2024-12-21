@@ -5,9 +5,12 @@ set(PROGRAMS_SRCS
 	term.c
 	cat.c
 	farbview.c
+	wump.c
+	test.c
+	less.c
 )
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE -fPIC -O1 -mred-zone -mstackrealign")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE -fPIC -O3 -mred-zone")
 
 foreach(PROGRAM IN LISTS PROGRAMS_SRCS)
 	string(REPLACE ".c" "" PROGRAM_BIN ${PROGRAM})

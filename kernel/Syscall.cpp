@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <kernel/Syscall.h>
 #include <kernel/arch/amd64/x64_sched_help.h>
 #include <kernel/mem/Paging.h>
@@ -7,13 +8,15 @@
 #include <kernel/vfs/vfs.h>
 #include <priv/common.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <unistd.h>
-#include <errno.h>
+#include <kernel/arch/x86_common/IO.h>
 
-extern HashTable<Process*>* process_pid_map;
+extern HashTable<Process *> *process_pid_map;
 namespace Syscall {
 
-static void sys$exit(Process *current, int status, [[maybe_unused]] int* errno) {
+static void sys$exit(Process *current, int status,
+					 [[maybe_unused]] int *errno) {
 #if 0
 	Scheduler::the()->sched_spinlock.acquire();
 	auto alert = current->alert();
@@ -29,21 +32,22 @@ static void sys$exit(Process *current, int status, [[maybe_unused]] int* errno) 
 	Scheduler::schedule(0);
 #endif
 	(void)status;
-	printk("exit\n");
+	printk("exit %d\n", current->pid);
 	current->exit_code = status;
 	current->kill();
 	Paging::the()->release(*current->root_page_level());
 	Process::sched(0);
 }
 
-static size_t sys$fork(Process *current, SyscallReg *regs, [[maybe_unused]] int* errno) {
+static size_t sys$fork(Process *current, SyscallReg *regs,
+					   [[maybe_unused]] int *errno) {
 	Process *child = current->fork(regs);
 	child->next = current_process->next;
 	child->prev = current_process;
 	current_process->next = child;
 	printk("Run queue: \n");
 	printk("%d", current_process->pid);
-	Process* p = current_process->next;
+	Process *p = current_process->next;
 	while (p != current_process) {
 		p = p->next;
 		if (p->state() != ProState::Dead) {
@@ -61,27 +65,49 @@ static size_t sys$fork(Process *current, SyscallReg *regs, [[maybe_unused]] int*
 // FIXME Make verify_buffer work with CoW
 static bool verify_buffer(RootPageLevel *pd, uintptr_t buffer_addr,
 						  size_t size) {
-	uintptr_t start_addr = buffer_addr - (buffer_addr % PAGE_SIZE);
+	uintptr_t start_addr = buffer_addr & ~(PAGE_SIZE-1);
 
 	for (uintptr_t i = start_addr; i < size + (PAGE_SIZE - 1); i += PAGE_SIZE) {
-		if (pd->get_page_flags(buffer_addr + i) &
-			(PAEPageFlags::Present | PAEPageFlags::User))
+		auto flags = pd->get_page_flags(buffer_addr + i);
+		if (!(flags & PAEPageFlags::Present) || !(flags & PAEPageFlags::User))
 			return false;
 	}
 	return true;
 }
 
-FileHandle *stdin_filehandle;
-FileHandle *stdout_filehandle;
+static bool verify_buffer_write(Process* current, RootPageLevel *pd, uintptr_t buffer_addr,
+						  size_t size) {
+	(void)current;
+	uintptr_t start_addr = buffer_addr & ~(PAGE_SIZE-1);
+
+	for (uintptr_t addr = start_addr; addr < start_addr + size + (PAGE_SIZE - 1); addr += PAGE_SIZE) {
+		auto flags = pd->get_page_flags(addr);
+
+		printk("%x %x %d %d %d %d\n", addr, current->cow_table->get(addr), flags, (flags & PAEPageFlags::Present) , (flags & PAEPageFlags::User) , (flags & PAEPageFlags::Write));
+		if (!(flags & PAEPageFlags::Present) || !(flags & PAEPageFlags::User) || !(flags & PAEPageFlags::Write)) {
+			if (!current->cow_table->get(addr)) 
+				return false;
+		}
+	}
+
+	for (uintptr_t addr = start_addr; addr < size + (PAGE_SIZE - 1); addr += PAGE_SIZE) {
+		printk("reslve cow\n");
+		Process::resolve_cow(current, addr);
+	}
+
+	return true;
+}
 
 KSyscallData data;
 // FIXME: Two processes can share the same VFSNode which causes problems (i.e.
 // processes might snipe values from the keyboard buffer and the value is lost
 // for another process reading it).
-static int sys$read(Process *current, int fd, const char *buffer,
-					size_t count, [[maybe_unused]] int* errno) {
+static int sys$read(Process *current, int fd, const char *buffer, size_t count,
+					[[maybe_unused]] int *errno) {
+	// FIXME check writable
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)buffer, count)) {
 		*errno = EFAULT;
+		printk("verify buffer failed %x\n", buffer);
 		return -1;
 	}
 
@@ -91,28 +117,21 @@ static int sys$read(Process *current, int fd, const char *buffer,
 	}
 
 	auto fh = current->m_file_handles[fd];
-	if (fd == 0) {
-		if (!stdin_filehandle)
-			stdin_filehandle = new FileHandle(new StdDev(false));
-		fh = stdin_filehandle;
-	} else if (fd == 1) {
-		if (!stdout_filehandle)
-			stdout_filehandle = new FileHandle(new StdDev(true));
-		fh = stdout_filehandle;
+	if (!fh || !fh->node()) {
+		printk("NO FILE\n");
+		return -1;
 	}
 	fh->block_if_required(count);
 
+	// FIXME block_on_handle crashes
 	current->block_on_handle(fh);
-	printk("check_blocked_begin\n");
 	uintptr_t rip = get_rip();
-	
+
 	while (fh->check_blocked()) {
-		printk("check_blocked\n");
 		uint64_t *sp;
 		asm volatile("mov %%rsp, %0" : "=a"(sp) :);
 		x64_syscall_block_help(sp, rip);
 	}
-	printk("check_blocked_end\n");
 
 #if 0
 	// FIXME: Are we 100% sure the stack isn't getting mangled? We're relying on
@@ -142,7 +161,8 @@ static int sys$read(Process *current, int fd, const char *buffer,
 }
 
 static size_t sys$write(Process *current, uint32_t handle,
-						uintptr_t buffer_addr, size_t length, [[maybe_unused]] int* errno) {
+						uintptr_t buffer_addr, size_t length,
+						[[maybe_unused]] int *errno) {
 	(void)handle;
 	auto current_pd = current->root_page_level();
 
@@ -157,28 +177,18 @@ static size_t sys$write(Process *current, uint32_t handle,
 		return -1;
 	}
 
-	if (handle == 0) {
-		// printk("Write Handle %x\n", current->m_file_handles[handle]);
-		if (!stdin_filehandle)
-			stdin_filehandle = new FileHandle(new StdDev(false));
-		stdin_filehandle->write(reinterpret_cast<void *>(buffer_addr), length);
-		return length;
-	} else if (handle == 1) {
-		if (!stdout_filehandle)
-			stdout_filehandle = new FileHandle(new StdDev(true));
-		stdout_filehandle->write(reinterpret_cast<void *>(buffer_addr), length);
-		return length;
-	}
 	current->m_file_handles[handle]->write(
 		reinterpret_cast<void *>(buffer_addr), length);
 
 	return length;
 }
 
-static int sys$open(Process *current, const char *buffer, int flags, [[maybe_unused]] int* errno) {
+static int sys$open(Process *current, const char *buffer, int flags,
+					[[maybe_unused]] int *errno) {
 	(void)flags;
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)buffer,
 					   PAGE_SIZE)) {
+		printk("Invalid buffer\n");
 		*errno = EFAULT;
 		return -1;
 	}
@@ -186,6 +196,7 @@ static int sys$open(Process *current, const char *buffer, int flags, [[maybe_unu
 	auto path = VFS::the().parse_path(buffer);
 	FileHandle *handle = VFS::the().open_fh(path);
 	if (!handle) {
+		printk("NO SUCH FILE %s\n", buffer);
 		*errno = ENOENT;
 		return -1;
 	}
@@ -195,7 +206,8 @@ static int sys$open(Process *current, const char *buffer, int flags, [[maybe_unu
 	return fd;
 }
 
-static int sys$lseek(Process *current, int fd, off_t offset, int whence, [[maybe_unused]] int* errno) {
+static int sys$lseek(Process *current, int fd, off_t offset, int whence,
+					 [[maybe_unused]] int *errno) {
 	if ((size_t)fd > (current->m_file_handles.size() - 1)) {
 		*errno = EBADF;
 		return -1;
@@ -212,19 +224,23 @@ static int sys$lseek(Process *current, int fd, off_t offset, int whence, [[maybe
 	return fh->tell();
 }
 
-static void *sys$mmap(Process *current, void *address, size_t length, [[maybe_unused]] int* errno) {
+static void *sys$mmap(Process *current, void *address, size_t length,
+					  [[maybe_unused]] int *errno) {
 	auto current_pd = current->root_page_level();
 	size_t addr = reinterpret_cast<size_t>(address);
 	if (!length)
 		return nullptr;
 
-	uintptr_t free_page = Paging::the()->allocator()->find_free_pages((length+4095)/PAGE_SIZE);
+	uintptr_t free_page = Paging::the()->allocator()->find_free_pages(
+		(length + 4095) / PAGE_SIZE);
 
-	for (size_t extent = 0; extent < (length+4095)/PAGE_SIZE; extent++) {
-		if (current_pd->get_page_flags(addr+(extent*PAGE_SIZE)) & (PAEPageFlags::Present))
+	for (size_t extent = 0; extent < (length + 4095) / PAGE_SIZE; extent++) {
+		if (current_pd->get_page_flags(addr + (extent * PAGE_SIZE)) &
+			(PAEPageFlags::Present))
 			return nullptr;
 
-		Paging::the()->map_page(*current_pd, addr+(extent*PAGE_SIZE), free_page+(extent*PAGE_SIZE),
+		Paging::the()->map_page(*current_pd, addr + (extent * PAGE_SIZE),
+								free_page + (extent * PAGE_SIZE),
 								PAEPageFlags::User | PAEPageFlags::Present |
 									PAEPageFlags::Write);
 	}
@@ -241,11 +257,11 @@ static void *sys$mmap(Process *current, void *address, size_t length, [[maybe_un
 	}
 #endif
 
-	return (void*)addr;
+	return (void *)addr;
 }
 
-static size_t sys$exec(Process *current, const char *buffer,
-					   const char **argv, [[maybe_unused]] int* errno) {
+static size_t sys$exec(Process *current, const char *buffer, const char **argv,
+					   [[maybe_unused]] int *errno) {
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)buffer, 255)) {
 		*errno = EFAULT;
 		return -1;
@@ -259,17 +275,24 @@ static size_t sys$exec(Process *current, const char *buffer,
 		argc--;
 	}
 
-	char** argv_copy = nullptr;
+	char **argv_copy = nullptr;
 	if (argc) {
-		argv_copy = new char*[argc];
+		argv_copy = new char *[argc];
 		for (size_t i = 0; i < argc; i++) {
-			size_t arg_sz = strlen(argv_copy[i]);
+			size_t arg_sz = strlen(argv[i])+1;
 			argv_copy[i] = new char[arg_sz];
-			memcpy(argv_copy[i], argv[i], sizeof(char)*arg_sz);
+			argv_copy[i][arg_sz-1] = '\0';
+			memcpy(argv_copy[i], argv[i], sizeof(char) * arg_sz);
 		}
 	}
+
+	for (size_t i = 0; i < argc; i++) {
+		printk("%s\n", argv_copy[i]);
+	}
+
 	// Lazily just kill the process, copy the pid, and file descriptors.
-	auto proc = Process::create_user(buffer, argc, const_cast<const char**>(argv_copy));
+	auto proc = Process::create_user(buffer, argc,
+									 const_cast<const char **>(argv_copy));
 	if (!proc)
 		return -1;
 
@@ -278,8 +301,8 @@ static size_t sys$exec(Process *current, const char *buffer,
 	auto parent = current->parent();
 	auto pid = current->pid;
 	current->dont_goto_me = true;
-	current->kill();
-	printk("killing original %x\n", current->pid);
+	//current->kill();
+	//printk("killing original %x\n", current->pid);
 	current->collapse_cow();
 
 	for (size_t i = 0; i < current->m_file_handles.size(); i++) {
@@ -297,25 +320,26 @@ static size_t sys$exec(Process *current, const char *buffer,
 	return 0;
 }
 
-extern "C" void sched_sled(uintptr_t rsp) { printk("sched_sled %x\n", rsp); Process::sched(rsp); }
+extern "C" void sched_sled(uintptr_t rsp) {
+	Process::sched(rsp);
+}
 
-static int sys$sleep(Process *current, size_t ms, [[maybe_unused]] int* errno) {
+static int sys$sleep(Process *current, size_t ms, [[maybe_unused]] int *errno) {
 	printk("block_help\n");
 	Process *proc = current;
 	proc->block_on_sleep(ms);
 	uintptr_t rip = get_rip();
-	asm volatile("sti");
-	if (proc->state() == ProState::Blocked) {
+	while (proc->state() == ProState::Blocked) {
 		uint64_t *sp;
 		asm volatile("mov %%rsp, %0" : "=a"(sp) :);
 		x64_syscall_block_help(sp, rip);
 	}
-	asm volatile("cli");
 
 	return 0;
 }
 
-static int sys$waitpid(Process *current, pid_t pid, int *wstatus, int options, [[maybe_unused]] int* errno) {
+static int sys$waitpid(Process *current, pid_t pid, int *wstatus, int options,
+					   [[maybe_unused]] int *errno) {
 	// FIXME: Implement the functionality for pid <= 0
 	assert(pid > 0);
 	(void)options;
@@ -333,25 +357,55 @@ static int sys$waitpid(Process *current, pid_t pid, int *wstatus, int options, [
 	asm volatile("cli");
 #endif
 	printk("waitpid begin\n");
-	Process** p = process_pid_map->get(pid);
+	Process **p = process_pid_map->get(pid);
 	if (!p) {
 		printk("Waitpid failed %d\n", pid);
 		return -1;
 	}
 
+	printk("Waitpid %d %x\n", (*p)->state(), *p);
 	current->block_on_proc(*p);
 	uintptr_t rip = get_rip();
-	if ((*p)->state() == ProState::Running) {
+	while ((*p)->state() != ProState::Dead) {
 		uint64_t *sp;
 		asm volatile("mov %%rsp, %0" : "=a"(sp) :);
 		x64_syscall_block_help(sp, rip);
 	}
+	printk("Waitpid %d %x\n", (*p)->state(), *p);
 	auto current_pgl = (PageLevel *)get_cr3();
 	Paging::switch_page_directory(current->root_page_level());
 	*wstatus = (*p)->exit_code;
 	Paging::switch_page_directory(current_pgl);
 	printk("Waitpid end %d\n", pid);
 	return pid;
+}
+
+static int sys$gettimeofday(Process *current, timeval *tv, void*, [[maybe_unused]] int *errno) {
+	if (!verify_buffer(current->root_page_level(), (uintptr_t)tv, PAGE_SIZE)) {
+		*errno = EFAULT;
+		return -1;
+	}
+	outb(0x70, 00);
+	uint8_t seconds_bcd = inb(0x71);
+	uint8_t seconds = (((seconds_bcd>>4)&0xf)*10)+(seconds_bcd&0xf);
+	outb(0x70, 2);
+	uint8_t minutes_bcd = inb(0x71);
+	uint8_t minutes = (((minutes_bcd>>4)&0xf)*10)+(minutes_bcd&0xf);
+	outb(0x70, 4);
+	uint8_t hour_bcd = inb(0x71);
+	uint8_t hour = (((hour_bcd>>4)&0xf)*10)+(hour_bcd&0xf);
+	outb(0x70, 7);
+	uint8_t day_bcd = inb(0x71);
+	uint8_t day = (((day_bcd>>4)&0xf)*10)+(day_bcd&0xf);
+	outb(0x70, 8);
+	uint8_t month_bcd = inb(0x71);
+	uint8_t month = (((month_bcd>>4)&0xf)*10)+(month_bcd&0xf);
+	outb(0x70, 9);
+	uint8_t years_bcd = inb(0x71);
+	int years = (((years_bcd>>4)&0xf)*10)+(years_bcd&0xf);
+	tv->tv_sec = ((29+years)*31556926)+((11+month)*2629743)+((day-1)*86400)+((hour+2)*3600)+((minutes+47)*60)+seconds;
+
+	return 0;
 }
 
 void handler(SyscallReg *regs) {
@@ -362,7 +416,8 @@ void handler(SyscallReg *regs) {
 	// :)
 	decltype(regs->rax) return_value = 0;
 	decltype(regs->rax) syscall_no = regs->rax;
-	// FIXME This breaks one of the rules POSIX sets for errno. However, I'm lazy.
+	// FIXME This breaks one of the rules POSIX sets for errno. However, I'm
+	// lazy.
 	int errno = 0;
 	Process *current = current_process;
 
@@ -379,7 +434,8 @@ void handler(SyscallReg *regs) {
 					 static_cast<int>(regs->rdx), &errno);
 	} break;
 	case SYS_WRITE: {
-		return_value = sys$write(current, regs->rbx, regs->rdx, regs->rdi, &errno);
+		return_value =
+			sys$write(current, regs->rbx, regs->rdx, regs->rdi, &errno);
 	} break;
 	case SYS_READ: {
 		return_value = sys$read(current, static_cast<int>(regs->rbx),
@@ -392,8 +448,8 @@ void handler(SyscallReg *regs) {
 								 static_cast<int>(regs->rdi), &errno);
 	} break;
 	case SYS_MMAP: {
-		return_value = reinterpret_cast<size_t>(
-			sys$mmap(current, reinterpret_cast<void *>(regs->rbx), regs->rdx, &errno));
+		return_value = reinterpret_cast<size_t>(sys$mmap(
+			current, reinterpret_cast<void *>(regs->rbx), regs->rdx, &errno));
 	} break;
 	case SYS_EXEC: {
 		return_value =
@@ -401,20 +457,26 @@ void handler(SyscallReg *regs) {
 					 reinterpret_cast<const char **>(regs->rdx), &errno);
 	} break;
 	case SYS_WAITPID: {
-		return_value = static_cast<size_t>(sys$waitpid(
-			current, static_cast<pid_t>(regs->rbx),
-			reinterpret_cast<int *>(regs->rdx), static_cast<int>(regs->rdi), &errno));
+		return_value = static_cast<size_t>(
+			sys$waitpid(current, static_cast<pid_t>(regs->rbx),
+						reinterpret_cast<int *>(regs->rdx),
+						static_cast<int>(regs->rdi), &errno));
 	} break;
 	case SYS_SLEEP: {
 		return_value = static_cast<size_t>(
 			sys$sleep(current, static_cast<size_t>(regs->rbx), &errno));
+	} break;
+	case SYS_GETTIMEOFDAY: {
+		return_value = static_cast<size_t>(
+			sys$gettimeofday(current, reinterpret_cast<timeval*>(regs->rbx), reinterpret_cast<void*>(regs->rdx), &errno));
 	} break;
 	default:
 		printk("Unknown syscall %d\n", syscall_no);
 		break;
 	}
 
-	// FIXME This breaks one of the rules POSIX sets for errno. However, I'm lazy.
+	// FIXME This breaks one of the rules POSIX sets for errno. However, I'm
+	// lazy.
 	regs->rbx = errno;
 	regs->rax = return_value;
 	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,

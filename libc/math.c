@@ -1,6 +1,6 @@
 #include <math.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define E_C 2.718281828459045
 #define PI 3.141592653589793
@@ -20,8 +20,8 @@ double sqrt(double x) {
 // double round_to_nearest(double value);
 
 double floor(double x) {
-	// return round_to_nearest(x);
-	return (double)(int64_t)x;
+	volatile int64_t y = x;
+	return y;
 }
 
 double fract(double x) { return x - floor(x); }
@@ -36,8 +36,8 @@ double round(double x) {
 double pow(double x, double y) {
 	double result = 1;
 
-	if (x == 2 && fabs(floor(y)) == y && x < ((1ull<<64ull)-1ull)) {
-		return 1ull<<(size_t)(floor(y));
+	if (x == 2 && fabs(floor(y)) == y && x < ((1ull << 64ull) - 1ull)) {
+		return 1ull << (size_t)(floor(y));
 	}
 
 	for (int i = 0; i < round(y); i++) {
@@ -76,15 +76,12 @@ double acos(double x) {
 	return sum;
 }
 
-int abs(int x) {
-	return x > 0 ? x : -x;
-}
+int abs(int x) { return x > 0 ? x : -x; }
 
 double fmod(double x, double y) { return __builtin_fmod(x, y); }
 
 double ceil(double x) {
-	double f = fract(x);
-	if (!f)
-		return x;
-	return floor(x) + 1;
+	int64_t y = x;
+	if (y == x) return x;
+	return y+1;
 }

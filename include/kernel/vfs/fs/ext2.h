@@ -106,7 +106,9 @@ class Ext2FileSystem : public VFSNode {
 	virtual VFSNode *traverse(Vec<const char *> &path, size_t path_index = 0);
 
   private:
-	void read_singly(INode &inode, size_t singly_position, void *out,
+	void read_indirect_singly(INode &inode, size_t singly_position, void *out,
+					 size_t block_idx, size_t size_to_read, size_t position);
+	void read_singly(uint32_t* singly_blocks, INode &inode, size_t singly_position, void *out,
 					 size_t block_idx, size_t size_to_read, size_t position);
 	VFSNode *traverse_internal(INode *cur_inode, Vec<const char *> &path,
 							   size_t path_index = 0);

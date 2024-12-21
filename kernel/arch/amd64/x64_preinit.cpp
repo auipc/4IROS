@@ -65,14 +65,14 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 		((uint64_t)&interrupt_##no##_begin >> 16) & 0xFFFF;                    \
 	idtgate[no].offset_hi = ((uint64_t)&interrupt_##no##_begin >> 32) & 0xFFFF;
 
-#define INT_IST1(no)                                                                \
+#define INT_IST1(no)                                                           \
 	assert((uint64_t)&interrupt_##no##_begin <= BIT48_MAX);                    \
 	idtgate[no].present = 1;                                                   \
 	/* remove me?*/                                                            \
 	/*idtgate[no].ist = 1;*/                                                   \
 	idtgate[no].segment = 0x8;                                                 \
 	idtgate[no].type = (no < 0x10) ? 0xe : 0xf;                                \
-	idtgate[no].ist = 1;							   \
+	idtgate[no].ist = 1;                                                       \
 	idtgate[no].offset_lo = (uint64_t)&interrupt_##no##_begin & 0xFFFF;        \
 	idtgate[no].offset_mid =                                                   \
 		((uint64_t)&interrupt_##no##_begin >> 16) & 0xFFFF;                    \
@@ -93,8 +93,7 @@ INTEXT(65);
 INTEXT(78);
 INTEXT(48);
 
-__attribute__((optnone))
-void interrupts_init() {
+__attribute__((optnone)) void interrupts_init() {
 	// get_idt(&idtptr);
 	idtptr.limit = 256 * 8;
 	idtptr.base = (uint64_t)idtgate;
@@ -226,8 +225,7 @@ uint64_t to_virt(uint64_t addr) {
 #define VIRT_MASK_ADDR(x, y) (x + (((virt >> y)) & 0x1ffull))
 //#define VIRT_MASK_ADDR(x,y) (x + (((virt>>y))&0x1ffull))
 
-__attribute__((optnone))
-uintptr_t get_page_map(uint64_t virt) {
+__attribute__((optnone)) uintptr_t get_page_map(uint64_t virt) {
 	RootPageLevel *pml4 = (RootPageLevel *)get_cr3();
 	auto p1 = pml4->entries[(virt >> 39) & 0x1ff].level();
 	auto p2 = p1->entries[(virt >> 30) & 0x1ff].level();
@@ -236,9 +234,8 @@ uintptr_t get_page_map(uint64_t virt) {
 	return p4;
 }
 
-__attribute__((optnone))
-void simp_map_page(uint64_t virt, uint64_t phys) {
-	printk("Map %x\n", virt);
+__attribute__((optnone)) void simp_map_page(uint64_t virt, uint64_t phys) {
+	info("Map %x\n", virt);
 	uint64_t *pml4 = (uint64_t *)get_cr3();
 	uint64_t *pdpte =
 		(uint64_t *)VIRT_MASK(pml4, 39); //(*(pml4 + ((virt>>39)&0x1ff))&~4095);
@@ -268,8 +265,7 @@ void simp_map_page(uint64_t virt, uint64_t phys) {
 }
 
 // https://wiki.osdev.org/RSDP#Detecting_the_RSDP
-__attribute__((optnone))
-RSDP *get_rsdp_ptr() {
+__attribute__((optnone)) RSDP *get_rsdp_ptr() {
 	RSDP *rsdp_ptr = nullptr;
 
 	// Skip over 0x0
@@ -292,8 +288,7 @@ RSDP *get_rsdp_ptr() {
 	return rsdp_ptr;
 }
 
-__attribute__((optnone))
-HPET *scan_acpi_hpet(RSDP *rsdp) {
+__attribute__((optnone)) HPET *scan_acpi_hpet(RSDP *rsdp) {
 	RSDT *rsdt = (RSDT *)(uint64_t)rsdp->rsdt_addr;
 	uint32_t *rsdt_entries = (uint32_t *)(((uint8_t *)rsdt) + sizeof(RSDT));
 	size_t n_entries = (rsdt->length - 40) / 4;
@@ -301,7 +296,7 @@ HPET *scan_acpi_hpet(RSDP *rsdp) {
 		DESCRIPTION_HEADER *header =
 			(DESCRIPTION_HEADER *)(uint64_t)rsdt_entries[i];
 		if (!strncmp(header->signature, "HPET", 4)) {
-			printk("found HPET\n");
+			info("found HPET\n");
 			HPET *hpet = (HPET *)header;
 			return hpet;
 		}
@@ -309,8 +304,7 @@ HPET *scan_acpi_hpet(RSDP *rsdp) {
 	return nullptr;
 }
 
-__attribute__((optnone))
-uint64_t scan_acpi_apic(RSDP *rsdp) {
+__attribute__((optnone)) uint64_t scan_acpi_apic(RSDP *rsdp) {
 	RSDT *rsdt = (RSDT *)(uint64_t)rsdp->rsdt_addr;
 	uint32_t *rsdt_entries = (uint32_t *)(((uint8_t *)rsdt) + sizeof(RSDT));
 	size_t n_entries = (rsdt->length - 40) / 4;
@@ -336,7 +330,7 @@ uint64_t scan_acpi_apic(RSDP *rsdp) {
 				} break;
 				case 1: {
 					// IOAPIC* ioapic = (IOAPIC*)madt_entries+2;
-					printk("%x\n", length);
+					info("%x\n", length);
 					/*simp_map_page((uint64_t)ioapic->apic_address,
 					(uint64_t)ioapic->apic_address);
 
@@ -355,7 +349,7 @@ uint64_t scan_acpi_apic(RSDP *rsdp) {
 			}
 			return (uint64_t)madt->local_intc_addr;
 		}
-		printk("%s\n", header->signature);
+		info("%s\n", header->signature);
 	}
 
 	return 0;
@@ -370,8 +364,8 @@ static constexpr uint8_t IOREDIR_BASE = 0x10;
 
 static uint8_t *local_apic = 0;
 
-__attribute__((optnone))
-void ioapic_set_ioredir_val(uint8_t index, const uint64_t value) {
+__attribute__((optnone)) void ioapic_set_ioredir_val(uint8_t index,
+													 const uint64_t value) {
 	index *= 2;
 	*(uint32_t *)(IOAPIC_ADDR) = index + IOREDIR_BASE;
 	*(uint32_t *)(IOAPIC_ADDR + IOAPIC_REGISTER_WINDOW) =
@@ -380,8 +374,7 @@ void ioapic_set_ioredir_val(uint8_t index, const uint64_t value) {
 	*(uint32_t *)(IOAPIC_ADDR + IOAPIC_REGISTER_WINDOW) = value >> 32ull;
 }
 
-__attribute__((optnone))
-extern "C" void write_eoi() {
+__attribute__((optnone)) extern "C" void write_eoi() {
 	uint32_t *eoi_register = (uint32_t *)(local_apic + 0xB0);
 	*eoi_register = 0;
 }
@@ -403,10 +396,11 @@ extern "C" void gpf_interrupt(ExceptReg &eregs) {
 		printk("GPF caused by segment %x in table %s", eregs.error >> 3,
 			   table_str);
 	}
-	printk("rax %x rbx %x rcx %x rdx %x cs %x\n", eregs.rax, eregs.rbx, eregs.rcx, eregs.rdx, eregs.cs);
+	printk("rax %x rbx %x rcx %x rdx %x cs %x\n", eregs.rax, eregs.rbx,
+		   eregs.rcx, eregs.rdx, eregs.cs);
 	printk("Fault at 0x%x\n", eregs.rip);
 	printk("current_process pid %d\n", current_process->pid);
-	Debug::stack_trace((uint64_t *)&eregs);
+	Debug::stack_trace();
 	panic("General Protection Fault\n");
 }
 
@@ -437,9 +431,11 @@ extern "C" void pf_interrupt(ExceptReg &eregs) {
 		panic("Page Fault");
 	}
 
-	printk("rax %x rbx %x rcx %x rdx %x cs %x\n", eregs.rax, eregs.rbx, eregs.rcx, eregs.rdx, eregs.cs);
+	printk("rax %x rbx %x rcx %x rdx %x cs %x\n", eregs.rax, eregs.rbx,
+		   eregs.rcx, eregs.rdx, eregs.cs);
 	printk("current_process pid %d\n", current_process->pid);
-	int fault_succ = Process::resolve_cow(fault_addr&~(PAGE_SIZE-1));
+	printk("%x\n",fault_addr & ~(PAGE_SIZE - 1));
+	int fault_succ = Process::resolve_cow(current_process, fault_addr & ~(PAGE_SIZE - 1));
 	if (!fault_succ) {
 		panic("AHHHH");
 		current_process->kill();
@@ -464,7 +460,8 @@ void sleep(const uint64_t ms_time) {
 // (https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf#page=11)
 static uint64_t fp_per_tick = 0;
 uint64_t tick_counter = 0;
-#define HPET0_TICK_COUNT 0xB00B15
+//#define HPET0_TICK_COUNT 0xB00B15
+#define HPET0_TICK_COUNT 0xA00B15
 
 uint64_t global_waiter_time = 0;
 
@@ -542,11 +539,13 @@ struct {
 KSyscallData ksyscall_data = {};
 __attribute__((aligned(16))) uint8_t fxsave_region[512];
 
+void *nested_interrupt_stack = 0;
+
 extern "C" void syscall_entry();
 
 extern "C" [[noreturn]] void kernel_main();
-[[noreturn]] __attribute__((optnone)) extern "C" void kx86_64_preinit(const KernelBootInfo &kbootinfo,
-											 multiboot_info *boot_head) {
+[[noreturn]] __attribute__((optnone)) extern "C" void
+kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	uintptr_t tss_ptr =
 		get_page_map((uintptr_t)&tss) + (((uintptr_t)&tss) & 4095);
 	assert(tss_ptr <= ((1ull << 32ull) - 1ull));
@@ -615,7 +614,7 @@ extern "C" [[noreturn]] void kernel_main();
 	// Timer
 	*(uint32_t *)(local_apic + 0x320) |= 1 << 12 | 1 << 16 | 70;
 
-	printk("? %x\n", *(uint32_t *)(ioapic + 0x10));
+	info("? %x\n", *(uint32_t *)(ioapic + 0x10));
 
 	for (int i = 0; i < 24; i++) {
 		if (i == 2) {
@@ -624,8 +623,10 @@ extern "C" [[noreturn]] void kernel_main();
 		}
 
 		if (i == 21) {
-			// The HPET has a lower priority (bits 7:4) than the keyboard interrupt, which is intentional.
-			// Since most interrupts don't have a high chance to block for who knows long, it's probably best to keep the HPET at the lowest priority.
+			// The HPET has a lower priority (bits 7:4) than the keyboard
+			// interrupt, which is intentional. Since most interrupts don't have
+			// a high chance to block for who knows long, it's probably best to
+			// keep the HPET at the lowest priority.
 			ioapic_set_ioredir_val(i, 48);
 			continue;
 		}
@@ -633,11 +634,7 @@ extern "C" [[noreturn]] void kernel_main();
 		ioapic_set_ioredir_val(i, 0x40 + i);
 	}
 
-	// Keyboard enable
-	/*ioapic_set_ioredir_val(1, 65);
-	ioapic_set_ioredir_val(21, 85);*/
-
-	printk("%d\n", (*(uint64_t *)(hpet->address.address) >> 32));
+	info("%d\n", (*(uint64_t *)(hpet->address.address) >> 32));
 
 	// Enable all HPETs
 	*(uint64_t *)(hpet->address.address + 0x10) |= 1;
@@ -650,24 +647,23 @@ extern "C" [[noreturn]] void kernel_main();
 	// Comparator
 	*(uint64_t *)(hpet->address.address + 0x108) = HPET0_TICK_COUNT;
 
-	// sleep(5000);
-	printk("Sleep 5s\n");
-	printk("kbootinfo %x %x\n", kbootinfo.kmap_start, kbootinfo.kmap_end);
+	info("kbootinfo %x %x\n", kbootinfo.kmap_start, kbootinfo.kmap_end);
 
-	printk("Available memory %x\n", (1 * MB) + (boot_head->mem_upper * KB));
+	info("Available memory %x\n", (1 * MB) + (boot_head->mem_upper * KB));
 
 	Paging::setup((1 * MB) + (boot_head->mem_upper * KB), kbootinfo);
 
-	void* nested_interrupt_stack = kmalloc(PAGE_SIZE);
-	tss.ist[0] = (uint32_t)(uint64_t)nested_interrupt_stack;
-	tss.ist[1] = (uint32_t)((uint64_t)nested_interrupt_stack>>32);
-	printk("tss.ist[0] %x\n", nested_interrupt_stack);
 	auto current_pd = (RootPageLevel *)get_cr3();
 	size_t base = kbootinfo.kmap_end + 50 * MB;
 	for (int i = 0; i <= 20 * MB; i += PAGE_SIZE) {
 		Paging::the()->map_page(*current_pd, base + i, base + i);
 	}
 	actual_malloc_init((void *)base, 20 * MB);
+
+	nested_interrupt_stack = (void*)(((uint64_t)kmalloc_really_aligned(PAGE_SIZE,16))+PAGE_SIZE);
+	tss.ist[0] = (uint32_t)(uint64_t)nested_interrupt_stack;
+	tss.ist[1] = (uint32_t)((uint64_t)nested_interrupt_stack >> 32);
+	info("tss.ist[0] %x\n", nested_interrupt_stack);
 
 	// stuff 4 syscall
 	// IA32_LSTAR
@@ -682,7 +678,7 @@ extern "C" [[noreturn]] void kernel_main();
 	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
 			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
 
-	ksyscall_data.fxsave_region = (uint8_t**)&fxsave_region;
+	ksyscall_data.fxsave_region = (uint8_t **)&fxsave_region;
 	// mp stuff
 	// write_icr((3<<18)|(1<<15)|(5<<8));
 

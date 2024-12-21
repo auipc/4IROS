@@ -33,7 +33,8 @@ size_t Bitmap::count_unset() const {
 // FIXME cache last location
 size_t Bitmap::scan(const size_t span) {
 	size_t streak = 0;
-	for (size_t i = m_last_position/s_bits_per_container; i < m_containers; i++) {
+	for (size_t i = m_last_position / s_bits_per_container; i < m_containers;
+		 i++) {
 #ifdef OS_SSE4
 		if (count_unset_container(i) < span)
 			continue;
@@ -51,7 +52,7 @@ size_t Bitmap::scan(const size_t span) {
 				}
 				m_last_position = i * s_bits_per_container;
 				if (j > 0)
-					m_last_position += j-1;
+					m_last_position += j - 1;
 				return base;
 			}
 		}
@@ -61,7 +62,8 @@ size_t Bitmap::scan(const size_t span) {
 
 size_t Bitmap::scan_no_set(const size_t span) const {
 	size_t streak = 0;
-	for (size_t i = m_last_position/s_bits_per_container; i < m_containers; i++) {
+	for (size_t i = m_last_position / s_bits_per_container; i < m_containers;
+		 i++) {
 #ifdef OS_SSE4
 		if (count_unset_container(i) < span)
 			continue;

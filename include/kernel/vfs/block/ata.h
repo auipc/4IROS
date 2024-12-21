@@ -19,8 +19,8 @@ class ATABlockNode : public VFSNode {
 	ATABlockNode(const char *name, DriveConfig config);
 	virtual int open(Vec<const char *> path) override;
 	virtual int read(void *buffer, size_t size) override;
-
   private:
-	int read_512(uint16_t *buffer);
+	int read_512(uint8_t *buffer, size_t under);
+	int read_512_temp(uint8_t *buffer, size_t under);
 	DriveConfig m_config;
 };

@@ -90,9 +90,7 @@ void screen_init() {
 	memset((char *)screen_buf, 0, SCREEN_SIZE);
 }
 
-void printk(const char *str, ...) {
-	__builtin_va_list list;
-	__builtin_va_start(list, str);
+void vprintk(const char *str, __builtin_va_list list) {
 	// size_t next_str_length = 0;
 	print_spinlock.acquire();
 	while (*str != '\0') {
@@ -136,6 +134,24 @@ void printk(const char *str, ...) {
 	}
 	__builtin_va_end(list);
 	print_spinlock.release();
+}
+
+void printk(const char *str, ...) {
+	__builtin_va_list list;
+	__builtin_va_start(list, str);
+	vprintk(str, list);
+	__builtin_va_end(list);
+}
+
+void info(const char *str, ...) {
+#ifdef DEBUG_VERBOSE
+	__builtin_va_list list;
+	__builtin_va_start(list, str);
+	vprintk(str, list);
+	__builtin_va_end(list);
+#else
+	(void)str;
+#endif
 }
 
 [[noreturn]] void panic(const char *str) {

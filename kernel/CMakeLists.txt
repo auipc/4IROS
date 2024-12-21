@@ -36,6 +36,7 @@ set(SRCS
 	util/Spinlock.cpp
 	icxxabi.cpp
 	Debug.cpp
+	prof.cpp
 )
 
 add_executable(4IROS ${SRCS})

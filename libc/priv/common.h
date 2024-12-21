@@ -12,5 +12,6 @@ enum {
 	SYS_WAITPID = 9,
 	SYS_LSEEK = 10,
 	SYS_SLEEP = 11,
+	SYS_GETTIMEOFDAY = 12,
 };
 #endif

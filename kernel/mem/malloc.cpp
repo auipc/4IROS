@@ -58,7 +58,7 @@ void kmalloc_init() {
 static void *allocate_block_temp(uintptr_t blocks_needed) {
 	assert(blocks_needed > 0);
 	s_mem_offset += blocks_needed * k_allocation_block_size;
-	printk("mem left: %x\n", s_mem_end - s_mem_offset);
+	info("mem left: %x\n", s_mem_end - s_mem_offset);
 	assert(s_mem_offset < s_mem_end);
 	return reinterpret_cast<void *>(s_mem_offset);
 }
@@ -135,14 +135,18 @@ void kfree(void *ptr) {
 #endif
 }
 
-void *operator new(size_t size) { 
+void *operator new(size_t size) {
 	// FIXME kmalloc_really_aligned is broken while kmalloc_aligned isn't :(
 	if (s_use_actual_allocator)
-		return kmalloc_really_aligned(size, 16); 
+		return kmalloc_really_aligned(size, 16);
 	return kmalloc(size);
 }
-void *operator new(size_t size, size_t align) { return kmalloc_really_aligned(size, align); }
-void *operator new(size_t size, unsigned int align) { return kmalloc_really_aligned(size, align); }
+void *operator new(size_t size, size_t align) {
+	return kmalloc_really_aligned(size, align);
+}
+void *operator new(size_t size, unsigned int align) {
+	return kmalloc_really_aligned(size, align);
+}
 
 void *operator new[](size_t size) { return kmalloc(size); }
 

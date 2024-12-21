@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <errno.h>
 
 static const char scancode_ascii[] = {
 	0,	 0,	  '1',	'2',  '3',	'4', '5', '6', '7', '8', '9', '0',
@@ -28,8 +29,11 @@ static const char scancode_ascii_caps[] = {
 
 int main() {
 	int pid = 0;
+	char* buf = (char*)mmap((void*)0x990000, 4096); //[2]
 	if (!(pid = fork())) {
-		execvp("term", NULL);
+		execvp("farbview", NULL);
+		//char* argv[] = {"frotz", "TRINITY.DAT", 0};
+		//execvp("frotz", argv);
 		while (1);
 	}
 
@@ -40,9 +44,17 @@ int main() {
 		return 1;
 	uint8_t use_upper = 0;
 
+	*buf = 0x39;
+	printf("%d\n", buf[0]);
+#if 0
 	while (1) {
-		char buf[2];
+		//char* buf = (char*)mmap(0x900000, 4096); //[2]
 		size_t size_read = read(fd, buf, 2);
+		printf("size_read %d\n", size_read);
+		if (((int)size_read) == -1) {
+			printf("errno %d\n", errno);
+			break;
+		}
 		for (int i = 0; i < size_read; i += 2) {
 			if (buf[i + 1] == 42)
 				use_upper = !buf[i];
@@ -53,56 +65,15 @@ int main() {
 
 				if (!use_upper) {
 					printf("%c", scancode_ascii[buf[i + 1]]);
-					write(0, &scancode_ascii[buf[i + 1]], 1);
+					fwrite(&scancode_ascii[buf[i + 1]], 1, 1, stdin);
 				} else {
 					printf("%c", scancode_ascii_upper[buf[i + 1]]);
-					write(0, &scancode_ascii_upper[buf[i + 1]], 1);
+					fwrite(&scancode_ascii_upper[buf[i + 1]], 1, 1, stdin);
 				}
 			}
 		}
 	}
+#endif
 	while (1)
 		;
-
-	/*
-	printf("pid: %d\n", pid);
-	waitpid(pid);
-
-	printf("scancode_ascii sizeof %d\n", sizeof(scancode_ascii));
-	printf("Hello, World\n");
-	char *addr = (char *)mmap((void *)0x60000, 0x4000);
-	addr[0] = 1;
-	printf("%x\n", *addr);
-	char *addr1 = (char *)mmap((void *)0x50000, 0x2000);
-	addr1[0] = 1;
-	printf("%x\n", *addr1);
-
-	int fd = open("/dev/keyboard", 0);
-	printf("fd %d\n", fd);
-	uint8_t use_upper = 0;
-	uint8_t caps_lock = 0;
-
-	while (1) {
-		char buf[2 * 20];
-		size_t size_read = read(fd, buf, 2 * 20);
-		for (int i = 0; i < size_read; i += 2) {
-			if (buf[i + 1] == 42)
-				use_upper = buf[i] ^ !caps_lock;
-
-			if (buf[i + 1] == 58 && !buf[i]) {
-				caps_lock = !caps_lock;
-				use_upper = caps_lock;
-			}
-
-			if (!buf[i] && sizeof(scancode_ascii) > buf[i + 1]) {
-				if (!scancode_ascii[buf[i + 1]])
-					continue;
-
-				if (!use_upper)
-					printf("%c", scancode_ascii[buf[i + 1]]);
-				else
-					printf("%c", scancode_ascii_upper[buf[i + 1]]);
-			}
-		}
-	}*/
 }

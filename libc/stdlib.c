@@ -1,42 +1,37 @@
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <math.h>
+#include <limits.h>
 
-#if 0
-typedef struct _BTreeNode {
-	struct BTreeNode* left;
-	struct BTreeNode* right;
-} BTreeNode;
-
-typedef struct _BTree {
-	BTreeNode root;
-} BTree;
-
-static uintptr_t addr_base = 0;
-static uintptr_t addr = 0;
-static size_t addr_sz = 0x10000;
-
-void *malloc(size_t size) {
-	if (!addr) {
-		addr_base = addr = (uintptr_t)mmap((void *)0x590000, 0x10000);
-		printf("MMAP\n");
-	}
-
-	while ((addr+size) > (addr_base+addr_sz)) {
-		printf("Allocating more mem\n");
-		(void)mmap((void*)(addr_base+addr_sz), 0x10000);
-		addr_sz += 0x10000;
-	}
-
-	void *p = (void *)addr;
-	addr += size;
-	return p;
+static const uint64_t SALT = 0x3555555555333333;
+static uint64_t _seed = 9438029384980948;
+void srand(unsigned int seed) {
+	_seed = seed;
 }
-
-void free(void* addr) {
-	(void)addr;
+int rand() {
+	asm volatile("rorq $1, %0":"=m"(_seed):"m"(_seed));
+	_seed ^= SALT;
+	return _seed%INT_MAX;
 }
-#endif
+// I suck
+void qsort(void *base, size_t nel, size_t width, int (*compar)(const void *, const void *)) {
+	if (nel <= 1) return;
+	uint8_t* a = (uint8_t*)base;
+
+        for (size_t i = 0; i < nel; i++) {
+                for (size_t j = i; j < nel; j++) {
+                        if (compar(&a[(j*width)], &a[(i*width)]) == -1)
+			{
+				uint8_t* m = (uint8_t*)malloc(width);
+				memcpy(m, &a[i*width], width);
+				memcpy(&a[i*width], &a[j*width], width);
+				memcpy(&a[j*width], m, width);
+				free(m);
+			}
+                }
+        }
+}

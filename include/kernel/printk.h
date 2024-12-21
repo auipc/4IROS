@@ -4,5 +4,7 @@
 
 void screen_init();
 void write_scb(char c, uint8_t color);
+void vprintk(const char *str, __builtin_va_list list);
 void printk(const char *str, ...);
+void info(const char *str, ...);
 [[noreturn]] void panic(const char *str);

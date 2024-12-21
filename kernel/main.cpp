@@ -10,11 +10,11 @@
 #include <kernel/mem/malloc.h>
 #include <kernel/printk.h>
 #include <kernel/shedule/proc.h>
+#include <kernel/util/HashTable.h>
 #include <kernel/util/NBitmap.h>
 #include <kernel/util/Spinlock.h>
 #include <kernel/util/Vec.h>
 #include <kernel/vfs/vfs.h>
-#include <kernel/util/HashTable.h>
 //#define STB_TRUETYPE_IMPLEMENTATION
 //#include <stb_truetype.h>
 
@@ -205,23 +205,22 @@ extern "C" [[noreturn]] void kernel_main() {
 	VFS::the().get_dev_fs()->push(kbd);
 	kbd->init();
 
-	VFS::the().get_dev_fs()->push(new BochsFramebuffer());
-	// printk("ps2\n");
+	auto bochs = new BochsFramebuffer();
+	VFS::the().get_dev_fs()->push(bochs);
+	bochs->init();
 
-#if 0
 	// Read generated symtab file
-	auto pth = VFS::the().parse_path("symtab");
+	auto pth = VFS::the().parse_path("asymtab");
 	auto symtab_file = VFS::the().open(pth);
 	if (!symtab_file) {
+		printk("Warning!!! Symtab file missing\n");
+	} else {
 		auto symtab_sz = symtab_file->size();
 		char* sym_buf = new char[symtab_sz];
 		symtab_file->read(sym_buf, symtab_sz);
 		Debug::parse_symtab(sym_buf, symtab_sz);
 		delete[] sym_buf;
-	} else {
-		printk("Warning!!! Symtab file missing\n");
 	}
-#endif
 
 	Process::init();
 	panic("Task switch failed somehow???\n");

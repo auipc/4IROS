@@ -13,7 +13,7 @@ extern "C" {
 #define SEEK_END 2
 
 int fork();
-int open(const char *path, int flags);
+int open(const char *path, int flags, ...);
 int read(int fd, void *buf, size_t count);
 int write(int fd, void *buffer, size_t len);
 off_t lseek(int fd, off_t offset, int whence);
@@ -22,6 +22,7 @@ int execvp(const char *path, const char **argv);
 int waitpid(pid_t pid, int *wstatus, int options);
 void *mmap(void *address, size_t length);
 int msleep(uint64_t ms);
+int usleep(uint64_t us);
 
 #ifdef __cplusplus
 };

@@ -11,6 +11,10 @@ typedef struct {
 	builtin_ptr_t func;
 } builtin_t;
 
+void builtin_exit(int argc, char **argv) {
+	exit(0);
+}
+
 void builtin_echo(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
 		if (i > 1)
@@ -20,35 +24,28 @@ void builtin_echo(int argc, char **argv) {
 	printf("\n");
 }
 
-static const builtin_t s_builtins[] = {{"echo", &builtin_echo}};
+static const builtin_t s_builtins[] = {{"echo", &builtin_echo}, {"exit", &builtin_exit}};
 
-void handle_cmd(const char *buf, size_t buf_sz) {
+void handle_cmd(char *buf, size_t buf_sz) {
 	pid_t pid = 0;
 	int status = 0;
 	if (buf_sz <= 1)
 		return;
-	// parse args
-	int argc = 0;
-	char **argv = NULL;
+	char **argv = malloc(sizeof(char*)*1);
 
-	size_t last_bound = 0;
-	char *s = NULL;
-	for (size_t i = 0; i < buf_sz; i++) {
-		if (buf[i] == ' ' || buf[i] == '\0') {
-			s = (char *)malloc(sizeof(char) * ((i - last_bound) + 1));
-			memset(s, 0, sizeof(char) * ((i - last_bound) + 1));
-
-			memcpy(s, buf + last_bound, i - last_bound);
-
-			char **tmp = (char **)malloc(sizeof(char **) * ++argc);
-			memcpy(tmp, argv, sizeof(char **) * (argc - 1));
-			argv = tmp;
-			argv[argc - 1] = s;
-
-			last_bound = i + 1;
+	size_t argc = 0, i = 0, last_bound = 0;
+	for (; i < buf_sz; i++) {
+		if (buf[i] == ' ') {
+			buf[i] = '\0';
+			argv[argc++] = &buf[last_bound];
+			argv = realloc(argv, sizeof(char*)*(argc+1));
+			last_bound = i+1;
 		}
 	}
-
+	buf[i] = '\0';
+	argv[argc++] = &buf[last_bound];
+	last_bound = i+1;
+	argv[argc] = 0;
 	for (int i = 0; i < sizeof(s_builtins) / sizeof(s_builtins[0]); i++) {
 		if (!strcmp(s_builtins[i].name, argv[0])) {
 			s_builtins[i].func(argc, argv);
@@ -59,14 +56,13 @@ void handle_cmd(const char *buf, size_t buf_sz) {
 	if (!(pid = fork())) {
 		exit(execvp(argv[0], argv));
 	}
-	printf("CMD FORK  PID%x\n", pid);
 
 	waitpid(pid, &status, 0);
 	if (status) {
 		printf("Not found\n");
 	}
 
-	// FIXME: free args
+	free(argv);
 }
 
 void parse_autorun() {
@@ -75,41 +71,39 @@ void parse_autorun() {
 	lseek(autorun_fd, 0, SEEK_SET);
 	char *autorun_buf = (char *)malloc(sz);
 	read(autorun_fd, autorun_buf, sz);
+	fwrite(autorun_buf, sz, 1, stdout);
+#if 0
 	for (int i = 0; i < sz; i++) {
 		if (autorun_buf[i] == '\n') {
 			handle_cmd(autorun_buf, i - 1);
 		}
 	}
+#endif
 }
 
 int main() {
-#if 0
-	if (fork()) {
-		while(1) {
-		}
-	}
-#endif
-	printf("Shell\n");
-	//parse_autorun();
-	char *buf = (char *)malloc(4096);
+	char *buf = (char *)malloc(0x1000);
 	size_t buf_sz = 0;
-	printf(">");
+	printf("~>");
 	while (1) {
-		buf_sz += read(0, buf + buf_sz, 1);
-		for (int i = 0; i < buf_sz; i++) {
-			if (buf[i] == '\b') {
-				if (buf_sz > 1) {
-					buf[buf_sz] = '\0';
-					buf[buf_sz - 1] = '\0';
-					buf_sz -= 2;
-				}
+		if ((buf_sz+1) >= 0x1000) continue;
+		int sz = read(0, buf + buf_sz, 1);
+		if (!sz) continue;
+		buf_sz++;
+		if (buf[buf_sz-1] == '\b') {
+			if (buf_sz > 1) {
+				buf[buf_sz] = '\0';
+				buf[buf_sz - 1] = '\0';
+				buf_sz -= 2;
 			}
-			if (buf[i] == '\n') {
-				buf[i] = '\0';
-				handle_cmd(buf, buf_sz);
-				buf_sz = 0;
-				printf(">");
-			}
+			continue;
+		}
+		if (buf[buf_sz-1] == '\n') {
+			buf[buf_sz-1] = '\0';
+			handle_cmd(buf, buf_sz);
+			buf_sz = 0;
+			printf("~>");
+			continue;
 		}
 	}
 }

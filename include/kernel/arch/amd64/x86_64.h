@@ -1,11 +1,11 @@
 #pragma once
-#include <stdint.h>
 #include <kernel/arch/amd64/kernel.h>
+#include <stdint.h>
 
 struct KSyscallData {
 	uintptr_t stack;
 	uintptr_t user_stack;
-	uint8_t** fxsave_region;
+	uint8_t **fxsave_region;
 } PACKED;
 
 enum EFlags {

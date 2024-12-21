@@ -10,9 +10,7 @@ template <typename T> class Vec {
 	Vec() {}
 
 	~Vec() {
-		if (container)
-			kfree(container);
-
+		clear();
 		container = nullptr;
 		m_size = 0;
 	}
@@ -41,13 +39,9 @@ template <typename T> class Vec {
 
 	T *data() { return container; }
 
-	T *begin() {
-		return &container[0];
-	}
+	T *begin() { return &container[0]; }
 
-	T *end() {
-		return &container[m_size-1];
-	}
+	T *end() { return &container[m_size - 1]; }
 
 	inline size_t size() { return m_size; }
 
@@ -58,7 +52,7 @@ template <typename T> class Vec {
 			T *tmp = new T[m_size];
 			memcpy(tmp, container, sizeof(T) * m_size);
 			if (container)
-				kfree(container);
+				delete container;
 			container = tmp;
 		} else {
 			container = new T[m_size];
@@ -76,15 +70,17 @@ template <typename T> class Vec {
 			tmp = new T[m_size - 1];
 
 			uint32_t new_pos = 0;
-			for (uint32_t i = 0; i < m_size; i++) {
+			for (size_t i = 0; i < m_size; i++) {
 				if (i != pos) {
 					memcpy(&tmp[new_pos++], &container[i], sizeof(T));
+					continue;
 				}
+				container[i].~T();
 			}
 		}
 
 		if (container)
-			kfree(container);
+			delete container;
 
 		if (m_size - 1 != 0)
 			container = tmp;
@@ -103,6 +99,9 @@ template <typename T> class Vec {
 
 	void clear() {
 		m_size = 0;
+		for (size_t i = 0; i < m_size; i++) {
+			container[i].~T();
+		}
 		delete container;
 	}
 

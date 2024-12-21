@@ -148,15 +148,10 @@ x64_syscall_block_help:
 	// rip
 	pushq %rsi
 
-	swapgs
-	mov %gs:16, %rax
-	mov (%rax), %rax
-	fxrstor (%rax)
-	swapgs
-
 	// General registers
 	// RBP?
 	pushq %rbp
+	movq %rsp, %rbp
 	pushq %r8
 	pushq %r9
 	pushq %r10
@@ -171,12 +166,51 @@ x64_syscall_block_help:
 	pushq %rcx
 	pushq %rbx
 	pushq %rax
+	swapgs
+	mov %gs:16, %rax
+	mov (%rax), %rax
+	fxsave (%rax)
+	swapgs
 	movq %rsp, %rdi
 	// Returns the stack
 	call sched_sled
-	ret
+
+	// If we get here, then we early returned in sched.
+	swapgs
+	mov %gs:16, %rax
+	mov (%rax), %rax
+	fxrstor (%rax)
+	swapgs
+	popq %rax
+	popq %rbx
+	popq %rcx
+	popq %rdx
+	popq %rsi
+	popq %rdi
+	popq %r15
+	popq %r14
+	popq %r13
+	popq %r12
+	popq %r11
+	popq %r10
+	popq %r9
+	popq %r8
+	popq %rbp
+	iretq
 
 .global get_rip
 get_rip:
 	mov (%rsp), %rax
+	ret
+
+.global block_help
+block_help:
+	push %rdi
+	push %rsi
+	mov %rsp, %rdi
+	lea 0x5(%rip), %rsi
+	call x64_syscall_block_help
+1:
+	pop %rdi
+	pop %rsi
 	ret

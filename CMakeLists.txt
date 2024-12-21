@@ -6,7 +6,7 @@ option(UBSAN "Enables Clang's UBSAN" OFF)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-builtin -O0 -ggdb -gdwarf-2 -Wall -nostdlib -mno-red-zone -mregparm=3")
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -ggdb")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffreestanding -fno-builtin -O3 -Wunused-result -ggdb -gdwarf-2 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -mno-red-zone -mregparm=3 -Wno-unused-function -mstackrealign")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffreestanding -fno-builtin -O0 -Wunused-result -ggdb -gdwarf-2 -Werror -Wall -Wextra -fno-exceptions -fno-rtti -nostdlib -mno-red-zone -mregparm=3 -Wno-unused-function -mstackrealign")
 
 if (SSE4)
 	add_definitions(-DOS_SSE4)

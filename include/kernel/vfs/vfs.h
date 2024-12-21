@@ -80,18 +80,19 @@ enum SeekMode { SEEK_SET = 0, SEEK_CUR = 1, SEEK_END = 2 };
 class FileHandle {
   public:
 	FileHandle(VFSNode *node);
-	FileHandle(FileHandle& handle) 
-		: m_position(handle.m_position)
-		, m_node(handle.m_node)
-	{
-	}
+	FileHandle(FileHandle &handle)
+		: m_position(handle.m_position), m_node(handle.m_node) {}
 	int read(void *buffer, size_t size);
 	int write(void *buffer, size_t size);
 	int seek(int64_t offset, SeekMode origin);
 	size_t tell();
 	bool check_blocked() { return m_node->check_blocked(); }
 	void block_if_required(size_t size) {
-		return m_node->block_if_required(size);
+		m_node->block_if_required(size);
+	}
+
+	VFSNode* node() {
+		return m_node;
 	}
 
   private:

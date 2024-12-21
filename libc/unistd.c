@@ -1,17 +1,20 @@
+#include <errno.h>
 #include <priv/common.h>
 #include <priv/util.h>
 #include <unistd.h>
-#include <errno.h>
 
 // Syscalls use the System V x64 calling convention (minus rcx) and rax
 // specifies the syscall
 int fork() {
 	int r = 0;
-	asm volatile("syscall" : "=a"(r), "=b"(_errno) : "a"(SYS_FORK) : "rcx", "r11", "memory");
+	asm volatile("syscall"
+				 : "=a"(r), "=b"(_errno)
+				 : "a"(SYS_FORK)
+				 : "rcx", "r11", "memory");
 	return r;
 }
 
-int open(const char *path, int flags) {
+int open(const char *path, int flags, ...) {
 	int r = 0;
 	asm volatile("syscall"
 				 : "=a"(r), "=b"(_errno)
@@ -49,7 +52,9 @@ off_t lseek(int fd, off_t offset, int whence) {
 
 _Noreturn void exit(int status) {
 	for (;;)
-		asm volatile("syscall" :"=b"(_errno):"a"(SYS_EXIT), "b"((uint64_t)status)
+		asm volatile("syscall"
+					 : "=b"(_errno)
+					 : "a"(SYS_EXIT), "b"((uint64_t)status)
 					 : "rcx", "r11", "memory");
 	// asm volatile("movq %1, %%rdi\n"
 	//"syscall" :: "a"(SYS_EXIT), "b"((uint64_t)status):"rcx", "r11", "rdi");
@@ -100,4 +105,8 @@ int msleep(uint64_t ms) {
 				 : "a"(SYS_SLEEP), "b"(ms)
 				 : "rcx", "r11", "memory");
 	return r;
+}
+
+int usleep(uint64_t us) {
+	return msleep(us/1000);
 }

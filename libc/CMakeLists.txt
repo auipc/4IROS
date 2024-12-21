@@ -9,6 +9,10 @@ set(LIBC_SRCS
 	asm/mathhelp.S
 	temporary_malloc.cpp
 	gprof.c
+	sys/time.c
+	time.c
+	alloca.c
+	ctype.c
 )
 
 set(LIBK_SRCS
