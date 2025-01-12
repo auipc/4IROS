@@ -9,6 +9,48 @@
 #include <kernel/util/Vec.h>
 #include <stdint.h>
 
+template <typename T>
+class DumbSmart {
+public:
+	DumbSmart(T* ptr) 
+		: m_ptr(ptr)
+	{
+		// I'm stupid ;-;
+		m_refs = new size_t;
+		(*m_refs) = 1;
+	}
+
+	~DumbSmart() {
+		(*m_refs) -= 1;
+		if (m_ptr && m_refs && !*m_refs) {
+			delete m_ptr;
+			m_ptr = nullptr;
+			delete m_refs;
+			m_refs = nullptr;
+		}
+	}
+
+	DumbSmart(DumbSmart& dumb) 
+		: m_ptr(dumb.m_ptr)
+		, m_refs(dumb.m_refs)
+	{
+		(*m_refs) += 1;
+		printk("copy %x %x\n", dumb, *dumb.m_refs);
+	}
+
+	T* operator->() {
+		return m_ptr;
+	}
+
+	T* ptr() {
+		return m_ptr;
+	}
+private:
+	T* m_ptr;
+	size_t* m_refs;
+};
+
+
 struct CoWInfo;
 struct PageLevel;
 struct LovelyPageLevel;
@@ -37,6 +79,8 @@ class Paging {
 
 	RootPageLevel *clone(const RootPageLevel &);
 	RootPageLevel *clone_for_fork(const RootPageLevel &,
+								  bool just_copy = false);
+	RootPageLevel *clone_for_fork_test(const RootPageLevel &,
 								  bool just_copy = false);
 
 	RootPageLevel *clone_for_fork_shallow_cow(RootPageLevel &pml4,
@@ -82,10 +126,13 @@ class Paging {
 	}
 
 	inline static void switch_page_directory(PageLevel *page_directory) {
+		assert(page_directory);
 		asm volatile("movq %0, %%cr3" ::"a"(page_directory));
 	}
 
 	void unmap_page(RootPageLevel &pd, uintptr_t virt);
+
+	// 4 page map routines (we have like 5 actually) 
 	void map_page_assume(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
 						 uint64_t flags = PAEPageFlags::Present |
 										  PAEPageFlags::Write);
@@ -94,20 +141,13 @@ class Paging {
 										PAEPageFlags::Write);
 	void map_page(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
 				  uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
+
+	void map_page_user(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
+				  uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
+
 	void create_page_level(PageSkellington &lvl);
 	void resolve_cow_fault(RootPageLevel &owner_pd, RootPageLevel &dest_pd,
 						   uintptr_t fault_addr, bool owner_initiated = false);
-	// Allows for the mapping a page without a proper way to address it later.
-	// For example, if we want to map one of our page levels so it can be
-	// modified with a lower level or new permissions. Then we'd have to map
-	// with impunity. Sooo the solution is to map the current level with
-	// impunity and map the level beyond that with no impunity (I know this is
-	// horrible). The only other solution I can come up with is having a
-	// temporary address outside the virtual address of the highest page level
-	// and temporarily mapping the page levels we want to modify to that
-	// address.
-	// void map_page_with_no_impunity(RootPageLevel& pd, uintptr_t virt,
-	// uintptr_t phys);
 
 	static RootPageLevel *s_kernel_page_directory;
 
@@ -115,6 +155,7 @@ class Paging {
 	static size_t s_pf_allocator_base;
 
   private:
+	friend struct PageSkellington;
 	friend struct PageLevel;
 	friend struct LovelyPageLevel;
 
@@ -139,7 +180,7 @@ struct PageSkellington {
 		return reinterpret_cast<PageLevel *>(pdata & PAGE_ADDRESS_MASK);
 	}
 
-	LovelyPageLevel *fetch();
+	DumbSmart<LovelyPageLevel> fetch();
 	LovelyPageLevel *fetch_pool();
 	void commit(LovelyPageLevel &level);
 

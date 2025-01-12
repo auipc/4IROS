@@ -37,3 +37,5 @@ inline uint64_t rdtsc() {
 
 void ioapic_set_ioredir_val(uint8_t index, const uint64_t value);
 extern uint64_t global_waiter_time;
+void disable_timer();
+void enable_timer();

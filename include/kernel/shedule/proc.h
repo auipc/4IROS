@@ -16,11 +16,14 @@ struct CoWInfo {
 extern KSyscallData ksyscall_data;
 class Process;
 struct Blocker {
-	enum { ProcessBlock, SleepBlock, FileIOBlock } blocked_on;
+	enum { ProcessBlock, SleepBlock, FileIOReadBlock, FileIOWriteBlock } blocked_on;
 	union {
 		Process *blocked_process;
 		uint64_t sleep_waiter_ms;
-		FileHandle *blocked_handle;
+		struct {
+			FileHandle *blocked_handle;
+			size_t blocked_sz;
+		} file;
 	};
 };
 
@@ -32,11 +35,11 @@ enum class ProState {
 
 class Process {
   public:
-	Process();
+	Process(const char *name);
 	Process(Process *p);
 	~Process();
 	static void init();
-	static void sched(uintptr_t rsp);
+	static void sched(uintptr_t rsp, bool is_timer_triggered=false);
 	static void reentry();
 	void collapse_cow();
 	static void resolve_cow_recurse(RootPageLevel *level, Process *current,
@@ -60,8 +63,11 @@ class Process {
 
 	void block_on_proc(Process *p);
 	void block_on_sleep(size_t ms);
-	void block_on_handle(FileHandle *handle);
+	void block_on_handle_read(FileHandle *handle);
+	void block_on_handle_write(FileHandle *handle, size_t sz);
 	void poll_is_blocked();
+
+	const char *name() { return m_name; }
 
 	inline Process *parent() { return m_parent; }
 	inline void set_parent(Process *p) { m_parent = p; }
@@ -89,6 +95,7 @@ class Process {
 	uintptr_t m_kern_stack_bot;
 	uint8_t *m_saved_fpu;
 	RootPageLevel *m_pglv;
+	const char *m_name;
 };
 
 extern Process *current_process;

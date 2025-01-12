@@ -19,7 +19,7 @@ bool g_use_halfway_allocator = false;
 
 [[maybe_unused]] static uintptr_t s_alloc_base = 0;
 static const uintptr_t k_allocation_block_size = 4096;
-static const uintptr_t BOOTSTRAP_MEMORY = 0x30000;
+static const uintptr_t BOOTSTRAP_MEMORY = 0x2a000;
 
 void kmalloc_temp_init() {
 	s_mem_offset = reinterpret_cast<uintptr_t>(&_heap_start);
@@ -58,7 +58,7 @@ void kmalloc_init() {
 static void *allocate_block_temp(uintptr_t blocks_needed) {
 	assert(blocks_needed > 0);
 	s_mem_offset += blocks_needed * k_allocation_block_size;
-	info("mem left: %x\n", s_mem_end - s_mem_offset);
+	printk("mem left: %x\n", s_mem_end - s_mem_offset);
 	assert(s_mem_offset < s_mem_end);
 	return reinterpret_cast<void *>(s_mem_offset);
 }
@@ -83,6 +83,7 @@ static void *allocate_block(uintptr_t blocks_needed) {
 	return nullptr;
 }
 
+extern "C"
 void *kmalloc(size_t size) {
 #ifdef __i386__
 	if (g_use_halfway_allocator) {

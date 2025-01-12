@@ -6,6 +6,7 @@ namespace Debug {
 void parse_symtab(const char *buffer, size_t length);
 SymTab *resolve_symbol(uintptr_t addr);
 void stack_trace(uint64_t *rbp = nullptr);
+void stack_trace_depth(int depth);
 
 void print_type(char);
 void print_type(const char *);

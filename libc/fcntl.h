@@ -12,6 +12,7 @@ extern "C" {
 #define O_RDWR (O_RDONLY | O_WRONLY)
 #define O_CREAT (1 << 2)
 #define O_TRUNC (1 << 3)
+#define O_APPEND (1 << 4)
 
 #ifdef __cplusplus
 };

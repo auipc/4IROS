@@ -55,7 +55,7 @@ void render_char(Line *current_line, uint32_t *display_buffer, int bochs_fd,
 
 	int f_x0, f_y0, f_x1, f_y1;
 	stbtt_GetFontBoundingBox(font, &f_x0, &f_y0, &f_x1, &f_y1);
-	scale = stbtt_ScaleForPixelHeight(font, 32);
+	scale = stbtt_ScaleForPixelHeight(font, 24);
 	stbtt_GetFontVMetrics(font, &ascent, &descent, &lineGap);
 	baseline = (int)(f_y1 * scale);
 
@@ -220,7 +220,9 @@ int main() {
 	if (bochs_fd < 0)
 		return 1;
 
-	int font_fd = open("jetbrains.ttf", 0);
+	int serial_fd = open("/dev/serial", 0);
+	int tty_fd = open("/dev/tty", 0);
+	int font_fd = open("alagard.ttf", 0);
 	size_t font_sz = lseek(font_fd, 0, SEEK_END);
 	lseek(font_fd, 0, SEEK_SET);
 	uint8_t *ttf_buffer = malloc(font_sz);
@@ -231,6 +233,8 @@ int main() {
 		printf("Failure\n");
 		return 1;
 	}
+
+	stbtt__GetGlyphGSUBInfo(&font, NULL, 0);
 
 	int shell_pid = 0;
 	// FIXME this fork obliterates the CoW table for the subsequent fork,
@@ -249,26 +253,15 @@ int main() {
 			text_alloc += 0x1000;
 			text = realloc(text, text_alloc);
 		}
-		if ((line_index + 1) > 50) {
+		if ((line_index + 1) > (line_alloc)) {
 			line_alloc += 100;
 			lines = realloc(lines, sizeof(Line) * line_alloc);
 		}
 		Line *current_line = &lines[line_index];
 		char c = 0;
-		size_t size_read = read(1, &c, 1);
-#if 0
-		if (c == '-') {
-			yline = 0;
-			xpos = 0;
-			memset(display_buffer, 0, xres * yres * 4);
-			lseek(bochs_fd, 0, SEEK_SET);
-			write(bochs_fd, display_buffer, xres * yres * 4);
-			fprintf(stderr, "Debug");
-		}
-#endif
-		// if (is_multibyte(c)) {
-		// }
+		size_t size_read = read(tty_fd, &c, 1);
 
+#if 0
 		if (c == '\b') {
 			text_sz--;
 			current_line->text_buf_end--;
@@ -288,7 +281,8 @@ int main() {
 			}
 			continue;
 		} else
-			text[text_sz++] = c;
+#endif
+		text[text_sz++] = c;
 
 		current_line->text_buf_end++;
 		// FIXME handle text wrap
@@ -318,6 +312,7 @@ int main() {
 			}
 		}
 
+		write(serial_fd, &c, 1);
 		render_char(current_line, display_buffer, bochs_fd, c, &font, false);
 	}
 

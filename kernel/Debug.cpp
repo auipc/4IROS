@@ -83,6 +83,30 @@ void Debug::stack_trace(uint64_t *rbp) {
 	printk("==END STACK TRACE==\n");
 }
 
+void Debug::stack_trace_depth(int depth) {
+	uint64_t* rbp;
+	READ_REGISTER("rbp", rbp);
+
+	printk("==BEGIN STACK TRACE==\n");
+	for (int i = 0; i < depth; i++) {
+		if (!rbp)
+			break;
+
+		uint64_t rip = *(rbp + 1);
+		if (!rip)
+			break;
+
+		printk("RIP: %x", rip);
+		SymTab *symbol = resolve_symbol(rip);
+		if (symbol)
+			printk(" Function: %s", symbol->func_name);
+		printk("\n");
+		rbp = (uint64_t *)*(rbp);
+	}
+	printk("==END STACK TRACE==\n");
+}
+
+
 void print_type(char c) { printk("%c", c); }
 
 void Debug::print_type(const char *str) { printk("%s", str); }

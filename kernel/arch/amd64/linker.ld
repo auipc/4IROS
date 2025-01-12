@@ -38,5 +38,8 @@ SECTIONS
 		*(.bootstrap_stack)
 	}
 
+	.note.GNU-stack : {
+	}
+
 	_kernel_end = .;
 }

@@ -30,9 +30,11 @@ SECTIONS
 
 	.temp_page ALIGN(4K) : {
 		_heap_start = .;
-		. += 0x30000;
+		. += 0x2a000;
 		_heap_end = .;
 	}
 
+	.note.GNU-stack : {
+	}
 	_kernel_end = .;
 }

@@ -11,10 +11,11 @@ void kmalloc_init();
 void actual_malloc_init(void *addr, size_t size);
 void *actual_malloc(size_t size);
 void actual_free(void *addr);
-void *kmalloc(size_t size);
+extern "C" void *kmalloc(size_t size);
 void *kmalloc_aligned(size_t size, size_t alignment);
 void kfree(void *ptr);
 void *kmalloc_really_aligned(size_t size, size_t alignment);
+extern bool s_use_actual_allocator;
 
 #ifndef NO_DEF_NEW
 #define MALLOC_NEW_MUST_BE_PAGE_ALIGNED                                        \

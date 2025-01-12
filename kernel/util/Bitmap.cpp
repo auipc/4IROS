@@ -36,7 +36,7 @@ size_t Bitmap::scan(const size_t span) {
 	for (size_t i = m_last_position / s_bits_per_container; i < m_containers;
 		 i++) {
 #ifdef OS_SSE4
-		if (count_unset_container(i) < span)
+		if (count_unset_container(i) < (span%s_bits_per_container))
 			continue;
 #endif
 		for (size_t j = 0; j < s_bits_per_container; j++) {
@@ -65,7 +65,7 @@ size_t Bitmap::scan_no_set(const size_t span) const {
 	for (size_t i = m_last_position / s_bits_per_container; i < m_containers;
 		 i++) {
 #ifdef OS_SSE4
-		if (count_unset_container(i) < span)
+		if (count_unset_container(i) < (span%s_bits_per_container))
 			continue;
 #endif
 		for (size_t j = 0; j < s_bits_per_container; j++) {

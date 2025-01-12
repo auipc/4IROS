@@ -252,7 +252,11 @@ __attribute__((optnone)) void simp_map_page(uint64_t virt, uint64_t phys) {
 
 	uint64_t *pt = (uint64_t *)VIRT_MASK_ADDR(pd, 21);
 	if (!*pt) {
-		uint64_t pt_addr = (uint64_t)kmalloc(sizeof(uint64_t) * 512);
+		uint64_t pt_addr = 0;
+		if (s_use_actual_allocator)
+			pt_addr = (uint64_t)kmalloc_really_aligned(sizeof(uint64_t) * 512, 4096);
+		else
+			pt_addr = (uint64_t)kmalloc(sizeof(uint64_t) * 512);
 		// offset into pd
 		*pt = to_phys(pt_addr);
 		*pt |= 3;
@@ -381,6 +385,18 @@ __attribute__((optnone)) extern "C" void write_eoi() {
 	*eoi_register = 0;
 }
 
+
+bool timer_disabled = false;
+void disable_timer() {
+	ioapic_set_ioredir_val(21, 1 << 16);
+	timer_disabled = true;
+}
+
+void enable_timer() {
+	ioapic_set_ioredir_val(21, 48);
+	timer_disabled = false;
+}
+
 extern "C" void unhandled_interrupt() { panic("Unhandled Interrupt\n"); }
 
 extern "C" void div_interrupt() { panic("Division Fault\n"); }
@@ -398,11 +414,18 @@ extern "C" void gpf_interrupt(ExceptReg &eregs) {
 		printk("GPF caused by segment %x in table %s", eregs.error >> 3,
 			   table_str);
 	}
+
 	printk("rax %x rbx %x rcx %x rdx %x cs %x\n", eregs.rax, eregs.rbx,
 		   eregs.rcx, eregs.rdx, eregs.cs);
 	printk("Fault at 0x%x\n", eregs.rip);
-	printk("current_process pid %d\n", current_process->pid);
-	Debug::stack_trace();
+	printk("current_process pid %d %s\n", current_process->pid, current_process->name());
+	if (eregs.cs == 0x23) {
+		printk("current_process->kill()");
+		current_process->kill();
+		Process::sched(0);
+		return;
+	}
+	Debug::stack_trace((uint64_t*)eregs.rbp);
 	panic("General Protection Fault\n");
 }
 
@@ -413,6 +436,17 @@ extern "C" void tss_interrupt() { panic("Invalid TSS"); }
 extern "C" void pf_interrupt(ExceptReg &eregs) {
 	uintptr_t fault_addr = get_cr2();
 	bool user = eregs.error & 4;
+	if (user) {
+		printk("Process %s[%d] faulted on address %x while executing at %x\n", current_process->name(), current_process->pid, fault_addr, eregs.rip);
+		Debug::stack_trace((uint64_t*)eregs.rbp);
+		int fault_succ =
+			Process::resolve_cow(current_process, fault_addr & ~(PAGE_SIZE - 1));
+		if (fault_succ) return;
+		printk("current_process->kill()");
+		current_process->kill();
+		Process::sched(0);
+		return;
+	}
 	printk("Unrecoverable %s page fault caused by ",
 		   (user) ? "user" : "kernel");
 	if (eregs.error & 2) {
@@ -437,13 +471,7 @@ extern "C" void pf_interrupt(ExceptReg &eregs) {
 		   eregs.rcx, eregs.rdx, eregs.cs);
 	printk("current_process pid %d\n", current_process->pid);
 	printk("%x\n", fault_addr & ~(PAGE_SIZE - 1));
-	int fault_succ =
-		Process::resolve_cow(current_process, fault_addr & ~(PAGE_SIZE - 1));
-	if (!fault_succ) {
-		panic("AHHHH");
-		current_process->kill();
-		Process::sched(0);
-	}
+	panic("Failure\n");
 }
 
 extern uint64_t global_waiter_time;
@@ -463,8 +491,7 @@ void sleep(const uint64_t ms_time) {
 // (https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf#page=11)
 static uint64_t fp_per_tick = 0;
 uint64_t tick_counter = 0;
-// #define HPET0_TICK_COUNT 0xB00B15
-#define HPET0_TICK_COUNT 0xA00B15
+#define HPET0_TICK_COUNT 0xB00B
 
 uint64_t global_waiter_time = 0;
 
@@ -492,7 +519,7 @@ tick_counter*fp_per_tick, ms_elapsed); uint64_t cr3; asm volatile("movq %%cr3,
 #endif
 end:
 */
-	Process::sched((uintptr_t)regs);
+	Process::sched((uintptr_t)regs, true);
 	write_eoi();
 }
 
@@ -539,6 +566,7 @@ struct {
 	.ptr = (uint64_t)gdt,
 };
 
+
 KSyscallData ksyscall_data = {};
 __attribute__((aligned(16))) uint8_t fxsave_region[512];
 
@@ -547,7 +575,8 @@ void *nested_interrupt_stack = 0;
 extern "C" void syscall_entry();
 
 extern "C" [[noreturn]] void kernel_main();
-[[noreturn]] __attribute__((optnone)) extern "C" void
+extern "C"
+__attribute__((optnone)) [[noreturn]] void
 kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	uintptr_t tss_ptr =
 		get_page_map((uintptr_t)&tss) + (((uintptr_t)&tss) & 4095);
@@ -652,16 +681,23 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 
 	info("kbootinfo %x %x\n", kbootinfo.kmap_start, kbootinfo.kmap_end);
 
-	info("Available memory %x\n", (1 * MB) + (boot_head->mem_upper * KB));
+	printk("Available memory %x\n", (1 * MB) + (boot_head->mem_upper * KB));
 
-	Paging::setup((1 * MB) + (boot_head->mem_upper * KB), kbootinfo);
+	static constexpr size_t FAKE_MEM = 100*MB;
+	printk("Fake mem %x\n", FAKE_MEM);
 
-	auto current_pd = (RootPageLevel *)get_cr3();
-	size_t base = kbootinfo.kmap_end + 50 * MB;
-	for (int i = 0; i <= 20 * MB; i += PAGE_SIZE) {
-		Paging::the()->map_page(*current_pd, base + i, base + i);
+	Paging::setup(/*(1 * MB) + (boot_head->mem_upper * KB)*/FAKE_MEM, kbootinfo);
+
+	size_t base = FAKE_MEM+1*MB;
+	int i = 0;
+	//Paging::the()->allocator()->mark_range(base, kbootinfo.kmap_end+10*MB);
+	for (i = 0; i <= 20 * MB; i += PAGE_SIZE) {
+		simp_map_page((uint64_t)base+i, (uint64_t)base+i);
 	}
-	actual_malloc_init((void *)base, 20 * MB);
+	actual_malloc_init((void *)base, 30 * MB);
+	for (; i <= 30 * MB; i += PAGE_SIZE) {
+		Paging::the()->map_page(*(RootPageLevel*)get_cr3(), (uint64_t)base+i, (uint64_t)base+i);
+	}
 
 	nested_interrupt_stack =
 		(void *)(((uint64_t)kmalloc_really_aligned(PAGE_SIZE, 16)) + PAGE_SIZE);

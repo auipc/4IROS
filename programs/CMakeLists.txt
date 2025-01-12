@@ -8,6 +8,9 @@ set(PROGRAMS_SRCS
 	wump.c
 	test.c
 	less.c
+	gol.c
+	touch.c
+	say.c
 )
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE -fPIC -O3 -mred-zone")

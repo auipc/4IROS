@@ -5,6 +5,7 @@ class VGAFramebuffer final : public VFSNode {
   public:
 	virtual void init() override;
 	virtual int write(void *buffer, size_t size) override;
+	virtual inline bool is_directory() override { return false; }
 
   private:
 	static void write_misc_port(uint8_t byte);

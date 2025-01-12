@@ -5,6 +5,7 @@ class PS2Keyboard final : public VFSNode {
   public:
 	PS2Keyboard();
 	~PS2Keyboard();
+	virtual inline bool is_directory() override { return false; }
 	virtual void init() override;
 	// FIXME broken
 	virtual size_t size() override { return s_writer_pos; };
@@ -15,6 +16,6 @@ class PS2Keyboard final : public VFSNode {
 	static size_t s_buffer_pos;
 	static size_t s_writer_pos;
 
-	static constexpr uint16_t KEYBD_BUFFER_SZ = 4096;
+	static constexpr size_t KEYBD_BUFFER_SZ = (4*MB);
 	static bool s_initialized;
 };

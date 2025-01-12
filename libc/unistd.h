@@ -12,6 +12,9 @@ extern "C" {
 #define SEEK_CUR 1
 #define SEEK_END 2
 
+
+int sleep(unsigned int s);
+int isatty();
 int fork();
 int open(const char *path, int flags, ...);
 int read(int fd, void *buf, size_t count);

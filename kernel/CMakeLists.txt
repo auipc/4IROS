@@ -16,6 +16,8 @@ set(SRCS
 	driver/PS2Keyboard.cpp
 	driver/VGAFramebuffer.cpp
 	driver/BochsFramebuffer.cpp
+	driver/Serial.cpp
+	driver/TTY.cpp
 	Syscall.cpp
 	shedule/proc.cpp
 	main.cpp

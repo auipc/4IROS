@@ -2,6 +2,8 @@
 #include <kernel/vfs/block/ata.h>
 #include <kernel/vfs/fs/ext2.h>
 #include <kernel/vfs/vfs.h>
+#include <sys/types.h>
+#include <string.h>
 
 static VFS *s_vfs;
 
@@ -11,12 +13,47 @@ VFSNode::VFSNode(const char *name) : m_name(name) {}
 
 VFSNode::~VFSNode() {}
 
+// FIXME FIXME FIXME account for size!!!! this is a yuge bug
+int VFSNode::read(void *buffer, size_t size) {
+	(void)size;
+	if (is_directory()) {
+		VFSNode* node = nullptr;
+		if (m_position >= m_nodes.size()) {
+			if (!m_mounted_filesystem)
+				return -1;
+
+			size_t trupos = m_position-m_nodes.size();
+			if (trupos >= m_mounted_filesystem->m_nodes.size()) 
+				return -1;
+
+			node = m_mounted_filesystem->m_nodes[trupos];
+		} else {
+			node = m_nodes[m_position];
+		}
+		*(ino_t*)buffer = 0;
+		size_t len = strlen(node->m_name);
+		memcpy((char*)((uintptr_t)buffer+sizeof(ino_t)), node->m_name, len);
+		memset((char*)((uintptr_t)buffer+sizeof(ino_t)+len), 0, 1);
+		m_position++;
+		return 1;
+	}
+	return -1;
+}
+
 // FIXME: a deep enough filesystem will cause a stack overflow.
 VFSNode *VFSNode::traverse(Vec<const char *> &path, size_t path_index) {
 	auto nodes = m_nodes;
 
 	if (path_index >= path.size())
 		return nullptr;
+
+	if (path[path_index][0] == '/') {
+		if (path_index == 0 && path.size() == 1) {
+			return VFS::the().get_root_fs();
+		}
+
+		return VFS::the().get_root_fs()->traverse(path, path_index+1);
+	}
 
 	for (size_t i = 0; i < nodes.size(); i++) {
 		if (!strcmp(nodes[i]->m_name, path[path_index])) {
@@ -51,7 +88,6 @@ int FileHandle::read(void *buffer, size_t size) {
 
 int FileHandle::write(void *buffer, size_t size) {
 	assert(m_node);
-	// FIXME: This is a race condition waiting to happen!
 	m_node->seek(m_position);
 	int res = m_node->write(buffer, size);
 	m_position = m_node->position();
@@ -94,6 +130,8 @@ VFS::VFS() {
 	fs->init();
 	m_root_vfs_node->m_mounted_filesystem = fs;
 	print_fs(m_root_vfs_node);
+	// REMOVE ME
+	//fs->create("sigma");
 }
 
 VFS &VFS::the() { return *s_vfs; }
@@ -110,6 +148,14 @@ Vec<const char *> VFS::parse_path(const char *path) {
 
 	for (size_t i = 0; i < strlen(path); i++) {
 		if (path[i] == '/') {
+			if (!i) {
+				accum[accum_idx++] = path[i];
+				accum[accum_idx] = '\0';
+				path_vec.push(accum);
+				accum = new char[256];
+				accum_idx = 0;
+				continue;
+			}
 			if (accum_idx > 0) {
 				accum[accum_idx] = '\0';
 				path_vec.push(accum);

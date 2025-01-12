@@ -2,6 +2,7 @@
 #include <kernel/minmax.h>
 #include <kernel/printk.h>
 #include <kernel/vfs/block/ata.h>
+#include <kernel/minmax.h>
 
 #define DRIVE_SELECT_PORT 0x1F6
 #define COMMAND_PORT 0x1F7
@@ -91,7 +92,7 @@ int ATABlockNode::read_512_temp(uint8_t *buffer, size_t under) {
 	(void)under;
 	size_t begin = max((size_t)0, m_position % 512);
 	size_t min_sz = min((size_t)512, begin + under);
-	assert(!(begin % 2));
+	//assert(!(begin % 2));
 	LeftRight lr = {};
 
 	for (i = 0; i < begin / 2; i++) {
@@ -118,6 +119,58 @@ int ATABlockNode::read_512_temp(uint8_t *buffer, size_t under) {
 	return 0;
 }
 
+int ATABlockNode::write_512(uint8_t* buffer, size_t) {
+	size_t lba_pos = m_position / 512;
+	outb(DRIVE_SELECT_PORT, m_config);
+	outb(0x1F2, 0);
+	outb(0x1F3, (lba_pos >> 24) & 0xFF);
+	outb(0x1F4, 0); //(lba_pos>>32)&0xFF);
+	outb(0x1F5, 0); //(lba_pos>>40)&0xFF);
+	outb(0x1F2, 1);
+	outb(0x1F3, lba_pos & 0xFF);
+	outb(0x1F4, (lba_pos >> 8) & 0xFF);
+	outb(0x1F5, (lba_pos >> 16) & 0xFF);
+	outb(COMMAND_PORT, 0x30);
+
+	for (int i = 0; i < 256; i++) {
+		outw(DATA_PORT, (buffer[(i*2)+1]<<8) | buffer[i*2]);
+		outb(COMMAND_PORT, 0xE7);
+		uint8_t status;
+		do {
+			status = inb(STATUS_PORT);
+		} while (status & 0x80);
+	}
+	m_position += 512;
+	return 0;
+}
+
+int ATABlockNode::write(void *buffer, size_t size) {
+	(void)buffer;
+	size_t buffer_pos = 0;
+	size_t size_rem = size;
+
+	while (size_rem) {
+		size_t old_pos = m_position;
+		size_t pos_rem = m_position%512;
+		//printk("ATABlockNode::write %d", m_position);
+		m_position &= ~511;
+		char* temp_buf = new char[512];
+		read_512_temp((uint8_t *)temp_buf, 512);
+
+		size_t sz_read = min((512-pos_rem), size);
+		memcpy(temp_buf+pos_rem, (char*)buffer+buffer_pos, sz_read);
+		size_rem -= sz_read;
+		buffer_pos += sz_read;
+
+		m_position -= 512;
+		write_512((uint8_t*)temp_buf, 512);
+		delete[] temp_buf;
+		m_position = old_pos;
+		m_position += size;
+	}
+	return 0;
+}
+
 int ATABlockNode::read(void *buffer, size_t size) {
 	if (!size)
 		return -1;
@@ -128,25 +181,16 @@ int ATABlockNode::read(void *buffer, size_t size) {
 	if (disable_int)
 		asm volatile("cli");
 
-	size_t lba_sector_count = (size + 511) / 512;
-	if (lba_sector_count == 1) {
-		size_t old_pos = m_position;
-		read_512_temp((uint8_t *)buffer, size);
-		m_position = old_pos;
-		m_position += size;
-	} else {
-		uint8_t *b = new uint8_t[512 * lba_sector_count];
-		size_t old_pos = m_position;
-
-		for (size_t i = 0; i < lba_sector_count; i++) {
-			read_512(b + (512 * i), size);
-		}
-
-		m_position = old_pos;
-		memcpy((char *)buffer, &b[m_position % (512)], size);
-		m_position += size;
-		delete[] b;
+	size_t old_pos = m_position;
+	size_t left = size;
+	size_t off = 0;
+	while(left) {
+		read_512_temp((uint8_t *)((size_t)buffer+off), min(left,(size_t)512));
+		off += 512;
+		left -= min(left, (size_t)512);
 	}
+	m_position = old_pos;
+	m_position += size;
 
 	if (disable_int)
 		asm volatile("sti");

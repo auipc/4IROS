@@ -18,18 +18,14 @@ class VFSNode {
 
 	void set_name(const char *name) { m_name = name; }
 
-	const char *get_name() const { return m_name; }
+	const char *name() const { return m_name; }
 
 	virtual int open(Vec<const char *> path) {
 		(void)path;
 		return -1;
 	}
 
-	virtual int read(void *buffer, size_t size) {
-		(void)buffer;
-		(void)size;
-		return -1;
-	}
+	virtual int read(void *buffer, size_t size);
 
 	virtual int write(void *buffer, size_t size) {
 		(void)buffer;
@@ -48,6 +44,7 @@ class VFSNode {
 	}
 
 	virtual bool check_blocked() { return false; }
+	virtual bool check_blocked_write(size_t) { return false; }
 	virtual void block_if_required(size_t) {}
 
 	virtual size_t position() { return m_position; }
@@ -57,12 +54,17 @@ class VFSNode {
 		m_nodes.push(node);
 	}
 
+	virtual VFSNode* create(const char* name) {
+		(void)name;
+		return nullptr;
+	}
+
 	virtual Vec<VFSNode *> &nodes() { return m_nodes; }
 
 	virtual VFSNode *mounted_filesystem() { return m_mounted_filesystem; }
 
-	// FIXME: File size should be able to exceed integer width.
 	virtual size_t size() { return 0; }
+	virtual void set_size(size_t) { }
 
   protected:
 	friend class VFS;
@@ -87,7 +89,8 @@ class FileHandle {
 	int seek(int64_t offset, SeekMode origin);
 	size_t tell();
 	bool check_blocked() { return m_node->check_blocked(); }
-	void block_if_required(size_t size) { m_node->block_if_required(size); }
+	bool check_blocked_write(size_t sz) { return m_node->check_blocked_write(sz); }
+	void block_if_required(size_t size) { m_node->seek(m_position); m_node->block_if_required(size); m_position = m_node->position(); }
 
 	VFSNode *node() { return m_node; }
 

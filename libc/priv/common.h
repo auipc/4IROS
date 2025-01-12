@@ -13,5 +13,6 @@ enum {
 	SYS_LSEEK = 10,
 	SYS_SLEEP = 11,
 	SYS_GETTIMEOFDAY = 12,
+	SYS_KILL = 13
 };
 #endif

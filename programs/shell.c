@@ -11,8 +11,6 @@ typedef struct {
 	builtin_ptr_t func;
 } builtin_t;
 
-void builtin_exit(int argc, char **argv) { exit(0); }
-
 void builtin_echo(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
 		if (i > 1)
@@ -21,6 +19,8 @@ void builtin_echo(int argc, char **argv) {
 	}
 	printf("\n");
 }
+
+void builtin_exit(int argc, char **argv) { exit(0); }
 
 static const builtin_t s_builtins[] = {{"echo", &builtin_echo},
 									   {"exit", &builtin_exit}};
@@ -53,13 +53,13 @@ void handle_cmd(char *buf, size_t buf_sz) {
 	}
 
 	if (!(pid = fork())) {
-		exit(execvp(argv[0], argv));
+		execvp(argv[0], argv);
+		printf("Not found\n");
+		exit(127);
 	}
 
 	waitpid(pid, &status, 0);
-	if (status) {
-		printf("Not found\n");
-	}
+	//fprintf(stderr, "Exit status %d\n", status);
 
 	free(argv);
 }
@@ -83,7 +83,8 @@ void parse_autorun() {
 int main() {
 	char *buf = (char *)malloc(0x1000);
 	size_t buf_sz = 0;
-	printf("~>");
+	printf("?");
+	fflush(stdout);
 	while (1) {
 		if ((buf_sz + 1) >= 0x1000)
 			continue;
@@ -91,6 +92,7 @@ int main() {
 		if (!sz)
 			continue;
 		buf_sz++;
+#if 0
 		if (buf[buf_sz - 1] == '\b') {
 			if (buf_sz > 1) {
 				buf[buf_sz] = '\0';
@@ -99,11 +101,13 @@ int main() {
 			}
 			continue;
 		}
+#endif
 		if (buf[buf_sz - 1] == '\n') {
 			buf[buf_sz - 1] = '\0';
 			handle_cmd(buf, buf_sz);
 			buf_sz = 0;
-			printf("~>");
+			printf("?");
+			fflush(stdout);
 			continue;
 		}
 	}

@@ -48,7 +48,8 @@ extern "C" uint64_t pdpte0[512];
 extern "C" uint64_t pdbad[512];
 extern "C" uint64_t ptbad[512];
 
-[[noreturn]] extern "C" void kx86_64_start(uint32_t multiboot_header,
+extern "C" 
+[[noreturn]] void kx86_64_start(uint32_t multiboot_header,
 										   multiboot_info *boot_head) {
 	(void)multiboot_header;
 

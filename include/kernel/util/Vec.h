@@ -15,12 +15,21 @@ template <typename T> class Vec {
 		m_size = 0;
 	}
 
-	Vec(Vec &c) {
+	Vec(const Vec &c) {
 		m_size = c.m_size;
 		if (m_size > 0) {
-			container = reinterpret_cast<T *>(kmalloc(sizeof(T) * c.m_size));
+			container = new T[c.m_size];
 			memcpy(container, c.container, sizeof(T) * c.m_size);
 		}
+	}
+
+	Vec& operator=(Vec& c) {
+		m_size = c.m_size;
+		if (m_size > 0) {
+			container = new T[c.m_size];
+			memcpy(container, c.container, sizeof(T) * c.m_size);
+		}
+		return *this;
 	}
 
 	// the hard way
@@ -79,8 +88,10 @@ template <typename T> class Vec {
 			}
 		}
 
-		if (container)
+		if (container) {
 			delete container;
+			container = nullptr;
+		}
 
 		if (m_size - 1 != 0)
 			container = tmp;
@@ -98,11 +109,12 @@ template <typename T> class Vec {
 	}
 
 	void clear() {
-		m_size = 0;
 		for (size_t i = 0; i < m_size; i++) {
 			container[i].~T();
 		}
+		m_size = 0;
 		delete container;
+		container = nullptr;
 	}
 
   private:

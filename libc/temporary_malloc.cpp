@@ -32,7 +32,7 @@ size_t alloc_base_size = 0;
 
 void actual_malloc_init() {
 	alloc_base_size = 0x1000;
-	alloc_base_addr = mmap((void*)0xf00000, alloc_base_size);
+	alloc_base_addr = mmap((void*)0x90000000, alloc_base_size);
 	mem_slow_linked_list = new (alloc_base_addr) SlowLinkedList();
 	mem_slow_linked_list->size = 0;
 	mem_slow_linked_list->free = true;
@@ -65,13 +65,17 @@ static void *actual_malloc_find_free(size_t size, size_t alignment=0) {
 
 	if ((next_addr + size) >=
 		((size_t)alloc_base_addr + alloc_base_size)) {
-		(void)mmap((void*)((uintptr_t)alloc_base_addr+alloc_base_size), size+0x10000);
-		alloc_base_size += size+0x10000;
+		(void)mmap((void*)((uintptr_t)alloc_base_addr+alloc_base_size), size+0xfff);
+		alloc_base_size += size+0xfff;
 	}
 
 	auto next_node = new ((void *)(next_addr-sizeof(SlowLinkedList))) SlowLinkedList();
-	if (alignment > 1)
+	if (alignment > 1) {
 		next_addr += alignment-(next_addr%alignment);
+		(void)mmap((void*)((uintptr_t)alloc_base_addr+alloc_base_size), alignment-(next_addr%alignment)+0xfff);
+		alloc_base_size += alignment-(next_addr%alignment)+0xfff;
+	}
+
 	selected_node->next = next_node;
 	selected_node->next->free = false;
 	selected_node->next->size = size;
@@ -123,11 +127,21 @@ void *realloc(void* ptr, size_t size) {
 		next_addr += sizeof(SlowLinkedList);
 	} while (current_node);
 
+	if (!current_node) return nullptr;
+
 	void* p = malloc(size);
 	if (current_node) {
 		memcpy(p, ptr, (current_node->size > size) ? size : current_node->size);
 		free(ptr);
 	}
+	return p;
+}
+
+extern "C"
+void *calloc(size_t n, size_t sz) {
+	void* p = malloc(n*sz);
+	if (p)
+		memset(p, 0, n*sz);
 	return p;
 }
 

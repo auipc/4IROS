@@ -1,6 +1,10 @@
+#include <alloca.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef LIBK
+extern void *kmalloc(size_t size);
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -15,14 +19,19 @@ const char *strrchr(const char *str, int character) {
 	return last;
 }
 
-#ifndef LIBK
 char *strdup(const char *s) {
 	size_t s_sz = strlen(s);
-	char *m = (char *)malloc(s_sz);
+#ifndef LIBK
+	char *m = (char *)malloc(s_sz+1);
+#else
+	char *m = (char *)kmalloc(s_sz+1);
+#endif
 	memcpy(m, s, s_sz);
+	*(m+s_sz) = 0;
 	return m;
 }
 
+#ifndef LIBK
 char *strndup(const char *s, size_t n) {
 	char *m = (char *)malloc(n + 1);
 	memcpy(m, s, n);
@@ -73,6 +82,7 @@ char *strncpy(char *destination, const char *source, size_t n) {
 	return destination;
 }
 
+// stolen from OpenBSD
 int strncmp(const char *s1, const char *s2, size_t n) {
 
 	if (n == 0)
@@ -86,6 +96,21 @@ int strncmp(const char *s1, const char *s2, size_t n) {
 	return (0);
 }
 
+int memcmp(const void *s1, const void *s2, size_t n) {
+	if (!n)
+		return 0;
+
+	while (n--) {
+		if (*(unsigned char*)s1 != *(unsigned char*)s2)
+			return (*(unsigned char*)s1 > *(unsigned char*)s2) ? 1 : -1;
+		s1++;
+		s2++;
+	}
+
+	return 0;
+}
+
+// stolen from OpenBSD
 int strncasecmp(const char *s1, const char *s2, size_t n) {
 
 	if (n == 0)
@@ -99,6 +124,17 @@ int strncasecmp(const char *s1, const char *s2, size_t n) {
 	return (0);
 }
 
+void *memchr(const void* s, int c, size_t n) {
+	while (n-- && *((const unsigned char*)s++) != c);
+	return (n || *((const unsigned char*)s) != c) ? (void*)((char*)s+n) : 0;
+}
+
+void *memrchr(const void* s, int c, size_t n) {
+	while (n && *(((const unsigned char*)s)+(n--)) != c);
+	return (n || *(((const unsigned char*)s)+n) == c) ? (void*)(s+n) : NULL;
+}
+
+// stolen from OpenBSD
 int strcmp(const char *s1, const char *s2) {
 	while (*s1 == *s2++)
 		if (*s1++ == 0)
@@ -106,6 +142,7 @@ int strcmp(const char *s1, const char *s2) {
 	return (*(unsigned char *)s1 - *(unsigned char *)--s2);
 }
 
+// stolen from OpenBSD
 int strcasecmp(const char *s1, const char *s2) {
 	while ((*s1 == *s2++) || abs(*s1 - (*(s2 - 1))) == 32)
 		if (*s1++ == 0)

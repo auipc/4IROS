@@ -751,7 +751,7 @@ struct stbtt_fontinfo {
 
 	int numGlyphs; // number of glyphs, needed for range checking
 
-	int loca, head, glyf, hhea, hmtx, kern, gpos,
+	int loca, head, glyf, hhea, hmtx, kern, gpos, gsub,
 		svg;			  // table locations as offset from start of .ttf
 	int index_map;		  // a cmap mapping for our chosen character encoding
 	int indexToLocFormat; // format needed to map from glyph index to glyph
@@ -1547,6 +1547,8 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data,
 	info->hmtx = stbtt__find_table(data, fontstart, "hmtx"); // required
 	info->kern = stbtt__find_table(data, fontstart, "kern"); // not required
 	info->gpos = stbtt__find_table(data, fontstart, "GPOS"); // not required
+	info->gsub = stbtt__find_table(data, fontstart, "GSUB"); // not required
+	fprintf(stderr, "found gsub %x\n", info->gsub);
 
 	if (!cmap || !info->head || !info->hhea || !info->hmtx)
 		return 0;
@@ -2783,6 +2785,14 @@ static stbtt_int32 stbtt__GetGlyphClass(stbtt_uint8 *classDefTable, int glyph) {
 
 // Define to STBTT_assert(x) if you want to break on unimplemented formats.
 #define STBTT_GPOS_TODO_assert(x)
+
+static stbtt_int32 stbtt__GetGlyphGSUBInfo(const stbtt_fontinfo *info,
+										   char *glyphs, size_t glyph_sz) {
+	stbtt_uint8 *data;
+	data = info->data + info->gsub;
+	fprintf(stderr, "%d\n", ttUSHORT(data + 0));
+	fprintf(stderr, "%d\n", ttUSHORT(data + 2));
+}
 
 static stbtt_int32 stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo *info,
 												  int glyph1, int glyph2) {

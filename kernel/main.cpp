@@ -4,7 +4,9 @@
 #include <kernel/arch/x86_common/IO.h>
 #include <kernel/assert.h>
 #include <kernel/driver/BochsFramebuffer.h>
+#include <kernel/driver/Serial.h>
 #include <kernel/driver/PS2Keyboard.h>
+#include <kernel/driver/TTY.h>
 #include <kernel/driver/VGAFramebuffer.h>
 #include <kernel/mem/Paging.h>
 #include <kernel/mem/malloc.h>
@@ -201,13 +203,15 @@ extern "C" [[noreturn]] void kernel_main() {
 	VFS::init();
 
 	printk("ps2\n");
+	VFS::the().get_dev_fs()->push(new TTY());
+	VFS::the().get_dev_fs()->push(new Serial());
+
 	auto kbd = new PS2Keyboard();
 	VFS::the().get_dev_fs()->push(kbd);
 	kbd->init();
 
 	auto bochs = new BochsFramebuffer();
 	VFS::the().get_dev_fs()->push(bochs);
-	bochs->init();
 
 	// Read generated symtab file
 	auto pth = VFS::the().parse_path("asymtab");
@@ -221,6 +225,26 @@ extern "C" [[noreturn]] void kernel_main() {
 		Debug::parse_symtab(sym_buf, symtab_sz);
 		delete[] sym_buf;
 	}
+
+#if 0
+	auto kljdsfldjk = VFS::the().parse_path("sigma");
+	auto sigma_file = VFS::the().open(kljdsfldjk);
+	const char* sigma = "yes isgma";
+	sigma_file->write((void*)sigma,strlen(sigma));
+#endif
+
+#if 0
+	char buf[2];
+	auto p = VFS::the().parse_path("hyper.jpg");
+	auto hyper = VFS::the().open(p);
+	buf[1] = 0xc;
+	printk("hyper read\n");
+	for (size_t i = 0; i < hyper->size(); i++) {
+		hyper->read(buf, 1);
+		assert(buf[1] == 0xc);
+	}
+	printk("hyper end\n");
+#endif
 
 	Process::init();
 	panic("Task switch failed somehow???\n");

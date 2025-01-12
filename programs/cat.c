@@ -1,19 +1,18 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-int main() {
-	int fd = open("Makefile", 0);
-	if (fd < 0)
-		return 1;
-	off_t file_sz = lseek(fd, 0, SEEK_END);
+int main(int argc, char** argv) {
+	if (argc < 2) return 1;
+	int fd = open(argv[1], 0);
+	if (fd < 0) return 1;
+	int sz = lseek(fd, 0, SEEK_END);
+	if (!sz) return 1;
 	lseek(fd, 0, SEEK_SET);
-
-	char *buffer = (char *)malloc(sizeof(char) * file_sz);
-	int sz = read(fd, buffer, 0x1000);
-	printf("%d", sz);
-	if (sz < 0)
-		return 1;
-	printf("%.*s", sz, buffer);
+	char* buf = (char*)malloc(sizeof(char)*sz);
+	read(fd, buf, sz);
+	for (int i = 0; i < sz; i++)
+		fwrite(&buf[i], 1, 1, stdout);
 	return 0;
 }

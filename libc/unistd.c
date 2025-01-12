@@ -3,6 +3,10 @@
 #include <priv/util.h>
 #include <unistd.h>
 
+int isatty() {
+	return 1;
+}
+
 // Syscalls use the System V x64 calling convention (minus rcx) and rax
 // specifies the syscall
 int fork() {
@@ -97,6 +101,10 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, voi
 	return r;
 }
 #endif
+
+int sleep(unsigned int s) {
+	return msleep(s*1000);
+}
 
 int msleep(uint64_t ms) {
 	int r = 0;

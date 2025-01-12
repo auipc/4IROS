@@ -17,6 +17,7 @@ size_t screen_buf_y = 0;
 #define PORT 0x3f8
 #define SCREEN_SIZE (80 * 25 * sizeof(VGAChar))
 
+// Yoinked from OSDev.org
 static int init_serial() {
 	outb(PORT + 1, 0x00); // Disable all interrupts
 	outb(PORT + 3, 0x80); // Enable DLAB (set baud rate divisor)
@@ -54,6 +55,13 @@ void write_scb(char c, uint8_t color) {
 	if (c == '\n') {
 		screen_buf_x = 0;
 		screen_buf_y++;
+		return;
+	}
+
+	if (c == '\b') {
+		if (screen_buf_x > 0)
+			screen_buf_x -= 1;
+		screen_buf[screen_buf_x + 80 * screen_buf_y].c = 0;
 		return;
 	}
 

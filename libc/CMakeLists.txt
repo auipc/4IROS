@@ -13,6 +13,8 @@ set(LIBC_SRCS
 	time.c
 	alloca.c
 	ctype.c
+	signal.c
+	dirent.c
 )
 
 set(LIBK_SRCS

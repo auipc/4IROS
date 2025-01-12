@@ -1,4 +1,5 @@
 #include <gprof.h>
+#include <stdio.h>
 
 void mcount() {
 	uint64_t *rbp = 0;

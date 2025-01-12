@@ -24,3 +24,9 @@ int BochsFramebuffer::write(void *buffer, size_t size) {
 	m_position += size;
 	return size;
 }
+
+int BochsFramebuffer::read(void *buffer, size_t size) {
+	memcpy(buffer, (void *)(FRAMEBUFFER_ADDR + m_position), size);
+	m_position += size;
+	return size;
+}
