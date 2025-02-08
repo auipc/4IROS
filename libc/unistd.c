@@ -2,10 +2,17 @@
 #include <priv/common.h>
 #include <priv/util.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <stdio.h>
 
-int isatty() {
-	return 1;
+int optind = 1;
+
+int access(const char* path, int mode) {
+	struct stat st;
+	return stat(path, &st);
 }
+
+int isatty() { return 1; }
 
 // Syscalls use the System V x64 calling convention (minus rcx) and rax
 // specifies the syscall
@@ -55,6 +62,11 @@ off_t lseek(int fd, off_t offset, int whence) {
 }
 
 _Noreturn void exit(int status) {
+	// Flush the big 3 stdio handles
+	// however I think I'm supposed to flush everything including weird line buffered files made by the program
+	fflush(stdin);
+	fflush(stdout);
+	fflush(stderr);
 	for (;;)
 		asm volatile("syscall"
 					 : "=b"(_errno)
@@ -69,6 +81,15 @@ int execvp(const char *path, const char **argv) {
 	asm volatile("syscall"
 				 : "=a"(r), "=b"(_errno)
 				 : "a"(SYS_EXEC), "b"(path), "d"(argv)
+				 : "rcx", "r11", "memory");
+	return r;
+}
+
+int spawn(int* pid, const char *path, const char **argv) {
+	int r = 0;
+	asm volatile("syscall"
+				 : "=a"(r), "=b"(_errno)
+				 : "a"(SYS_SPAWN), "b"(pid), "d"(path), "D"(argv)
 				 : "rcx", "r11", "memory");
 	return r;
 }
@@ -102,17 +123,36 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, voi
 }
 #endif
 
-int sleep(unsigned int s) {
-	return msleep(s*1000);
-}
+int sleep(unsigned int s) { return msleep(s * 1000); }
 
 int msleep(uint64_t ms) {
+	return usleep(ms*1000);
+}
+
+int usleep(uint64_t us) { 
 	int r = 0;
 	asm volatile("syscall"
 				 : "=a"(r), "=b"(_errno)
-				 : "a"(SYS_SLEEP), "b"(ms)
+				 : "a"(SYS_SLEEP), "b"(us)
+				 : "rcx", "r11", "memory");
+	return r;
+
+}
+
+int close(int fd) {
+	int r = 0;
+	asm volatile("syscall"
+				 : "=a"(r), "=b"(_errno)
+				 : "a"(SYS_CLOSE), "b"(fd)
 				 : "rcx", "r11", "memory");
 	return r;
 }
 
-int usleep(uint64_t us) { return msleep(us / 1000); }
+int chdir(const char* path) {
+	int r = 0;
+	asm volatile("syscall"
+				 : "=a"(r), "=b"(_errno)
+				 : "a"(SYS_CHDIR), "b"(path)
+				 : "rcx", "r11", "memory");
+	return r;
+}

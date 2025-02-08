@@ -1,17 +1,17 @@
 #include <errno.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <signal.h>
-#include <stdlib.h>
 
 static const char scancode_ascii[] = {
 	0,	 0,	  '1',	'2',  '3',	'4', '5', '6', '7', '8', '9', '0',
 	'-', '=', '\b', '\t', 'q',	'w', 'e', 'r', 't', 'y', 'u', 'i',
 	'o', 'p', '[',	']',  '\n', 0,	 'a', 's', 'd', 'f', 'g', 'h',
-	'j', 'k', 'l',	';',  '\'',	'`', 0,	  '|', 'z', 'x', 'c', 'v',
+	'j', 'k', 'l',	';',  '\'', '`', 0,	  '|', 'z', 'x', 'c', 'v',
 	'b', 'n', 'm',	',',  '.',	'/', 0,	  0,   0,	' '};
 
 static const char scancode_ascii_upper[] = {
@@ -28,7 +28,7 @@ static const char scancode_ascii_caps[] = {
 	'J', 'K', 'L',	';',  '"',	'`', 0,	  '|', 'Z', 'X', 'C', 'V',
 	'B', 'N', 'M',	',',  '.',	'/', 0,	  0,   0,	' '};
 
-#define HERETIC
+//#define HERETIC
 #ifdef HERETIC
 void heretic() {
 	int serial_fd = open("/dev/serial", 0);
@@ -44,26 +44,35 @@ void heretic() {
 int main() {
 	int pid = 0;
 	if (!(pid = fork())) {
-		execvp("shell", NULL);
-		while (1)
-			;
+		execvp("term", NULL);
+		while(1);
 	}
 
+#if 0
+	if (!fork()) {
+		const char* argv[] = {"linuxxdoom", 0};
+		execvp("linuxxdoom", argv);
+		while(1);
+	}
+#endif
+
 #ifdef HERETIC
-	if(!fork()) {
+	if (!fork()) {
 		heretic();
 	}
 #endif
 
-	char* line_buffer = malloc(4096);
-	char* line_buffer_ptr = line_buffer;
+	char *line_buffer = malloc(4096);
+	char *line_buffer_ptr = line_buffer;
 	int fd = open("/dev/serial", 0);
 	while (1) {
 		unsigned char c;
 		size_t size_read = read(fd, &c, 1);
-		if ((line_buffer_ptr-line_buffer) > 4096) continue;
+		if ((line_buffer_ptr - line_buffer) > 4096)
+			continue;
 		*line_buffer_ptr = c;
 		printf("%c", c);
+		fflush(stdout);
 		if (*line_buffer_ptr == '\r')
 			*line_buffer_ptr = '\n';
 
@@ -77,9 +86,11 @@ int main() {
 		}
 
 		if (*line_buffer_ptr == '\n') {
-			fwrite(line_buffer, 1, (line_buffer_ptr-line_buffer)+1, stdin);
+			fwrite(line_buffer, 1, (line_buffer_ptr+1) - line_buffer, stdin);
+			fflush(stdin);
 			line_buffer_ptr = line_buffer;
-		} else line_buffer_ptr++;
+		} else
+			line_buffer_ptr++;
 	}
 
 #if 0

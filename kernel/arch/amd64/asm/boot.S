@@ -34,6 +34,7 @@ stack_top:
 .set HIGHER_HALF, 0xC0000000
 .global _pml4
 .global pdpte0
+.global pdptebad
 .global pdbad
 .global ptbad
 .align 4096
@@ -45,7 +46,8 @@ pd0:
 	.skip 4096
 pt0:
 	.skip 4096
-# kernel size is limited to 2mb yay
+pdptebad:
+	.skip 4096
 pdbad:
 	.skip 4096
 ptbad:

@@ -23,7 +23,7 @@ template <typename T> class Vec {
 		}
 	}
 
-	Vec& operator=(Vec& c) {
+	Vec &operator=(const Vec &c) {
 		m_size = c.m_size;
 		if (m_size > 0) {
 			container = new T[c.m_size];
@@ -72,6 +72,12 @@ template <typename T> class Vec {
 
 	void remove(size_t pos) {
 		assert(container);
+
+		if (pos == (m_size-1)) {
+			m_size--;
+			return;
+		}
+
 
 		T *tmp = nullptr;
 

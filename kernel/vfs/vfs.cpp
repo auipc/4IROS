@@ -2,8 +2,9 @@
 #include <kernel/vfs/block/ata.h>
 #include <kernel/vfs/fs/ext2.h>
 #include <kernel/vfs/vfs.h>
-#include <sys/types.h>
 #include <string.h>
+#include <sys/types.h>
+#include <kernel/minmax.h>
 
 static VFS *s_vfs;
 
@@ -17,23 +18,23 @@ VFSNode::~VFSNode() {}
 int VFSNode::read(void *buffer, size_t size) {
 	(void)size;
 	if (is_directory()) {
-		VFSNode* node = nullptr;
+		VFSNode *node = nullptr;
 		if (m_position >= m_nodes.size()) {
 			if (!m_mounted_filesystem)
 				return -1;
 
-			size_t trupos = m_position-m_nodes.size();
-			if (trupos >= m_mounted_filesystem->m_nodes.size()) 
+			size_t trupos = m_position - m_nodes.size();
+			if (trupos >= m_mounted_filesystem->m_nodes.size())
 				return -1;
 
 			node = m_mounted_filesystem->m_nodes[trupos];
 		} else {
 			node = m_nodes[m_position];
 		}
-		*(ino_t*)buffer = 0;
+		*(ino_t *)buffer = 0;
 		size_t len = strlen(node->m_name);
-		memcpy((char*)((uintptr_t)buffer+sizeof(ino_t)), node->m_name, len);
-		memset((char*)((uintptr_t)buffer+sizeof(ino_t)+len), 0, 1);
+		memcpy((char *)((uintptr_t)buffer + sizeof(ino_t)), node->m_name, len);
+		memset((char *)((uintptr_t)buffer + sizeof(ino_t) + len), 0, 1);
 		m_position++;
 		return 1;
 	}
@@ -51,7 +52,6 @@ VFSNode *VFSNode::traverse(Vec<const char *> &path, size_t path_index) {
 		if (path_index == 0 && path.size() == 1) {
 			return VFS::the().get_root_fs();
 		}
-
 		return VFS::the().get_root_fs()->traverse(path, path_index+1);
 	}
 
@@ -66,7 +66,7 @@ VFSNode *VFSNode::traverse(Vec<const char *> &path, size_t path_index) {
 	}
 
 	if (m_mounted_filesystem) {
-		return m_mounted_filesystem->traverse(path, 0);
+		return m_mounted_filesystem->traverse(path, path_index);
 	}
 
 	return nullptr;
@@ -131,7 +131,7 @@ VFS::VFS() {
 	m_root_vfs_node->m_mounted_filesystem = fs;
 	print_fs(m_root_vfs_node);
 	// REMOVE ME
-	//fs->create("sigma");
+	// fs->create("sigma");
 }
 
 VFS &VFS::the() { return *s_vfs; }
@@ -140,6 +140,7 @@ void VFS::init() { s_vfs = new VFS(); }
 
 VFS::~VFS() {}
 
+// FIXME memory leak
 Vec<const char *> VFS::parse_path(const char *path) {
 	Vec<const char *> path_vec;
 	size_t accum_idx = 0;
@@ -178,6 +179,58 @@ end:
 	return path_vec;
 }
 
+Vec<const char *> VFS::parse_path_cwd(Vec<const char*> cwd, const char *path) {
+	auto d = parse_path(path);
+
+	if (d[0][0] != '/') {
+		// FIXME leaks memory
+		d = add_paths(cwd, d);
+	}
+
+	// FIXME add a string class ffs
+	for (size_t i = 0; i < d.size(); i++) {
+		char* s = const_cast<char*>(d[i]);
+		int dots = 0;
+		while (*s) {
+			if (*s == '.') dots++;
+			else
+				dots = 0;
+			s++;
+		}
+
+		if (dots < 3 && dots > 0) {
+			if (i > 1) {
+				if (dots == 2) {
+					d.remove(i-1);
+					d.remove(i-1);
+				} else {
+					d.remove(i);
+				}
+			} else {
+				d.remove(i);
+			}
+		}
+	}
+
+	for (size_t i = 0; i < d.size(); i++) {
+		printk("%s\n", d[i]);
+	}
+
+	return d;
+}
+
+Vec<const char *> VFS::add_paths(Vec<const char*> lhs, Vec<const char*> rhs) {
+	Vec<const char*> p;
+	for (size_t i = 0; i < lhs.size(); i++) {
+		p.push(strdup(lhs[i]));
+	}
+
+	for (size_t i = 0; i < rhs.size(); i++) {
+		p.push(strdup(rhs[i]));
+	}
+	return p;
+}
+
 void VFS::print_fs(VFSNode *fs, int depth) {
 	for (int i = 0; i < depth; i++) {
 		printk(" ");
@@ -198,6 +251,7 @@ VFSNode *VFS::open(Vec<const char *> &name) {
 	if (!node)
 		return nullptr;
 	node->init();
+	node->m_position = 0;
 	return node;
 }
 
@@ -206,4 +260,9 @@ FileHandle *VFS::open_fh(Vec<const char *> &name) {
 	if (!node)
 		return nullptr;
 	return new FileHandle(node);
+}
+
+VFSNode* VFS::stat(Vec<const char *> &name) {
+	VFSNode *node = m_root_vfs_node->traverse(name);
+	return node;
 }

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 char stdin_buf[1024] = {};
 char stdout_buf[1024] = {};
@@ -44,9 +45,7 @@ FILE *stdin = &_stdin;
 FILE *stdout = &_stdout;
 FILE *stderr = &_stderr;
 
-int fileno(FILE* stream) {
-	return stream->fd;
-}
+int fileno(FILE *stream) { return stream->fd; }
 
 int setvbuf(FILE *stream, char *buf, int mode, size_t size) {
 	stream->buffering_mode = mode;
@@ -85,24 +84,27 @@ FILE *fopen(const char *filename, const char *mode) {
 	int flags = 0;
 	while (*mode) {
 		switch (*mode) {
-			case 'w':
-				flags |= O_WRONLY;
-				break;
-			default:
-				break;
+		case 'w':
+			flags |= O_WRONLY;
+			break;
+		default:
+			break;
 		}
 		mode++;
 	}
 
 	int fd = open(filename, flags);
-	if (fd < 0) return NULL;
+	if (fd < 0)
+		return NULL;
 	FILE *f = (FILE *)malloc(sizeof(FILE));
 	memset((char *)f, 0, sizeof(FILE));
 	f->fd = fd;
 	return f;
 }
 
-int fclose(FILE *stream) { return 0; }
+int fclose(FILE *stream) { 
+	return close(stream->fd);
+}
 
 int getchar() { return fgetc(stdin); }
 
@@ -151,18 +153,28 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream) {
 		int sz = write(stream->fd, buffer, size * count);
 		stream->pos += sz;
 		return sz;
+		break;
 	case _IOLBF:
 		if (!stream->buffer.buf)
 			return 0;
 		if (!stream->buffer.buf_sz)
 			return 0;
 		if (size * count >= (stream->buffer.buf_sz - stream->buffer.buf_idx)) {
-			return 0;
+			write(stream->fd, stream->buffer.buf, stream->buffer.buf_idx);
+			stream->buffer.buf_idx = 0;
 		}
-		memcpy(&stream->buffer.buf[stream->buffer.buf_idx], buffer,
-			   size * count);
-		stream->buffer.buf_idx += size * count;
-		for (size_t i = 0; i < size; i++) {
+
+		size_t buffer_idx = 0;
+		size_t size_rem = size * count;
+		if (size_rem >= stream->buffer.buf_sz) {
+			write(stream->fd, buffer, size_rem-stream->buffer.buf_sz);
+			buffer_idx += size_rem-stream->buffer.buf_sz;
+		}
+
+		memcpy(&stream->buffer.buf[stream->buffer.buf_idx], ((uint8_t*)buffer)+buffer_idx,
+			   (size * count)-buffer_idx);
+		stream->buffer.buf_idx += (size * count)-buffer_idx;
+		for (size_t i = 0; i < size*count; i++) {
 			if (((char *)buffer)[i] == '\n') {
 				write(stream->fd, stream->buffer.buf, stream->buffer.buf_idx);
 				stream->buffer.buf_idx = 0;
@@ -173,7 +185,7 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream) {
 		break;
 	}
 
-	stream->pos += size*count;
+	stream->pos += size * count;
 	return size * count;
 }
 
@@ -192,52 +204,105 @@ char *fgets(char *str, int count, FILE *stream) {
 	return str;
 }
 
-int puts(const char *str) { return fwrite(str, strlen(str), 1, stdout); }
-
-int fputs(const char *str, FILE *stream) {
-	return fwrite(str, strlen(str), 1, stream);
+int puts(const char *str) { 
+	return fputs(str, stdout);
 }
 
-typedef void(write_func_t)(void* args, char* b, size_t len);
+int fputs(const char *str, FILE *stream) {
+	char newline = '\n';
+	if (!fwrite(str, strlen(str), 1, stream)) return 0;
+	if (!fwrite(&newline, 1, 1, stream)) return 0;
+	return 1;
+}
 
-void funcprintf(write_func_t func, void* write_func_args, const char* format, va_list ap) {
+typedef void(write_func_t)(void *args, char *b, size_t len);
+
+void funcprintf(write_func_t func, void *write_func_args, const char *format,
+				va_list ap) {
+	size_t last = 0;
 	for (size_t j = 0; j < strlen(format); j++) {
 		char c = format[j];
 		switch (c) {
 		case '%': {
+ermm:
 			j++;
 			int precision = -1;
 			char c2 = format[j];
 			if (c2 == '.') {
 				char precision_char = format[j + 1];
-				if (precision_char == '*')
+				if (precision_char == '*') {
 					precision = va_arg(ap, int);
+					j += 2;
+					c2 = format[j];
+				} else {
+					precision = precision_char - '0';
+					j += 2;
+					c2 = format[j];
 
-				precision = precision_char - '0';
-				j += 2;
-				c2 = format[j];
-
-				// Skip invalid precision
-				if (precision > 9)
-					break;
+					// Skip invalid precision
+					if (precision > 9)
+						break;
+				}
 			}
 
 			switch (c2) {
+			case '0' ... '9':
+				// FIXME
+				goto ermm;
+				break;
+			case 'i':
 			case 'd': {
-				unsigned int value = va_arg(ap, unsigned int);
+				int value = va_arg(ap, int);
 				char buffer[10] = {};
 				itoa(value, buffer, 10);
-				func(write_func_args, buffer, strlen(buffer));
-				//fwrite(buffer, strlen(buffer), 1, stream);
-				break;
-			}
+				size_t buffer_len = strlen(buffer);
+
+				if (precision > 0 && buffer_len < precision) {
+					for (int _ = 0; _ < precision-buffer_len; _++) {
+						char zero = '0';
+						func(write_func_args, &zero, 1);
+					}
+				}
+
+				func(write_func_args, buffer, buffer_len);
+			} break;
+			case 'f': {
+				double value = va_arg(ap, double);
+				char neg = '-';
+				if ((uint32_t)value & (1<<31)) {
+					func(write_func_args, &neg, 1);
+				}
+
+				char in[8];
+				char frac[8];
+				itoa((int)value, in, 10);
+				func(write_func_args, in, strlen(in));
+
+				// euros hate this
+				char dot = '.';
+				func(write_func_args, &dot, 1);
+
+				int zeroes = 0;
+				float fr = fract(value);
+				while (fract(fr)) {
+					fr *= 10.0;
+					if ((int)fr == 0) {
+						zeroes++;
+					}
+				}
+				const char zero = '0';
+				for (int i = 0; i < zeroes; i++) {
+					func(write_func_args, &zero, 1);
+				}
+				itoa((int)floor(fr), frac, 10);
+				func(write_func_args, frac, strlen(frac));
+			} break;
 			case 'x': {
-				unsigned int value = va_arg(ap, unsigned int);
+				uint64_t value = va_arg(ap, uint64_t);
 				char buffer[8];
-				itoa(value, buffer, 16);
+				ulltoa(value, buffer, 16);
 				func(write_func_args, buffer, strlen(buffer));
-				break;
-			}
+			} break;
 			case 's': {
 				char *value = va_arg(ap, char *);
 				if (precision >= 0) {
@@ -245,18 +310,15 @@ void funcprintf(write_func_t func, void* write_func_args, const char* format, va
 				} else {
 					func(write_func_args, value, strlen(value));
 				}
-				break;
-			}
+			} break;
 			case 'c': {
 				char value = va_arg(ap, int);
 				func(write_func_args, &value, 1);
-				break;
-			}
+			} break;
 			default:
 				func(write_func_args, &c, 1);
 				func(write_func_args, &c2, 1);
-				break;
-			}
+			} break;
 			break;
 		}
 		default:
@@ -266,70 +328,74 @@ void funcprintf(write_func_t func, void* write_func_args, const char* format, va
 	}
 }
 
-static void iowrite(void* args, char* buf, size_t sz) {
-	fwrite(buf, sz, 1, (FILE*)args);
+static void iowrite(void *args, char *buf, size_t sz) {
+	fwrite(buf, sz, 1, (FILE *)args);
 }
 
 int fprintf(FILE *stream, const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);
-	funcprintf(iowrite, (void*)stream, format, ap);
+	funcprintf(iowrite, (void *)stream, format, ap);
 	va_end(ap);
 	return 0;
 }
 
 int vfprintf(FILE *stream, const char *format, __builtin_va_list list) {
-	funcprintf(iowrite, (void*)stream, format, list);
+	funcprintf(iowrite, (void *)stream, format, list);
 	return 0;
 }
 
 int printf(const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);
-	funcprintf(iowrite, (void*)stdout, format, ap);
+	funcprintf(iowrite, (void *)stdout, format, ap);
 	va_end(ap);
 	return 0;
 }
 
 struct bwrite_args {
-	char* out;
+	char *out;
 	size_t idx;
 	size_t lim;
 };
 
-static void bwrite(void* args, char* buf, size_t sz) {
-	struct bwrite_args* bargs = (struct bwrite_args*)args;
-	if ((size_t)(bargs->out+bargs->idx+sz) >= bargs->lim) return;
-	memcpy(bargs->out+bargs->idx, buf, sz);
+static void bwrite(void *args, char *buf, size_t sz) {
+	struct bwrite_args *bargs = (struct bwrite_args *)args;
+	if (bargs->lim && (size_t)(bargs->out + bargs->idx + sz) >= bargs->lim)
+		return;
+	memcpy(bargs->out + bargs->idx, buf, sz);
 	bargs->idx += sz;
 }
 
 int vsprintf(char *str, const char *format, __builtin_va_list list) {
-	struct bwrite_args bargs; 
+	struct bwrite_args bargs;
 	bargs.out = str;
 	bargs.idx = 0;
-	funcprintf(bwrite, (void*)&bargs, format, list);
+	funcprintf(bwrite, (void *)&bargs, format, list);
 	return 0;
 }
 
 int sprintf(char *str, const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);
-	struct bwrite_args bargs; 
+	struct bwrite_args bargs;
 	bargs.out = str;
 	bargs.idx = 0;
 	bargs.lim = 0;
-	funcprintf(bwrite, (void*)&bargs, format, ap);
+	funcprintf(bwrite, (void *)&bargs, format, ap);
+	char c = 0;
+	bwrite(&bargs, &c, 1);
 	va_end(ap);
 	return 0;
 }
 
-int vsnprintf(char *str, size_t size, const char *format, __builtin_va_list list) {
-	struct bwrite_args bargs; 
+int vsnprintf(char *str, size_t size, const char *format,
+			  __builtin_va_list list) {
+	struct bwrite_args bargs;
 	bargs.out = str;
 	bargs.idx = 0;
 	bargs.lim = size;
-	funcprintf(bwrite, (void*)&bargs, format, list);
+	funcprintf(bwrite, (void *)&bargs, format, list);
 	return 0;
 }
 
@@ -341,7 +407,7 @@ int snprintf(char *str, size_t size, const char *format, ...) {
 	return 0;
 }
 
-int sscanf(const char* s, const char* format, ...) {
+int sscanf(const char *s, const char *format, ...) {
 	va_list ap;
 	va_start(ap, format);
 
@@ -349,30 +415,36 @@ int sscanf(const char* s, const char* format, ...) {
 
 	while (*format) {
 		switch (*format) {
-			case '%': {
-				format++;
-				switch (*format) {
-					case 'd': {
-						size_t n = 0;
-						while (isdigit(*s)) {
-							if (!*s) return EOF;
-							n *= 10;
-							n += *s - '0';
-							s++;
-						}
-						int* p = va_arg(ap, int*);
-						*p = n;
-						match++;
-					} break;
+		case '%': {
+			format++;
+			switch (*format) {
+			case 'd': {
+				size_t n = 0;
+				while (isdigit(*s)) {
+					if (!*s)
+						return EOF;
+					n *= 10;
+					n += *s - '0';
+					s++;
 				}
+				int *p = va_arg(ap, int *);
+				*p = n;
+				match++;
 			} break;
-			default:
-				s++;
-				if (!*s) return EOF;
-				break;
+			}
+		} break;
+		default:
+			s++;
+			if (!*s)
+				return EOF;
+			break;
 		}
 		format++;
 	}
 	va_end(ap);
 	return match;
+}
+
+void perror(const char* s) {
+	fprintf(stderr, "error %s\n", s);
 }

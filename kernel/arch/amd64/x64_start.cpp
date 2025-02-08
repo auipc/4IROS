@@ -44,12 +44,12 @@ extern "C" void *memcpy(void *dest, const void *src, size_t size) {
 	return nullptr;
 }
 
-extern "C" uint64_t pdpte0[512];
+extern "C" uint64_t _pml4[512];
+extern "C" uint64_t pdptebad[512];
 extern "C" uint64_t pdbad[512];
 extern "C" uint64_t ptbad[512];
 
-extern "C" 
-[[noreturn]] void kx86_64_start(uint32_t multiboot_header,
+extern "C" [[noreturn]] void kx86_64_start(uint32_t multiboot_header,
 										   multiboot_info *boot_head) {
 	(void)multiboot_header;
 
@@ -73,8 +73,9 @@ extern "C"
 
 		for (uint64_t base = off; base < off + sechead.memsz; base += 0x1000) {
 			uint64_t vaddr = (base - off) + sechead.vaddr;
-			pdpte0[(vaddr >> 30) & 0x1ff] = ((uint64_t)pdbad) | 1;
-			pdbad[(vaddr >> 21) & 0x1ff] = ((uint64_t)ptbad) | 1;
+			_pml4[(vaddr >> 39) & 0x1ff] = ((uint64_t)pdptebad) | 3;
+			pdptebad[(vaddr >> 30) & 0x1ff] = ((uint64_t)pdbad) | 3;
+			pdbad[(vaddr >> 21) & 0x1ff] = ((uint64_t)ptbad) | 3;
 			ptbad[(vaddr >> 12) & 0x1ff] = base | flags;
 		}
 
@@ -94,6 +95,9 @@ extern "C"
 
 	pentryt pentry = (pentryt)ehead->entry;
 
+	(void)kbootinfo;
+	(void)pentry;
+	(void)boot_head;
 	pentry(kbootinfo, boot_head);
 	/*
 	vga_init();

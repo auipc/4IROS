@@ -10,16 +10,20 @@ set(LIBC_SRCS
 	temporary_malloc.cpp
 	gprof.c
 	sys/time.c
+	sys/ioctl.c
 	time.c
-	alloca.c
 	ctype.c
 	signal.c
 	dirent.c
+	termios.c
+	sys/stat.c
+	poll.c
 )
 
 set(LIBK_SRCS
 	stdlib.c
 	string.c
+	ctype.c
 	math.c
 	asm/mathhelp.S
 )

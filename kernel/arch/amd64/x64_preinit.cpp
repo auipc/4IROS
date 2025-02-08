@@ -11,6 +11,7 @@
 #include <kernel/unix/ELF.h>
 #include <kernel/vfs/vfs.h>
 #include <string.h>
+#include <kernel/Syscall.h>
 
 struct IDTPTR {
 	uint16_t limit;
@@ -54,7 +55,6 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 #define INTEXT(no) extern "C" void interrupt_##no##_begin();
 
 #define INT(no)                                                                \
-	assert((uint64_t) & interrupt_##no##_begin <= BIT48_MAX);                  \
 	idtgate[no].present = 1;                                                   \
 	/* remove me?*/                                                            \
 	/*idtgate[no].ist = 1;*/                                                   \
@@ -64,10 +64,9 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 	idtgate[no].offset_mid =                                                   \
 		((uint64_t) & interrupt_##no##_begin >> 16) & 0xFFFF;                  \
 	idtgate[no].offset_hi =                                                    \
-		((uint64_t) & interrupt_##no##_begin >> 32) & 0xFFFF;
+		((uint64_t) & interrupt_##no##_begin >> 32);
 
 #define INT_IST1(no)                                                           \
-	assert((uint64_t) & interrupt_##no##_begin <= BIT48_MAX);                  \
 	idtgate[no].present = 1;                                                   \
 	/* remove me?*/                                                            \
 	/*idtgate[no].ist = 1;*/                                                   \
@@ -78,7 +77,7 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 	idtgate[no].offset_mid =                                                   \
 		((uint64_t) & interrupt_##no##_begin >> 16) & 0xFFFF;                  \
 	idtgate[no].offset_hi =                                                    \
-		((uint64_t) & interrupt_##no##_begin >> 32) & 0xFFFF;
+		((uint64_t) & interrupt_##no##_begin >> 32);
 
 INTEXT(0);
 INTEXT(5);
@@ -216,11 +215,11 @@ struct HPET {
 } __attribute__((packed));
 
 uint64_t to_phys(uint64_t addr) {
-	return (addr - 0x280103000) + (0x20000 + 0x4000);
+	return (addr - 0xffffff8000215090) + (0x20000);
 }
 
 uint64_t to_virt(uint64_t addr) {
-	return (addr + 0x280103000) - (0x20000 + 0x4000);
+	return (addr + 0xffffff8000215090) - (0x20000);
 }
 
 #define VIRT_MASK(x, y) ((*(x + ((virt >> y) & 0x1ffull))) & ~4095ull)
@@ -254,16 +253,17 @@ __attribute__((optnone)) void simp_map_page(uint64_t virt, uint64_t phys) {
 	if (!*pt) {
 		uint64_t pt_addr = 0;
 		if (s_use_actual_allocator)
-			pt_addr = (uint64_t)kmalloc_really_aligned(sizeof(uint64_t) * 512, 4096);
+			pt_addr =
+				(uint64_t)kmalloc_really_aligned(sizeof(uint64_t) * 512, 4096);
 		else
 			pt_addr = (uint64_t)kmalloc(sizeof(uint64_t) * 512);
 		// offset into pd
-		*pt = to_phys(pt_addr);
+		*pt = get_page_map(pt_addr);
 		*pt |= 3;
 	}
 
 	uint64_t *pte =
-		(uint64_t *)VIRT_MASK_ADDR((uint64_t *)to_virt(*pt & ~4095ull), 12);
+		(uint64_t *)VIRT_MASK_ADDR((uint64_t *)(*pt & ~4095ull), 12);
 
 	*pte = phys & ~4095;
 	*pte |= 3;
@@ -385,7 +385,6 @@ __attribute__((optnone)) extern "C" void write_eoi() {
 	*eoi_register = 0;
 }
 
-
 bool timer_disabled = false;
 void disable_timer() {
 	ioapic_set_ioredir_val(21, 1 << 16);
@@ -399,7 +398,11 @@ void enable_timer() {
 
 extern "C" void unhandled_interrupt() { panic("Unhandled Interrupt\n"); }
 
-extern "C" void div_interrupt() { panic("Division Fault\n"); }
+extern "C" void div_interrupt(ExceptReg &eregs) { 
+	printk("Fault at 0x%x\n", eregs.error);
+	Debug::stack_trace((uint64_t *)eregs.rbp);
+	panic("Division Fault\n"); 
+}
 
 extern "C" void gpf_interrupt(ExceptReg &eregs) {
 	if (eregs.error) {
@@ -418,14 +421,15 @@ extern "C" void gpf_interrupt(ExceptReg &eregs) {
 	printk("rax %x rbx %x rcx %x rdx %x cs %x\n", eregs.rax, eregs.rbx,
 		   eregs.rcx, eregs.rdx, eregs.cs);
 	printk("Fault at 0x%x\n", eregs.rip);
-	printk("current_process pid %d %s\n", current_process->pid, current_process->name());
+	printk("current_process pid %d %s\n", current_process->pid,
+		   current_process->name());
 	if (eregs.cs == 0x23) {
 		printk("current_process->kill()");
 		current_process->kill();
 		Process::sched(0);
 		return;
 	}
-	Debug::stack_trace((uint64_t*)eregs.rbp);
+	Debug::stack_trace((uint64_t *)eregs.rbp);
 	panic("General Protection Fault\n");
 }
 
@@ -437,11 +441,14 @@ extern "C" void pf_interrupt(ExceptReg &eregs) {
 	uintptr_t fault_addr = get_cr2();
 	bool user = eregs.error & 4;
 	if (user) {
-		printk("Process %s[%d] faulted on address %x while executing at %x\n", current_process->name(), current_process->pid, fault_addr, eregs.rip);
-		Debug::stack_trace((uint64_t*)eregs.rbp);
-		int fault_succ =
-			Process::resolve_cow(current_process, fault_addr & ~(PAGE_SIZE - 1));
-		if (fault_succ) return;
+		printk("Process %s[%d] faulted on address %x while executing at %x\n",
+			   current_process->name(), current_process->pid, fault_addr,
+			   eregs.rip);
+		Debug::stack_trace((uint64_t *)eregs.rbp);
+		int fault_succ = Process::resolve_cow(current_process,
+											  fault_addr & ~(PAGE_SIZE - 1));
+		if (fault_succ)
+			return;
 		printk("current_process->kill()");
 		current_process->kill();
 		Process::sched(0);
@@ -491,13 +498,33 @@ void sleep(const uint64_t ms_time) {
 // (https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf#page=11)
 static uint64_t fp_per_tick = 0;
 uint64_t tick_counter = 0;
-#define HPET0_TICK_COUNT 0xB00B
+uint64_t second_base = 0;
+uint64_t last_second_counter = 0;
+uint64_t us_elapsed = 0;
+#define HPET0_TICK_COUNT 0xB00B //B00B135
 
 uint64_t global_waiter_time = 0;
+extern bool sched_enabled;
+
+HPET * hpet;
 
 extern "C" void timer_interrupt(InterruptReg *regs) {
+	if (!second_base) {
+		second_base = Syscall::timeofday();
+	}
+
+	// FIXME this will overflow
+	uint64_t timer_ticks = (*(uint64_t*)(hpet->address.address+0xF0) * fp_per_tick);
+	uint64_t seconds = timer_ticks/1000000000000000;
+	//us_elapsed = (timer_ticks%(seconds*1000000000000000))/1000000000;
+	us_elapsed = (timer_ticks%(1000000000000000))/1000000000;
+
+	second_base += (seconds-last_second_counter);
+	last_second_counter = seconds;
+	//printk("%d\n", second_base);
+
 	global_waiter_time =
-		(tick_counter * HPET0_TICK_COUNT * fp_per_tick) / 1000000000000;
+		(tick_counter * HPET0_TICK_COUNT * fp_per_tick) / 1000000000;
 	tick_counter++;
 	/*
 #ifndef TEST_TIMER
@@ -519,7 +546,8 @@ tick_counter*fp_per_tick, ms_elapsed); uint64_t cr3; asm volatile("movq %%cr3,
 #endif
 end:
 */
-	Process::sched((uintptr_t)regs, true);
+	if (sched_enabled)
+		Process::sched((uintptr_t)regs, true);
 	write_eoi();
 }
 
@@ -566,7 +594,6 @@ struct {
 	.ptr = (uint64_t)gdt,
 };
 
-
 KSyscallData ksyscall_data = {};
 __attribute__((aligned(16))) uint8_t fxsave_region[512];
 
@@ -575,8 +602,7 @@ void *nested_interrupt_stack = 0;
 extern "C" void syscall_entry();
 
 extern "C" [[noreturn]] void kernel_main();
-extern "C"
-__attribute__((optnone)) [[noreturn]] void
+extern "C" __attribute__((optnone)) [[noreturn]] void
 kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	uintptr_t tss_ptr =
 		get_page_map((uintptr_t)&tss) + (((uintptr_t)&tss) & 4095);
@@ -585,6 +611,12 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	gdt[10] |= (tss_ptr & 0xffff) << 16;
 	gdt[11] |= ((tss_ptr >> 16) & 0xff);
 	gdt[11] |= ((tss_ptr >> 24) & 0xff) << 24;
+
+	// IA32_KERNEL_GS_BASE
+	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
+			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
+
+	ksyscall_data.fxsave_region = (uint8_t **)&fxsave_region;
 
 	// Load new GDT
 	asm volatile("lgdt %0" ::"m"(gdt_ptr));
@@ -625,7 +657,7 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	RSDP *rsdp = get_rsdp_ptr();
 	simp_map_page((uint64_t)rsdp->rsdt_addr, (uint64_t)rsdp->rsdt_addr);
 	local_apic = (uint8_t *)scan_acpi_apic(rsdp);
-	HPET *hpet = scan_acpi_hpet(rsdp);
+	hpet = scan_acpi_hpet(rsdp);
 	simp_map_page((uint64_t)hpet->address.address,
 				  (uint64_t)hpet->address.address);
 	simp_map_page((uint64_t)IOAPIC_ADDR, (uint64_t)IOAPIC_ADDR);
@@ -683,20 +715,22 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 
 	printk("Available memory %x\n", (1 * MB) + (boot_head->mem_upper * KB));
 
-	static constexpr size_t FAKE_MEM = 100*MB;
+	static constexpr size_t FAKE_MEM = 100 * MB;
 	printk("Fake mem %x\n", FAKE_MEM);
 
-	Paging::setup(/*(1 * MB) + (boot_head->mem_upper * KB)*/FAKE_MEM, kbootinfo);
+	Paging::setup(/*(1 * MB) + (boot_head->mem_upper * KB)*/ FAKE_MEM,
+				  kbootinfo);
 
-	size_t base = FAKE_MEM+1*MB;
+	size_t base = FAKE_MEM + 1 * MB;
 	int i = 0;
-	//Paging::the()->allocator()->mark_range(base, kbootinfo.kmap_end+10*MB);
+	// Paging::the()->allocator()->mark_range(base, kbootinfo.kmap_end+10*MB);
 	for (i = 0; i <= 20 * MB; i += PAGE_SIZE) {
-		simp_map_page((uint64_t)base+i, (uint64_t)base+i);
+		simp_map_page((uint64_t)base + i, (uint64_t)base + i);
 	}
 	actual_malloc_init((void *)base, 30 * MB);
 	for (; i <= 30 * MB; i += PAGE_SIZE) {
-		Paging::the()->map_page(*(RootPageLevel*)get_cr3(), (uint64_t)base+i, (uint64_t)base+i);
+		Paging::the()->map_page(*(RootPageLevel *)get_cr3(), (uint64_t)base + i,
+								(uint64_t)base + i);
 	}
 
 	nested_interrupt_stack =
@@ -714,11 +748,6 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	// IA32_FMASK EFLAGS mask
 	write_msr(0xC0000084, (1 << 9) | (3 << 12) | (1 << 17), 0);
 
-	// IA32_KERNEL_GS_BASE
-	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
-			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
-
-	ksyscall_data.fxsave_region = (uint8_t **)&fxsave_region;
 	// mp stuff
 	// write_icr((3<<18)|(1<<15)|(5<<8));
 

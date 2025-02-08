@@ -7,16 +7,14 @@ extern "C" {
 
 #define RAND_MAX ((1 << 32) - 1)
 
-long strtol(const char* nptr, char** endptr, int base);
-char* getenv(const char* name);
+long strtol(const char *nptr, char **endptr, int base);
+char *getenv(const char *name);
 int abs(int x);
 int rand();
-__attribute__ ((malloc))
-void *calloc(size_t, size_t);
-__attribute__ ((malloc))
-void *malloc(size_t);
-__attribute__ ((malloc))
-void *realloc(void *ptr, size_t size);
+__attribute__((malloc)) void *calloc(size_t, size_t);
+__attribute__((malloc)) void *malloc(size_t);
+__attribute__((malloc)) void *realloc(void *ptr, size_t size);
+__attribute__((malloc)) void *aligned_alloc(size_t alignment, size_t size);
 void free(void *addr);
 void srand(unsigned int seed);
 void qsort(void *base, size_t nel, size_t width,

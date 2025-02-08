@@ -1,18 +1,21 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
-int main(int argc, char** argv) {
-	if (argc < 2) return 1;
+int main(int argc, char **argv) {
+	if (argc < 2)
+		return 1;
 	int fd = open(argv[1], 0);
-	if (fd < 0) return 1;
+	if (fd < 0)
+		return 1;
 	int sz = lseek(fd, 0, SEEK_END);
-	if (!sz) return 1;
+	if (!sz)
+		return 1;
+	printf("argc %d\n", argc);
 	lseek(fd, 0, SEEK_SET);
-	char* buf = (char*)malloc(sizeof(char)*sz);
+	char *buf = (char *)malloc(sizeof(char) * sz);
 	read(fd, buf, sz);
-	for (int i = 0; i < sz; i++)
-		fwrite(&buf[i], 1, 1, stdout);
+	fwrite(buf, sz, 1, stdout);
 	return 0;
 }

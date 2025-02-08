@@ -3,6 +3,11 @@
 #include <kernel/util/Vec.h>
 #include <limits.h>
 #include <string.h>
+#include <errno.h>
+
+enum VFSError {
+	VFSFULL = -1,
+};
 
 class VFSNode {
   public:
@@ -54,7 +59,7 @@ class VFSNode {
 		m_nodes.push(node);
 	}
 
-	virtual VFSNode* create(const char* name) {
+	virtual VFSNode *create(const char *name) {
 		(void)name;
 		return nullptr;
 	}
@@ -64,7 +69,7 @@ class VFSNode {
 	virtual VFSNode *mounted_filesystem() { return m_mounted_filesystem; }
 
 	virtual size_t size() { return 0; }
-	virtual void set_size(size_t) { }
+	virtual void set_size(size_t) {}
 
   protected:
 	friend class VFS;
@@ -89,8 +94,14 @@ class FileHandle {
 	int seek(int64_t offset, SeekMode origin);
 	size_t tell();
 	bool check_blocked() { return m_node->check_blocked(); }
-	bool check_blocked_write(size_t sz) { return m_node->check_blocked_write(sz); }
-	void block_if_required(size_t size) { m_node->seek(m_position); m_node->block_if_required(size); m_position = m_node->position(); }
+	bool check_blocked_write(size_t sz) {
+		return m_node->check_blocked_write(sz);
+	}
+	void block_if_required(size_t size) {
+		m_node->seek(m_position);
+		m_node->block_if_required(size);
+		m_position = m_node->position();
+	}
 
 	VFSNode *node() { return m_node; }
 
@@ -117,8 +128,11 @@ class VFS {
 	~VFS();
 	static void init();
 	Vec<const char *> parse_path(const char *path);
+	Vec<const char *> parse_path_cwd(Vec<const char*> cwd, const char *path);
+	Vec<const char *> add_paths(Vec<const char*> lhs, Vec<const char*> rhs);
 	VFSNode *open(Vec<const char *> &name);
 	FileHandle *open_fh(Vec<const char *> &name);
+	VFSNode* stat(Vec<const char *> &name);
 
 	void print_fs(VFSNode *root, int depth = 0);
 
@@ -126,6 +140,14 @@ class VFS {
 
 	inline VFSNode *get_root_fs() { return m_root_vfs_node; }
 	inline VFSNode *get_dev_fs() { return m_dev_fs; }
+
+
+	static int vfs2posixerr(VFSError error) {
+		switch (error) {
+			case VFSFULL:
+				return ENOSPC;
+		}
+	}
 
   private:
 	VFSNode *m_root_vfs_node = nullptr;

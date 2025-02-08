@@ -1,6 +1,7 @@
 #include <alloca.h>
 #include <math.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 #ifdef LIBK
 extern void *kmalloc(size_t size);
@@ -22,12 +23,12 @@ const char *strrchr(const char *str, int character) {
 char *strdup(const char *s) {
 	size_t s_sz = strlen(s);
 #ifndef LIBK
-	char *m = (char *)malloc(s_sz+1);
+	char *m = (char *)malloc(s_sz + 1);
 #else
-	char *m = (char *)kmalloc(s_sz+1);
+	char *m = (char *)kmalloc(s_sz + 1);
 #endif
 	memcpy(m, s, s_sz);
-	*(m+s_sz) = 0;
+	*(m + s_sz) = 0;
 	return m;
 }
 
@@ -71,12 +72,14 @@ char *strcpy(char *destination, const char *source) {
 	return destination;
 }
 
+// FIXME
 char *strncpy(char *destination, const char *source, size_t n) {
 	if (n == 0)
 		return (0);
 
-	size_t read_sz = (strlen(source) > n) ? n : strlen(source);
-	for (size_t i = 0; i < read_sz; i++) {
+	memset(destination, 0, n); 
+	for (size_t i = 0; i < n; i++) {
+		if (!source[i]) break;
 		destination[i] = source[i];
 	}
 	return destination;
@@ -101,8 +104,8 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 		return 0;
 
 	while (n--) {
-		if (*(unsigned char*)s1 != *(unsigned char*)s2)
-			return (*(unsigned char*)s1 > *(unsigned char*)s2) ? 1 : -1;
+		if (*(unsigned char *)s1 != *(unsigned char *)s2)
+			return (*(unsigned char *)s1 > *(unsigned char *)s2) ? 1 : -1;
 		s1++;
 		s2++;
 	}
@@ -110,28 +113,32 @@ int memcmp(const void *s1, const void *s2, size_t n) {
 	return 0;
 }
 
-// stolen from OpenBSD
 int strncasecmp(const char *s1, const char *s2, size_t n) {
-
 	if (n == 0)
-		return (0);
-	do {
-		if ((*s1 != *s2++) && (abs(*s1 - (*(s2 - 1))) != 32))
-			return (*(unsigned char *)s1 - *(unsigned char *)--s2);
-		if (*s1++ == 0)
-			break;
-	} while (--n != 0);
-	return (0);
+		return 0;
+
+	for (int i = 0; i < n; i++) {
+		if (!s1[i] && !s2[i]) break;
+		if (toupper((unsigned char)s1[i]) != toupper((unsigned char)s2[i])) {
+			return -1;
+		}
+	}
+
+	return 0;
 }
 
-void *memchr(const void* s, int c, size_t n) {
-	while (n-- && *((const unsigned char*)s++) != c);
-	return (n || *((const unsigned char*)s) != c) ? (void*)((char*)s+n) : 0;
+void *memchr(const void *s, int c, size_t n) {
+	while (n-- && *((const unsigned char *)s++) != c)
+		;
+	return (n || *((const unsigned char *)s) != c) ? (void *)((char *)s + n)
+												   : 0;
 }
 
-void *memrchr(const void* s, int c, size_t n) {
-	while (n && *(((const unsigned char*)s)+(n--)) != c);
-	return (n || *(((const unsigned char*)s)+n) == c) ? (void*)(s+n) : NULL;
+void *memrchr(const void *s, int c, size_t n) {
+	while (n && *(((const unsigned char *)s) + (n--)) != c)
+		;
+	return (n || *(((const unsigned char *)s) + n) == c) ? (void *)(s + n)
+														 : NULL;
 }
 
 // stolen from OpenBSD
@@ -150,10 +157,11 @@ int strcasecmp(const char *s1, const char *s2) {
 	return (*(unsigned char *)s1 - *(unsigned char *)--s2);
 }
 
-void memset(char *buffer, char value, size_t size) {
+void* memset(char *buffer, char value, size_t size) {
 	for (size_t i = 0; i < size; i++) {
 		buffer[i] = value;
 	}
+	return buffer;
 }
 
 #ifndef LIBK
@@ -162,7 +170,7 @@ void *memmove(void *s1, const void *s2, size_t n) {
 		return s1;
 
 	// FIXME
-	char *m = (char *)alloca(n);
+	char *m = (char *)malloc(n);
 	memcpy(m, s2, n);
 	memcpy(s1, m, n);
 	return s1;
@@ -178,7 +186,7 @@ void *memcpy(void *s1, const void *s2, size_t n) {
 	return s1;
 }
 
-void itoa(uint64_t n, char *buf, int base) {
+void ulltoa(uint64_t n, char *buf, int base) {
 	int i = 0;
 
 	buf[i++] = '\0';
@@ -189,6 +197,33 @@ void itoa(uint64_t n, char *buf, int base) {
 			buf[i++] = 'a' + ((n - 10) % base);
 		n /= (uint64_t)base;
 	} while (n);
+
+	i--;
+	for (int j = 0; j < i; j++, i--) {
+		uint64_t tmp = buf[i];
+		buf[i] = buf[j];
+		buf[j] = tmp;
+	}
+}
+
+void itoa(int64_t n, char *buf, int base) {
+	int neg = n < 0;
+	int i = 0;
+
+	if (neg)
+		n = -n;
+
+	buf[i++] = '\0';
+	do {
+		if ((n % base) < 10)
+			buf[i++] = '0' + (n % base);
+		else
+			buf[i++] = 'a' + ((n - 10) % base);
+		n /= (int64_t)base;
+	} while (n);
+
+	if (neg)
+		buf[i++] = '-';
 
 	i--;
 	for (int j = 0; j < i; j++, i--) {
@@ -216,6 +251,13 @@ size_t strlen(const char *str) {
 	const char *start = str;
 
 	while (*str)
+		str++;
+	return str - start;
+}
+
+size_t strnlen(const char *str, size_t n) {
+	const char *start = str;
+	while (*str || (n--))
 		str++;
 	return str - start;
 }

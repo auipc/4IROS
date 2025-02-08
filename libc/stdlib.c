@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <ctype.h>
 #include <limits.h>
 #include <math.h>
 #include <stddef.h>
@@ -6,8 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <assert.h>
-#include <ctype.h>
 
 static uint64_t _seed = 9217967468171297656;
 void srand(unsigned int seed) { _seed = seed; }
@@ -53,7 +53,7 @@ uint16_t compute_crc_16(uint8_t *buf, size_t sz) {
 }
 
 // FIXME not posix compliant
-long strtol(const char* nptr, char** endptr, int base) {
+long strtol(const char *nptr, char **endptr, int base) {
 	assert(base == 10);
 	long n = 0;
 	while (isdigit(*nptr)) {
@@ -65,9 +65,7 @@ long strtol(const char* nptr, char** endptr, int base) {
 	return n;
 }
 
-char* getenv(const char* name) {
-	return NULL;
-}
+char *getenv(const char *name) { return NULL; }
 
 int rand() {
 	uint8_t seed_1 = _seed;

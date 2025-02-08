@@ -84,7 +84,7 @@ void Debug::stack_trace(uint64_t *rbp) {
 }
 
 void Debug::stack_trace_depth(int depth) {
-	uint64_t* rbp;
+	uint64_t *rbp;
 	READ_REGISTER("rbp", rbp);
 
 	printk("==BEGIN STACK TRACE==\n");
@@ -105,7 +105,6 @@ void Debug::stack_trace_depth(int depth) {
 	}
 	printk("==END STACK TRACE==\n");
 }
-
 
 void print_type(char c) { printk("%c", c); }
 

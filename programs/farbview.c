@@ -14,6 +14,7 @@
 #define STBI_NO_STDIO
 #define STBI_NO_THREAD_LOCALS
 #include <stb_image.h>
+#include <dirent.h>
 
 uint16_t endswap16(uint16_t n) {
 	uint8_t *b = (uint8_t *)(&n);
@@ -43,75 +44,87 @@ uint64_t rdtsc() {
 	return tsc.counter;
 }
 
-uint32_t* downscale(uint32_t* buf, size_t w, size_t h, size_t dw, size_t dh) {
-	uint32_t* dest_buf = (uint32_t*)malloc(sizeof(uint32_t)*dw*dh);
+uint32_t *downscale(uint32_t *buf, size_t w, size_t h, size_t dw, size_t dh) {
+	if ((w < dw) && (h < dh))
+		return buf;
+	if ((w == dw) && (h==dh))
+		return buf;
+	uint32_t *dest_buf = (uint32_t *)malloc(sizeof(uint32_t) * dw * dh);
+	float ratio_x = w/dw;
+	printf("RATIO %d %d %f\n", w, dw, ratio_x);
 	for (size_t y = 0; y < dh; y++) {
 		for (size_t x = 0; x < dw; x++) {
-			float scale_x = w/dw;
-			float scale_y = h/dh;
-			dest_buf[y*dw+x] = buf[((int)(y*scale_y))*dw+((int)(x*scale_x))];
+			dest_buf[y * dw + x] = buf[y*w+(int)(x*ratio_x)];
 		}
 	}
+	free(buf);
 	return dest_buf;
 }
 
 int main(int argc, const char **argv) {
 	int fd = open("/dev/bochs", 0);
-	if (fd < 0) return 1;
+	if (fd < 0)
+		return 1;
 
+	int kbdfd = open("/dev/keyboard", 0);
 	uint16_t xres = 1280;
 	uint16_t yres = 800;
-	/*uint32_t *display_buffer =
-		(uint32_t *)malloc(sizeof(uint32_t) * xres * yres);*/
+	uint32_t *display_buffer =
+		(uint32_t *)malloc(sizeof(uint32_t) * xres * yres);
 
-	int index = 1;
-#if 0
-		char path[100] = {};
-		sprintf(path, "hi/%d.jpg", index);
-
-		fprintf("Opening image %s\n", path);
-#endif
-		// Read farbfeld image
-	int image_fd = open("hyper.jpg", 0);
-	if (image_fd < 0) return 1;
-
-	size_t sz = lseek(image_fd, 0, SEEK_END);
-	lseek(image_fd, 0, SEEK_SET);
-
-	//printf("Reading image %s\n", path);
-	uint8_t *buf = (uint8_t *)malloc(sz);
-	read(image_fd, buf, sz);
-	/*for (size_t i = 0; i < sz; i++)
-		read(image_fd, &buf[i], 1);*/
-
-	int height, width, channels;
-	volatile uint64_t tsc = rdtsc();
-	char *image_buffer =
-		stbi_load_from_memory(buf, sz, &width, &height, &channels, 3);
-	volatile uint64_t tsc_1 = rdtsc();
-	//printf("TSC :: %d\n", (tsc_1-tsc)/2000000);
-
-	int render_height = (height > yres) ? yres : height;
-	int render_width = (width > xres) ? xres : width;
-
-	//uint32_t* downscale_buf = downscale(image_buffer, width, height, xres, yres);
-	printf("height %d width %d\n",height,width);
-	for (size_t py = 0; py < render_height; py++) {
-		for (size_t px = 0; px < render_width; px++) {
-			uint8_t r = image_buffer[(py * width + px) * 3];
-			uint8_t g = image_buffer[(py * width + px) * 3 + 1];
-			uint8_t b = image_buffer[(py * width + px) * 3 + 2];
-
-			uint32_t col =
-				((b & 0xff)) | ((g & 0xff) << 8) | ((r & 0xff) << 16);
-			//display_buffer[py * xres + px] = col;
-			lseek(fd, (py * xres + px)*4, SEEK_SET);
-			write(fd, &col, sizeof(uint32_t));
-		}
+	char* path = "hi";
+	DIR *d = opendir(path);
+	if (!d) {
+		printf("Error: %d\n", errno);
+		return 1;
 	}
-	printf("bochs_fd = %d\n", fd);
-	free(buf);
-	free(image_buffer);
+	struct dirent *dir;
+	while ((dir = readdir(d))) {
+		printf("Opening image %s\n", dir->d_name);
+		char path[100];
+		sprintf(path, "hi/%s", dir->d_name);
+		// Read farbfeld image
+		int image_fd = open(path, 0);
+		if (image_fd < 0)
+			return 1;
+
+		size_t sz = lseek(image_fd, 0, SEEK_END);
+		lseek(image_fd, 0, SEEK_SET);
+
+		uint8_t *buf = (uint8_t *)malloc(sz);
+		read(image_fd, buf, sz);
+		close(image_fd);
+
+		int height, width, channels;
+		char *image_buffer =
+			stbi_load_from_memory(buf, sz, &width, &height, &channels, 3);
+
+		int render_height = (height > yres) ? yres : height;
+		int render_width = (width > xres) ? xres : width;
+
+		//image_buffer = downscale(image_buffer, width, height, render_width, render_height);
+		for (size_t py = 0; py < render_height; py++) {
+			for (size_t px = 0; px < render_width; px++) {
+				uint8_t r = image_buffer[(py * width + px) * 3];
+				uint8_t g = image_buffer[(py * width + px) * 3 + 1];
+				uint8_t b = image_buffer[(py * width + px) * 3 + 2];
+
+				uint32_t col =
+					((b & 0xff)) | ((g & 0xff) << 8) | ((r & 0xff) << 16);
+				display_buffer[py * xres + px] = col;
+			}
+		}
+		free(buf);
+		free(image_buffer);
+		lseek(fd, 0, SEEK_SET);
+		write(fd, display_buffer, sizeof(uint32_t)*xres*yres);
+#if 0
+		char lol[2];
+		do {
+			read(kbdfd, lol, 2);
+		} while(lol[0]);
+#endif
+	}
 #if 0
 	uint64_t magic;
 	read(image_fd, &magic, 8);

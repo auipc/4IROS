@@ -5,12 +5,13 @@
 #include <kernel/util/Bitmap.h>
 #include <math.h>
 
-PageFrameAllocator::PageFrameAllocator(size_t memory_size) {
+PageFrameAllocator::PageFrameAllocator(size_t base, size_t memory_size)
+	: m_addr_base(base)
+{
 	m_pages = memory_size / PAGE_SIZE;
 	for (int i = 1; i <= 4; i++) {
-		m_buddies.push(new Bitmap(m_pages / pow(2, i-1)));
+		m_buddies.push(new Bitmap(m_pages / pow(2, i - 1)));
 	}
-	printk("pages left %x\n", m_buddies[0]->count_unset());
 }
 
 PageFrameAllocator::~PageFrameAllocator() {
@@ -19,16 +20,9 @@ PageFrameAllocator::~PageFrameAllocator() {
 	}
 }
 
-/*
-size_t PageFrameAllocator::alloc_size(size_t memory_size) {
-	size_t a = sizeof(PageFrameAllocator);
-	a += sizeof(Vec<Bitmap>) * 4;
-	for (int i = 0; i < 4; i++) {
-		a += Bitmap::alloc_size(memory_size / (pow(2, i) * PAGE_SIZE));
-	}
-
-	return a;
-}*/
+size_t PageFrameAllocator::mem_in_use() {
+	return (m_pages - m_buddies[0]->count_unset())*PAGE_SIZE;
+}
 
 void PageFrameAllocator::mark_range(uintptr_t start, size_t end) {
 	printk("mark_range %x-%x\n", start, start + end);
@@ -39,8 +33,8 @@ void PageFrameAllocator::mark_range(uintptr_t start, size_t end) {
 	for (uintptr_t i = start; i < end; i += PAGE_SIZE) {
 		m_buddies[0]->set(i / PAGE_SIZE);
 		for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
-			if ((i % (uintptr_t)(pow(2, buddy-1) * PAGE_SIZE)) == 0) {
-				m_buddies[buddy]->set(i / (pow(2, buddy-1) * PAGE_SIZE));
+			if ((i % (uintptr_t)(pow(2, buddy - 1) * PAGE_SIZE)) == 0) {
+				m_buddies[buddy]->set(i / (pow(2, buddy - 1) * PAGE_SIZE));
 			}
 		}
 	}
@@ -53,12 +47,12 @@ size_t PageFrameAllocator::find_free_page() {
 	m_buddies[0]->set(address / PAGE_SIZE);
 
 	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
-		if ((address % (size_t)(pow(2, buddy-1) * PAGE_SIZE)) == 0) {
-			m_buddies[buddy]->set(address / (pow(2, buddy-1) * PAGE_SIZE));
+		if ((address % (size_t)(pow(2, buddy - 1) * PAGE_SIZE)) == 0) {
+			m_buddies[buddy]->set(address / (pow(2, buddy - 1) * PAGE_SIZE));
 		}
 	}
 
-	return address;
+	return m_addr_base+address;
 }
 
 size_t PageFrameAllocator::find_free_pages(size_t pages) {
@@ -77,7 +71,7 @@ size_t PageFrameAllocator::find_free_pages(size_t pages) {
 		}
 	}
 
-	return (start * PAGE_SIZE);
+	return m_addr_base+(start * PAGE_SIZE);
 }
 
 size_t PageFrameAllocator::largest_container(size_t size) {
@@ -89,9 +83,9 @@ size_t PageFrameAllocator::largest_container(size_t size) {
 #else
 
 	int container = 0;
-	int min = abs(size - (pow(2, container-1) * PAGE_SIZE));
+	int min = abs(size - (pow(2, container - 1) * PAGE_SIZE));
 	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
-		size_t buddy_size = pow(2, buddy-1) * PAGE_SIZE;
+		size_t buddy_size = pow(2, buddy - 1) * PAGE_SIZE;
 		int diff = abs(size - buddy_size);
 		if (diff < min) {
 			min = diff;
@@ -112,6 +106,7 @@ bool PageFrameAllocator::pertains(size_t page) {
 }
 
 void PageFrameAllocator::release_page(size_t page) {
+	page -= m_addr_base;
 	size_t page_idx = page / PAGE_SIZE;
 	if (!pertains(page_idx))
 		return;
@@ -119,7 +114,7 @@ void PageFrameAllocator::release_page(size_t page) {
 	for (size_t buddy = 1; buddy < m_buddies.size(); buddy++) {
 		size_t buddy_alignment = ((1 << buddy) - 1);
 		if ((page_idx & buddy_alignment) == 0) {
-			m_buddies[buddy]->set(page_idx / buddy_alignment);
+			m_buddies[buddy]->unset(page_idx / buddy_alignment);
 		}
 	}
 }

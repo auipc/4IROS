@@ -13,6 +13,7 @@ extern "C" {
 #define O_CREAT (1 << 2)
 #define O_TRUNC (1 << 3)
 #define O_APPEND (1 << 4)
+#define O_DIRECTORY (1 << 5)
 
 #ifdef __cplusplus
 };

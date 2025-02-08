@@ -9,12 +9,9 @@
 #include <kernel/util/Vec.h>
 #include <stdint.h>
 
-template <typename T>
-class DumbSmart {
-public:
-	DumbSmart(T* ptr) 
-		: m_ptr(ptr)
-	{
+template <typename T> class DumbSmart {
+  public:
+	DumbSmart(T *ptr) : m_ptr(ptr) {
 		// I'm stupid ;-;
 		m_refs = new size_t;
 		(*m_refs) = 1;
@@ -30,26 +27,19 @@ public:
 		}
 	}
 
-	DumbSmart(DumbSmart& dumb) 
-		: m_ptr(dumb.m_ptr)
-		, m_refs(dumb.m_refs)
-	{
+	DumbSmart(DumbSmart &dumb) : m_ptr(dumb.m_ptr), m_refs(dumb.m_refs) {
 		(*m_refs) += 1;
 		printk("copy %x %x\n", dumb, *dumb.m_refs);
 	}
 
-	T* operator->() {
-		return m_ptr;
-	}
+	T *operator->() { return m_ptr; }
 
-	T* ptr() {
-		return m_ptr;
-	}
-private:
-	T* m_ptr;
-	size_t* m_refs;
+	T *ptr() { return m_ptr; }
+
+  private:
+	T *m_ptr;
+	size_t *m_refs;
 };
-
 
 struct CoWInfo;
 struct PageLevel;
@@ -70,6 +60,18 @@ inline uint64_t get_cr3() {
 	return cr3;
 }
 
+template <typename T, typename U>
+struct Pair {
+	Pair(T t, U u)
+		: left(t)
+		, right(u)
+	{
+	}
+
+	T left;
+	U right;
+};
+
 #define PAGE_ADDRESS_MASK 0x000ffffffffff000
 
 class Paging {
@@ -77,16 +79,12 @@ class Paging {
 	~Paging();
 	static void setup(size_t total_memory, const KernelBootInfo &kbootinfo);
 
-	RootPageLevel *clone(const RootPageLevel &);
+	Pair<RootPageLevel *, void*> clone(const RootPageLevel &);
 	RootPageLevel *clone_for_fork(const RootPageLevel &,
 								  bool just_copy = false);
-	RootPageLevel *clone_for_fork_test(const RootPageLevel &,
-								  bool just_copy = false);
-
-	RootPageLevel *clone_for_fork_shallow_cow(RootPageLevel &pml4,
-											  HashTable<CoWInfo> *owner_table,
-											  HashTable<CoWInfo> *table,
-											  bool just_copy = false);
+	Pair<RootPageLevel *, void*> clone_for_fork_test(const RootPageLevel &,
+									   bool just_copy = false);
+	RootPageLevel *cow_clone(RootPageLevel &pml4);
 
 	inline static RootPageLevel *kernel_root_directory() {
 		// This shouldn't be null
@@ -132,7 +130,7 @@ class Paging {
 
 	void unmap_page(RootPageLevel &pd, uintptr_t virt);
 
-	// 4 page map routines (we have like 5 actually) 
+	// 4 page map routines (we have like 5 actually)
 	void map_page_assume(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
 						 uint64_t flags = PAEPageFlags::Present |
 										  PAEPageFlags::Write);
@@ -143,7 +141,8 @@ class Paging {
 				  uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
 
 	void map_page_user(RootPageLevel &pd, uintptr_t virt, uintptr_t phys,
-				  uint64_t flags = PAEPageFlags::Present | PAEPageFlags::Write);
+					   uint64_t flags = PAEPageFlags::Present |
+										PAEPageFlags::Write);
 
 	void create_page_level(PageSkellington &lvl);
 	void resolve_cow_fault(RootPageLevel &owner_pd, RootPageLevel &dest_pd,
@@ -156,13 +155,14 @@ class Paging {
 
   private:
 	friend struct PageSkellington;
-	friend struct PageLevel;
-	friend struct LovelyPageLevel;
+	friend struct BasePageLevel;
 
 	RootPageLevel *m_safe_pgl;
 	Paging(size_t total_memory, const KernelBootInfo &kbootinfo);
 	// A safe area of memory reserved for copying pages
 	uint8_t *m_safe_area;
+	// Allocates page structs
+	PageFrameAllocator *m_level_allocator;
 	PageFrameAllocator *m_allocator;
 	static Paging *s_instance;
 };
@@ -207,9 +207,7 @@ struct PageSkellington {
 
 static_assert(sizeof(PageSkellington) == 8);
 
-struct PageLevel {
-	MALLOC_NEW_MUST_BE_PAGE_ALIGNED;
-
+struct BasePageLevel {
 	inline PageLevel *map() const {
 		auto map_page = Paging::the()->m_safe_area + PAGE_SIZE;
 		Paging::the()->map_page_assume(*(RootPageLevel *)get_cr3(),
@@ -217,19 +215,18 @@ struct PageLevel {
 		return (PageLevel *)map_page;
 	}
 
+	int recursive_release(int depth=0);
+
 	PageSkellington entries[512];
+};
+
+struct PageLevel : BasePageLevel {
+	MALLOC_NEW_MUST_BE_PAGE_ALIGNED;
+
 } __attribute__((packed)) __attribute__((aligned(PAGE_SIZE)));
 
 // Without the malloc constraint
-struct LovelyPageLevel {
-	inline PageLevel *map() const {
-		auto map_page = Paging::the()->m_safe_area + PAGE_SIZE;
-		Paging::the()->map_page_assume(*(RootPageLevel *)get_cr3(),
-									   (uintptr_t)map_page, (uintptr_t)this);
-		return (PageLevel *)map_page;
-	}
-
-	PageSkellington entries[512];
+struct LovelyPageLevel : BasePageLevel {
 } __attribute__((packed));
 
 struct RootPageLevel : PageLevel {

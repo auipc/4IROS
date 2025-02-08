@@ -2,13 +2,22 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define E_C 2.718281828459045
-#define PI 3.141592653589793
-
+// FIXME this should just flip the sign bit!!
+// there's even a handy instruction fchs
 double fabs(double x) { return x > 0.0 ? x : -x; }
 
 double sqrt(double x) {
 	double res = 0;
+	asm volatile("fldl %1\n"
+				 "fsqrt\n"
+				 "fstl %0"
+				 : "=m"(res)
+				 : "m"(x));
+	return res;
+}
+
+float sqrtf(float x) {
+	float res = 0;
 	asm volatile("fldl %1\n"
 				 "fsqrt\n"
 				 "fstl %0"
@@ -60,15 +69,40 @@ double pow(double x, double y) {
 	return result;
 }
 
-double cos(double x) { return __builtin_cos(x); }
+double cos(double x) { 
+	double res = 0;
+	asm volatile("fldl %1\n"
+				 "fcos\n"
+				 "fstl %0"
+				 : "=m"(res)
+				 : "m"(x));
+	return res;
+}
 
-double sin(double x) { return __builtin_sin(x); }
+double sin(double x) { 
+	double res = 0;
+	asm volatile("fldl %1\n"
+				 "fsin\n"
+				 "fstl %0"
+				 : "=m"(res)
+				 : "m"(x));
+	return res;
+}
+
+void sincos(double x, double* sin, double* cos) {
+	asm volatile("fldl %2\n"
+				 "fsincos\n"
+				 "fstl %0\n"
+				 "fxch\n"
+				 "fstl %1\n"
+				 : "=m"(*cos), "=m"(*sin)
+				 : "m"(x));
+}
 
 // Yes, I know this sucks.
+// There's a much faster way to do this, however I like calculus (no)
 double acos(double x) {
 	float sum = 0;
-	// Integrate until we have an acceptable acos value (lol no)
-	// FIXME use the trapezoidal rule for this
 	for (float y = x; y < 1.0; y += 0.00001) {
 		sum += (1.0 / sqrt(1.0 - (y * y))) * 0.00001;
 	}

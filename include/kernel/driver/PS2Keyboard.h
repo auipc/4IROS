@@ -16,6 +16,6 @@ class PS2Keyboard final : public VFSNode {
 	static size_t s_buffer_pos;
 	static size_t s_writer_pos;
 
-	static constexpr size_t KEYBD_BUFFER_SZ = (4*MB);
+	static constexpr size_t KEYBD_BUFFER_SZ = (4 * MB);
 	static bool s_initialized;
 };

@@ -1,13 +1,16 @@
 #ifndef _LIBC_STDIO_H
 #define _LIBC_STDIO_H
 #pragma once
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdarg.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
 #define BUFSIZ 1024
 #define EOF -1
 typedef size_t fpos_t;
@@ -35,15 +38,17 @@ extern FILE *stderr;
 // line buffered
 #define _IOLBF 2
 
-void clearerr(FILE* stream);
-int fileno(FILE* stream);
+void perror(const char* s);
+void clearerr(FILE *stream);
+int fileno(FILE *stream);
 int setvbuf(FILE *stream, char *buf, int mode, size_t size);
 size_t ftell(FILE *stream);
 int feof(FILE *stream);
 int ferror(FILE *stream);
 int fflush(FILE *stream);
 int getchar(void);
-int sscanf(const char* s, const char* format, ...);
+
+int __attribute__ ((format (scanf, 2, 3))) sscanf(const char *s, const char *format, ...);
 int putchar(int ch);
 int fputc(int ch, FILE *stream);
 int ungetc(int ch, FILE *stream);
@@ -56,15 +61,16 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream);
 char *fgets(char *str, int count, FILE *stream);
 int vfprintf(FILE *stream, const char *format, __builtin_va_list list);
 int vsprintf(char *str, const char *format, __builtin_va_list list);
-int sprintf(char *str, const char *format, ...);
-int snprintf(char *str, size_t size, const char *format, ...);
-int vsnprintf(char *str, size_t size, const char *format, __builtin_va_list list);
-int fprintf(FILE *stream, const char *format, ...);
+int __attribute__ ((format (printf, 2, 3))) sprintf(char *str, const char *format, ...);
+int __attribute__ ((format (printf, 3, 4))) snprintf(char *str, size_t size, const char *format, ...);
+int vsnprintf(char *str, size_t size, const char *format,
+			  __builtin_va_list list);
+int __attribute__ ((format (printf, 2, 3))) fprintf(FILE *stream, const char *format, ...);
 int puts(const char *str);
 int fputs(const char *str, FILE *stream);
 // Sidenote: printf can fail? I'd like to see the C code that has error checking
 // for every print call...
-int printf(const char *format, ...);
+int __attribute__ ((format (printf, 1, 2))) printf(const char *format, ...);
 #ifdef __cplusplus
 };
 #endif

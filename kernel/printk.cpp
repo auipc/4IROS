@@ -110,7 +110,7 @@ void vprintk(const char *str, __builtin_va_list list) {
 			case 'x': {
 				uint64_t n = __builtin_va_arg(list, uint64_t);
 				char buf[33] = {};
-				itoa(n, buf, 16);
+				ulltoa(n, buf, 16);
 				write_scb_str(buf, 7);
 			} break;
 			case 'd': {

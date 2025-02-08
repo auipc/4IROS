@@ -7,314 +7,288 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
 #include <stdbool.h>
+#include <math.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <poll.h>
 
-static const uint16_t xres = 1280;
-static const uint16_t yres = 800;
-static const int SPACING = 10;
-int text_begin = 0;
+static const char scancode_ascii[] = {
+	0,	 0,	  '1',	'2',  '3',	'4', '5', '6', '7', '8', '9', '0',
+	'-', '=', '\b', '\t', 'q',	'w', 'e', 'r', 't', 'y', 'u', 'i',
+	'o', 'p', '[',	']',  '\n', 0,	 'a', 's', 'd', 'f', 'g', 'h',
+	'j', 'k', 'l',	';',  '\'', '`', 0,	  '|', 'z', 'x', 'c', 'v',
+	'b', 'n', 'm',	',',  '.',	'/', 0,	  0,   0,	' '};
 
-typedef struct _Line {
-	int bpsp_line_y;
-	int rend_begin_y;
-	int rend_extent_y;
-	size_t text_buf_begin;
-	size_t text_buf_end;
-} Line;
+static const char scancode_ascii_upper[] = {
+	0,	 0,	  '!',	'@',  '#',	'$', '%', '^', '&', '*', '(', ')',
+	'_', '+', '\b', '\t', 'Q',	'W', 'E', 'R', 'T', 'Y', 'U', 'I',
+	'O', 'P', '{',	'}',  '\n', 0,	 'A', 'S', 'D', 'F', 'G', 'H',
+	'J', 'K', 'L',	':',  '"',	'~', 0,	  '|', 'Z', 'X', 'C', 'V',
+	'B', 'N', 'M',	'<',  '>',	'?', 0,	  0,   0,	' '};
 
-struct {
-	unsigned char *ptr;
-	int width;
-	int height;
-	int xoff;
-	int yoff;
-} cache[256] = {};
-int yline = 0;
-float xpos = 2; // leave a little padding in case the character extends left
+static const char scancode_ascii_caps[] = {
+	0,	 0,	  '1',	'2',  '3',	'4', '5', '6', '7', '8', '9', '0',
+	'-', '=', '\b', '\t', 'Q',	'W', 'E', 'R', 'T', 'Y', 'U', 'I',
+	'O', 'P', '[',	']',  '\n', 0,	 'A', 'S', 'D', 'F', 'G', 'H',
+	'J', 'K', 'L',	';',  '"',	'`', 0,	  '|', 'Z', 'X', 'C', 'V',
+	'B', 'N', 'M',	',',  '.',	'/', 0,	  0,   0,	' '};
 
-int min(int x, int y) { return (x < y) ? x : y; }
+#define FRAMEBUFFER_SIZE 1280*800*4
 
-#if 0
-int read_uncode_char(const char* buffer, size_t at, size_t sz) {
-	if (at >= sz) return 0;
-
-	if (!(buffer[0] & (1<<7))) return buffer[0]&CHAR_MAX;
-	if ((at+1) >= sz) return 0;
-	return buffer[0] | (buffer[1]<<)
-}
-#endif
-bool is_multibyte(char c) {
-	if (!(c & (1 << 7)))
-		return false;
-	return true;
+uint32_t get_pxl(uint32_t* framebuffer, uint32_t x, uint32_t y) {
+	if ((x >= 1280) || (y >= 800)) return 0;
+	return framebuffer[1280*y+x];
 }
 
-void render_char(Line *current_line, uint32_t *display_buffer, int bochs_fd,
-				 char text, stbtt_fontinfo *font, bool no_render) {
-	int ascent, descent, baseline, lineGap;
+void draw_pxl(uint32_t* framebuffer, uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b) {
+	//printf("%d %d\n", x,y);
+	if ((x >= 1280) || (y >= 800)) return;
+	framebuffer[1280*y+x] = ((r<<16)|(g<<8)|b);
+}
+
+void draw_pxl_immediate(int fd, uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b) {
+	//printf("%d %d\n", x,y);
+	if ((x >= 1280) || (y >= 800)) return;
+	lseek(fd, (1280*y+x)*4, SEEK_SET);
+	uint32_t c = ((r<<16)|(g<<8)|b);
+	write(fd, &c, 4);
+}
+
+double max(double x, double y) {
+	return (x > y) ? x : y;
+}
+
+int startanim(int fd, uint32_t* framebuffer) {
+	if (fd < 0) {
+		printf("%d\n", errno);
+		return 1;
+	}
+	printf("%x %x\n", framebuffer, framebuffer+FRAMEBUFFER_SIZE);
+	memset((void*)framebuffer, 0, FRAMEBUFFER_SIZE);
+	write(fd, framebuffer, FRAMEBUFFER_SIZE);
+
+	float rot = ((M_PI*2)/360.0)*120.0;
+	for (double t = 0; t < (2.0*M_PI); t+=(1.0/800.0)) {
+		double rot_sin, rot_cos, t_sin, t_cos;
+		sincos(t, &t_sin, &t_cos);
+		double x = (t_sin+(2*sin(2*t)));
+		double y = (t_cos-(2*cos(2*t)));
+		double z = -((sin(3*t)+1)/2);
+
+		sincos(rot, &rot_sin, &rot_cos);
+
+		rot_sin /= 2.0;
+		rot_cos /= 2.0;
+		x *= (rot_sin+rot_cos);
+		x = (x*120)+640;
+		y = (y*120)+400;
+		double color = 255.0-(-z*255.0);
+		draw_pxl_immediate(fd, x+(z*120.0), y, color, color, color);
+		usleep(198);
+	}
+
+	double cbase = 255.0;
+	while (cbase > 0) {
+		memset((void*)framebuffer, 0, FRAMEBUFFER_SIZE);
+		for (double t = 0; t < (2.0*M_PI); t+=(1.0/800.0)) {
+			double rot_sin, rot_cos, t_sin, t_cos;
+			sincos(t, &t_sin, &t_cos);
+			double x = (t_sin+(2*sin(2*t)));
+			double y = (t_cos-(2*cos(2*t)));
+			double z = -((sin(3*t)+1)/2);
+
+			sincos(rot, &rot_sin, &rot_cos);
+
+			rot_sin /= 2.0;
+			rot_cos /= 2.0;
+			x *= (rot_sin+rot_cos);
+
+			x = (x*120)+640;
+			y = (y*120)+400;
+			double color = cbase-(-z*255.0);
+			color = (color > 0) ? color : 0;
+			draw_pxl(framebuffer, x+(z*120.0), y, color, color, color);
+		}
+		lseek(fd, 0, SEEK_SET);
+		write(fd, framebuffer, FRAMEBUFFER_SIZE);
+		rot += 0.01;
+		cbase -= 8.0;
+	}
+
+	return 0;
+}
+
+struct TextRendererInfo {
+	uint32_t* framebuffer;
+	uint32_t* xtra_framebuffer;
 	float scale;
+	int ascent, descent, lineGap;
+	struct stbtt_fontinfo fontinfo;
+};
 
-	int f_x0, f_y0, f_x1, f_y1;
-	stbtt_GetFontBoundingBox(font, &f_x0, &f_y0, &f_x1, &f_y1);
-	scale = stbtt_ScaleForPixelHeight(font, 24);
-	stbtt_GetFontVMetrics(font, &ascent, &descent, &lineGap);
-	baseline = (int)(f_y1 * scale);
+int x_off = 0;
 
-	if (text == '\n') {
-		xpos = 0;
-		yline += (ascent * scale) - (descent * scale) + (lineGap * scale);
-		if (yline >= yres) {
-			yline -= (ascent * scale) - (descent * scale) + (lineGap * scale);
-			// memset(display_buffer, 0, (((ascent * scale) - (descent * scale)
-			// + (lineGap * scale))*xres)*4);
+void draw_line(struct TextRendererInfo tr, int y_adv, const char* str, size_t len) {
+	int baseline = tr.ascent*tr.scale;
+	while (len--) {
+		int width, height;
+		int x0, y0, x1, y1;
+		stbtt_GetCodepointBox(&tr.fontinfo, *str, &x0, &y0, &x1, &y1);
+		int advanceWidth, lsBearing;
+		stbtt_GetCodepointHMetrics(&tr.fontinfo, *str, &advanceWidth, &lsBearing);
+		unsigned char* bitmap = stbtt_GetCodepointBitmap(&tr.fontinfo, tr.scale, tr.scale, *str, &width, &height, NULL, NULL);
+
+		int y_off = baseline+((int)(-y1*tr.scale));
+		y_off += y_adv;
+		//printf("%c y0=%d y1=%d\n", *str, (int)(y0*tr.scale), (int)(y1*tr.scale));
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				uint8_t color = bitmap[width*y+x];
+				if (color > 0)
+					draw_pxl(tr.framebuffer, x+x_off, y+y_off, color, color, color);
+			}
+		}
+
+		x_off += advanceWidth*tr.scale;
+		stbtt_FreeBitmap(bitmap, tr.fontinfo.userdata);
+		str++;
+	}
+}
+
+struct Line {
+	char* str;
+	size_t str_sz;
+};
+
+struct Line lines[512] = {0};
+size_t last_line_index = 0;
+size_t current_line = 0;
+
+int y_advance = 0;
+// FIXME make the spacing between lines completely uniform so we can use memcpy to scroll back
+void push_char(struct TextRendererInfo renderinfo, int tty_fd, char c) {
+	if (c == '\n') {
+		int line_stride = (renderinfo.ascent-renderinfo.descent)+renderinfo.lineGap;
+		y_advance += line_stride;
+		x_off = 0;
+		current_line++;
+		//fprintf(stderr, "line stride %d\n", (int)(line_stride*renderinfo.scale));
+		// Scroll the screen
+		size_t stride = line_stride*renderinfo.scale;
+		if ((y_advance*renderinfo.scale) > (800-(line_stride*renderinfo.scale))) {
+			memcpy(renderinfo.xtra_framebuffer, renderinfo.framebuffer+(stride*1280), 31*stride*1280*4);
+			memcpy(renderinfo.framebuffer, renderinfo.xtra_framebuffer, FRAMEBUFFER_SIZE);
+		}
+		while ((y_advance*renderinfo.scale) > (800-(line_stride*renderinfo.scale))) {
+			y_advance -= stride;
 		}
 		return;
 	}
 
-	int x0, y0, x1, y1;
-	int advance, lsb, height, width, xoff, yoff;
-	float x_shift = xpos - (float)floor(xpos);
-	stbtt_GetCodepointHMetrics(font, text, &advance, &lsb);
-	stbtt_GetCodepointBox(font, text, &x0, &y0, &x1, &y1);
+	//struct Line line = lines[current_line];
 
-	if ((xpos + ((x1 - x0) * scale)) > xres) {
-		xpos = 0;
-		yline += (ascent * scale) - (descent * scale) + (lineGap * scale);
+	// FIXME use size
+	draw_line(renderinfo, y_advance*renderinfo.scale, &c, 1);
+}
+
+void feed_lines(struct TextRendererInfo renderinfo, int tty_fd) {
+	int sz_to_read = 0;
+	ioctl(tty_fd, FIONREAD, (char*)&sz_to_read);
+	if (!sz_to_read) return;
+	char *linebuf = (char*)malloc(sz_to_read);
+	read(tty_fd, linebuf, sz_to_read);
+	for (int i = 0; i < sz_to_read; i++) {
+		push_char(renderinfo, tty_fd, linebuf[i]);
 	}
-
-	unsigned char *char_buf = cache[text].ptr;
-
-	if (!char_buf) {
-		cache[text].ptr = stbtt_GetCodepointBitmap(
-			font, scale, scale, text, &cache[text].width, &cache[text].height,
-			&cache[text].xoff, &cache[text].yoff);
-		char_buf = cache[text].ptr;
-	}
-	width = cache[text].width;
-	height = cache[text].height;
-	xoff = cache[text].xoff;
-	yoff = cache[text].yoff;
-
-	current_line->bpsp_line_y = yline;
-	if (!current_line->rend_begin_y) {
-		current_line->rend_begin_y = (yline + baseline - height) - (y0 * scale);
-	} else
-		current_line->rend_begin_y =
-			min(current_line->rend_begin_y,
-				(yline + baseline - height) - (y0 * scale));
-
-	current_line->rend_extent_y = (current_line->rend_extent_y > height)
-									  ? current_line->rend_extent_y
-									  : height;
-
-	// note that this stomps the old data, so where character boxes overlap
-	// (e.g. 'lj') it's wrong because this API is really for baking
-	// character bitmaps into textures. if you want to render a sequence of
-	// characters, you really need to render each bitmap to a temp buffer,
-	// then "alpha blend" that into the working buffer
-
-	for (int x = 0; x < width; x++) {
-		for (int y = 0; y < height; y++) {
-			if (char_buf[y * width + x]) {
-				int ypos = (yline + y + baseline - height) - (y0 * scale);
-				if (((ypos * xres) + x + (int)xpos) >= (xres * yres) ||
-					((ypos * xres) + x + (int)xpos) < 0) {
-					continue;
-				}
-				uint32_t r = char_buf[y * width + x] << 16;
-				uint32_t g = char_buf[y * width + x] << 8;
-				uint32_t b = char_buf[y * width + x];
-				display_buffer[(ypos * xres) + x + (int)xpos] = r | g | b;
-			}
-		}
-	}
-
-	xpos += (advance * scale);
-
-	if (!no_render) {
-		lseek(bochs_fd, 0, SEEK_SET);
-		write(bochs_fd, display_buffer, xres * yres * 4);
-	}
-#if 0
-	for (int ch = text_begin; ch < text_sz; ch++) {
-		if (text[ch] == '\n') {
-			if (!first_newline) first_newline = ch;
-			xpos = 0;
-			yline += (ascent * scale) - (descent * scale) + (lineGap * scale);
-			if (yline >= yres) {
-				yline -= (ascent * scale) - (descent * scale) + (lineGap * scale);
-				text_begin = first_newline+1;
-				//memset(display_buffer, 0, (((ascent * scale) - (descent * scale) + (lineGap * scale))*xres)*4);
-			}
-			continue;
-		}
-
-		int x0, y0, x1, y1;
-		int advance, lsb, height, width, xoff, yoff;
-		float x_shift = xpos - (float)floor(xpos);
-		stbtt_GetCodepointHMetrics(font, text[ch], &advance, &lsb);
-		stbtt_GetCodepointBox(font, text[ch], &x0, &y0, &x1, &y1);
-
-		if ((xpos+((x1-x0)*scale)) > xres) {
-			xpos = 0;
-			yline += (ascent * scale) - (descent * scale) + (lineGap * scale);
-		}
-
-		unsigned char *char_buf = cache[text[ch]].ptr;
-
-		if (!char_buf) {
-			cache[text[ch]].ptr = stbtt_GetCodepointBitmap(
-				font, scale, scale, text[ch], &cache[text[ch]].width, &cache[text[ch]].height, &cache[text[ch]].xoff, &cache[text[ch]].yoff);
-			char_buf = cache[text[ch]].ptr;
-		}
-		width = cache[text[ch]].width;
-		height = cache[text[ch]].height;
-		xoff = cache[text[ch]].xoff;
-		yoff = cache[text[ch]].yoff;
-
-		// note that this stomps the old data, so where character boxes overlap
-		// (e.g. 'lj') it's wrong because this API is really for baking
-		// character bitmaps into textures. if you want to render a sequence of
-		// characters, you really need to render each bitmap to a temp buffer,
-		// then "alpha blend" that into the working buffer
-
-		for (int x = 0; x < width; x++) {
-			for (int y = 0; y < height; y++) {
-				if (char_buf[y * width + x]) {
-					int ypos = (yline + y + baseline - height) - (y0 * scale);
-					if (((ypos * xres) + x + (int)xpos) >= (xres*yres) || ((ypos * xres) + x + (int)xpos) < 0) {
-						continue;
-					}
-					uint32_t r = char_buf[y*width+x]<<16;
-					uint32_t g = char_buf[y*width+x]<<8;
-					uint32_t b = char_buf[y*width+x];
-					display_buffer[(ypos * xres) + x + (int)xpos] = r|g|b;
-				}
-			}
-		}
-
-		xpos += (advance * scale);
-		if (text[ch + 1])
-			xpos += scale *
-					stbtt_GetCodepointKernAdvance(font, text[ch], text[ch + 1]);
-
-		//STBTT_free(char_buf, font->userdata);
-	}
-
-	lseek(bochs_fd, 0, SEEK_SET);
-	write(bochs_fd, display_buffer, xres * yres * 4);
-#endif
+	free(linebuf);
 }
 
 int main() {
-	int line_index = 0;
-	size_t text_alloc = 0x1000;
-	size_t text_sz = 0;
-	char *text = (char *)malloc(text_alloc);
-	size_t line_alloc = 100;
-	Line *lines = (Line *)malloc(sizeof(Line) * line_alloc);
-	memset((char *)lines, 0, sizeof(Line) * line_alloc);
-	uint32_t *display_buffer =
-		(uint32_t *)malloc(sizeof(uint32_t) * xres * yres);
+	int kbd_fd = open("/dev/keyboard", 0);
+	uint8_t use_upper = 0;
 
-	int bochs_fd = open("/dev/bochs", 0);
-	if (bochs_fd < 0)
-		return 1;
-
-	int serial_fd = open("/dev/serial", 0);
 	int tty_fd = open("/dev/tty", 0);
-	int font_fd = open("alagard.ttf", 0);
-	size_t font_sz = lseek(font_fd, 0, SEEK_END);
-	lseek(font_fd, 0, SEEK_SET);
-	uint8_t *ttf_buffer = malloc(font_sz);
-	read(font_fd, ttf_buffer, font_sz);
-	stbtt_fontinfo font;
-	if (!stbtt_InitFont(&font, ttf_buffer,
-						stbtt_GetFontOffsetForIndex(ttf_buffer, 0))) {
-		printf("Failure\n");
+	int shell_pid = 0;
+	spawn(&shell_pid, "shell", NULL);
+
+	int fd = open("/dev/bochs", 0);
+	uint32_t* framebuffer = malloc(FRAMEBUFFER_SIZE);
+	uint32_t* xtra_framebuffer = malloc(FRAMEBUFFER_SIZE);
+	if (fd < 0) {
+		printf("%d\n", errno);
 		return 1;
 	}
-
-	stbtt__GetGlyphGSUBInfo(&font, NULL, 0);
-
-	int shell_pid = 0;
-	// FIXME this fork obliterates the CoW table for the subsequent fork,
-	// somehow.
-	if (!(shell_pid = fork())) {
-		execvp("shell", NULL);
-		while (1)
-			;
-	}
-
-	int line_offset = 0;
-	int yline_fix = 0;
-
-	while (1) {
-		if (text_sz >= text_alloc) {
-			text_alloc += 0x1000;
-			text = realloc(text, text_alloc);
-		}
-		if ((line_index + 1) > (line_alloc)) {
-			line_alloc += 100;
-			lines = realloc(lines, sizeof(Line) * line_alloc);
-		}
-		Line *current_line = &lines[line_index];
-		char c = 0;
-		size_t size_read = read(tty_fd, &c, 1);
-
 #if 0
-		if (c == '\b') {
-			text_sz--;
-			current_line->text_buf_end--;
-			xpos = 0;
-			yline = current_line->bpsp_line_y;
-			memset((char *)&display_buffer[current_line->rend_begin_y * xres],
-				   0,
-				   ((current_line->rend_begin_y + current_line->rend_extent_y) *
-					xres) *
-					   4);
-			lseek(bochs_fd, 0, SEEK_SET);
-			write(bochs_fd, display_buffer, xres * yres * 4);
-			for (size_t i = current_line->text_buf_begin;
-				 i < current_line->text_buf_end; i++) {
-				render_char(current_line, display_buffer, bochs_fd, text[i],
-							&font, false);
-			}
-			continue;
-		} else
+	int ret;
+	if((ret = startanim(fd, framebuffer))) {
+		free(framebuffer);
+		close(fd);
+		return ret;
+	}
 #endif
-		text[text_sz++] = c;
 
-		current_line->text_buf_end++;
-		// FIXME handle text wrap
-		if (c == '\n') {
-			line_index++;
-			current_line = &lines[line_index];
-			current_line->text_buf_begin = text_sz;
-			current_line->text_buf_end = text_sz;
-			if (yline >= (yres - 140)) {
-				xpos = 0;
-				yline = 0; // lines[line_index-1].rend_begin_y;
-				memset(display_buffer, 0, xres * yres * 4);
-				line_offset++;
-				for (size_t line = line_offset; line < line_index; line++) {
-					Line *redraw_line = &lines[line];
-					redraw_line->rend_begin_y = 0;
-					redraw_line->rend_extent_y = 0;
-					for (size_t i = redraw_line->text_buf_begin;
-						 i < redraw_line->text_buf_end; i++) {
-						render_char(redraw_line, display_buffer, bochs_fd,
-									text[i], &font, true);
-					}
+	struct stat statbuf;
+	struct TextRendererInfo renderinfo;
+	
+	int font_fd = open("jetbrains.ttf", 0);
+	fstat(font_fd, &statbuf);
+	uint8_t* font_buf = malloc(statbuf.st_size);
+	read(font_fd, font_buf, statbuf.st_size);
+	stbtt_InitFont(&renderinfo.fontinfo, font_buf, 0);
+	close(font_fd);
+
+	stbtt_GetFontVMetrics(&renderinfo.fontinfo, &renderinfo.ascent, &renderinfo.descent, &renderinfo.lineGap);
+
+	float scale = stbtt_ScaleForPixelHeight(&renderinfo.fontinfo, 25);
+
+	renderinfo.framebuffer = framebuffer;
+	renderinfo.xtra_framebuffer = xtra_framebuffer;
+	renderinfo.scale = scale;
+
+	struct pollfd poll_fds[2] = {};
+	poll_fds[0].fd = kbd_fd;
+	poll_fds[0].events = POLLIN;
+	poll_fds[1].fd = tty_fd;
+	poll_fds[1].events = POLLIN;
+
+	while(1) {
+		if (poll(poll_fds, 2, 0) > 0) {
+			if (poll_fds[0].revents & POLLIN) {
+				int sz_to_read = 0;
+				ioctl(kbd_fd, FIONREAD, (char*)&sz_to_read);
+				// BAD
+				char buf[sz_to_read];
+				size_t size_read = read(kbd_fd, buf, sz_to_read);
+				if (((int)size_read) == -1) {
+					printf("errno %d\n", errno);
+					break;
 				}
+				for (int i = 0; i < size_read; i += 2) {
+					if (buf[i + 1] == 42)
+						use_upper = !buf[i];
 
-				lseek(bochs_fd, 0, SEEK_SET);
-				write(bochs_fd, display_buffer, xres * yres * 4);
+					if (buf[i]) continue;
+					if (!scancode_ascii[buf[i + 1]])
+						continue;
+					const char* scancode_set = use_upper ? scancode_ascii_upper : scancode_ascii;
+
+					if (buf[i + 1] >= sizeof(scancode_ascii)) continue;
+					write(0, &scancode_set[buf[i + 1]], 1);
+					push_char(renderinfo, tty_fd, scancode_set[buf[i + 1]]);
+				}
 			}
-		}
 
-		write(serial_fd, &c, 1);
-		render_char(current_line, display_buffer, bochs_fd, c, &font, false);
+			if (poll_fds[1].revents & POLLIN) {
+				feed_lines(renderinfo, tty_fd);
+			}
+			lseek(fd, 0, SEEK_SET);
+			write(fd, framebuffer, FRAMEBUFFER_SIZE);
+		}
 	}
 
+	close(kbd_fd);
+	close(tty_fd);
+	close(fd);
 	return 0;
 }

@@ -3,6 +3,8 @@
 #pragma once
 #include <stdint.h>
 
+#define M_PI 3.141592653589793
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -10,10 +12,12 @@ extern "C" {
 int abs(int x);
 double fabs(double x);
 double sqrt(double x);
+float sqrtf(float x);
 double floor(double x);
 double fract(double x);
 double round(double x);
 double pow(double x, double y);
+void sincos(double x, double* sin, double* cos);
 double cos(double x);
 double sin(double x);
 double acos(double x);

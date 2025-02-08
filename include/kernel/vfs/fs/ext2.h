@@ -2,8 +2,10 @@
 
 #include <kernel/vfs/vfs.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #define EXT2_DIR 0x4000
+#define EXT2_REG 0x8000
 
 struct [[gnu::packed]] Ext2SuperBlock {
 	uint32_t total_inodes;
@@ -68,6 +70,8 @@ struct [[gnu::packed]] INode {
 	uint32_t reserved_2[3];
 };
 
+static_assert(sizeof(INode) == 128);
+
 struct [[gnu::packed]] DirEntry {
 	uint32_t inode;
 	uint16_t size;
@@ -84,7 +88,8 @@ class Ext2FileSystem;
 
 class Ext2Entry : public VFSNode {
   public:
-	Ext2Entry(Ext2FileSystem *fs, const char *name, INode *&&inode, size_t inode_no);
+	Ext2Entry(Ext2FileSystem *fs, const char *name, INode *&&inode,
+			  size_t inode_no);
 	~Ext2Entry();
 
 	virtual int read(void *buffer, size_t size) override;
@@ -96,14 +101,15 @@ class Ext2Entry : public VFSNode {
 	virtual size_t size() override { return m_inode->size_low; }
 	virtual void set_size(size_t sz) override;
 
-	virtual inline bool is_directory() override { return m_is_directory; }
+	virtual inline bool is_directory() override { 
+		return (bool)(m_inode->type & EXT2_DIR);
+	}
+
   private:
-	virtual inline void set_is_directory() { m_is_directory = true; }
 	Ext2FileSystem *m_fs;
 	INode *m_inode;
 	size_t m_inode_no;
 	bool write_lock;
-	bool m_is_directory = false;
 	friend class Ext2FileSystem;
 };
 
@@ -112,14 +118,16 @@ class Ext2FileSystem : public VFSNode {
 	Ext2FileSystem(VFSNode *block_dev);
 	~Ext2FileSystem();
 	virtual void init() override;
-	virtual VFSNode *traverse(Vec<const char *> &path, size_t path_index = 0) override;
+	virtual VFSNode *traverse(Vec<const char *> &path,
+							  size_t path_index = 0) override;
 
-	virtual VFSNode* create(const char* name) override;
+	virtual VFSNode *create(const char *name) override;
 
 	virtual inline bool is_directory() override { return true; }
+
   private:
-	int scan_block_bitmap(const BlockGroupDescriptor& bgd);
-	int scan_inode_bitmap(const BlockGroupDescriptor& bgd);
+	int scan_block_bitmap(const BlockGroupDescriptor &bgd);
+	int scan_inode_bitmap(const BlockGroupDescriptor &bgd);
 	void read_indirect_singly(INode &inode, size_t singly_position, void *out,
 							  size_t block_idx, size_t size_to_read,
 							  size_t position);
@@ -130,13 +138,12 @@ class Ext2FileSystem : public VFSNode {
 							   size_t path_index = 0);
 	INode *read_inode(size_t index);
 	BlockGroupDescriptor bgd_from_inode(size_t index);
-	void write_inode(INode* node, size_t index);
+	void write_inode(INode *node, size_t index);
 	void seek_block(size_t block_addr);
 	Vec<Directory> scan_dir_entries(INode &inode);
-	uint32_t write_to_inode(INode &inode, size_t inode_no, void *out, size_t size,
-							 size_t position);
-	int read_from_inode(INode &inode, void *out, size_t size,
-							 size_t position);
+	ssize_t write_to_inode(INode &inode, size_t inode_no, void *out,
+							size_t size, size_t position);
+	int read_from_inode(INode &inode, void *out, size_t size, size_t position);
 	VFSNode *m_block_dev;
 	Ext2SuperBlock block;
 	INode *m_root_inode;

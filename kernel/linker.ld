@@ -2,26 +2,27 @@ ENTRY (kx86_64_preinit)
 
 SECTIONS
 {
+	BASE = 0xffffff8000103000;
 	. = 0x00100000;
 	_kernel_start = .;
-	. += 0x280000000;
+	. += BASE;
 
-	.text ALIGN (4K) : AT (ADDR (.text) - 0x280000000)
+	.text ALIGN (4K) : AT (ADDR (.text) - BASE)
 	{
 		*(.text)
 	}
 
-	.rodata ALIGN (4K) : AT (ADDR (.rodata) - 0x280000000)
+	.rodata ALIGN (4K) : AT (ADDR (.rodata) - BASE)
 	{
 		*(.rodata)
 	}
 
-	.data ALIGN (4K) : AT (ADDR (.data) - 0x280000000)
+	.data ALIGN (4K) : AT (ADDR (.data) - BASE)
 	{
 		*(.data)
 	}
 
-	.bss ALIGN (4K) : AT (ADDR (.bss) - 0x280000000)
+	.bss ALIGN (4K) : AT (ADDR (.bss) - BASE)
 	{
 		*(COMMON)
 		*(.bss)
@@ -30,7 +31,7 @@ SECTIONS
 
 	.temp_page ALIGN(4K) : {
 		_heap_start = .;
-		. += 0x2a000;
+		. += 0x40000;
 		_heap_end = .;
 	}
 

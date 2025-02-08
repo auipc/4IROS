@@ -1,10 +1,11 @@
 #include <kernel/arch/amd64/x64_sched_help.h>
+#include <kernel/driver/TTY.h>
 #include <kernel/shedule/proc.h>
 #include <kernel/unix/ELF.h>
-#include <kernel/driver/TTY.h>
 #include <kernel/util/HashTable.h>
 #include <kernel/vfs/stddev.h>
 #include <kernel/vfs/vfs.h>
+#include <kernel/prof.h>
 
 #define KSTACK_SIZE (4096 * 10)
 Process *current_process = nullptr;
@@ -13,35 +14,37 @@ uint64_t s_pid = 0;
 
 HashTable<Process *> *process_pid_map;
 
-static TTY* shared_fake;
+static TTY *shared_fake;
+bool sched_enabled = true;
 
-Process::Process(const char* name) : pid(s_pid++) {
+Process::Process(const char *name) : pid(s_pid++) {
+	m_cwd = VFS::the().parse_path("/");
 	m_name = strdup(name);
 	m_saved_fpu = (uint8_t *)kmalloc_really_aligned(512, 16);
-	if(!shared_fake)
+	if (!shared_fake)
 		shared_fake = new TTY();
-	m_file_handles.push(new FileHandle(shared_fake));
-	// FIXME make a path class with an explicit constructor so I don't have to keep doing this
+	m_file_handles[m_file_handle_counter++] = new FileHandle(shared_fake);
+	// FIXME make a path class with an explicit constructor so I don't have to
+	// keep doing this
+	auto serial_path = VFS::the().parse_path("/dev/serial");
 	auto path = VFS::the().parse_path("/dev/tty");
-	m_file_handles.push(VFS::the().open_fh(path));
-	m_file_handles.push(new FileHandle(new StdDev(true)));
+	m_file_handles[m_file_handle_counter++] = VFS::the().open_fh(path);
+	m_file_handles[m_file_handle_counter++] = VFS::the().open_fh(path);
+
 	if (!process_pid_map)
 		process_pid_map = new HashTable<Process *>();
 
-	cow_table = new HashTable<CoWInfo>();
 	process_pid_map->push(pid, this);
 	// FIXME clear FPU registers and state before calling this
 	initialize_fpu(m_saved_fpu);
 }
 
-Process::Process(Process *p) : pid(s_pid++) {
-	m_file_handles = p->m_file_handles;
-	cow_table = new HashTable<CoWInfo>();
+Process::Process(Process *p) : pid(s_pid++) 
+{
+	copy_handles(p);
 }
 
 Process::~Process() {
-	delete cow_table;
-	cow_table = nullptr;
 }
 
 void Process::init() {
@@ -66,7 +69,6 @@ void Process::kill_process(Process *p) {
 	delete p;
 }
 
-
 void Process::sched(uintptr_t rsp, bool is_timer_triggered) {
 	(void)is_timer_triggered;
 	if (current_process == current_process->next)
@@ -76,7 +78,8 @@ void Process::sched(uintptr_t rsp, bool is_timer_triggered) {
 		current_process->m_saved_user_stack_ksyscall = ksyscall_data.user_stack;
 	}
 	Process *old = current_process;
-	disable_timer();
+	//disable_timer();
+	sched_enabled = false;
 	asm volatile("sti");
 	do {
 		current_process = current_process->next;
@@ -85,13 +88,12 @@ void Process::sched(uintptr_t rsp, bool is_timer_triggered) {
 		}
 	} while (current_process->m_state != ProState::Running);
 	asm volatile("cli");
-	enable_timer();
+	sched_enabled = true;
+	//enable_timer();
 	if (current_process == old) {
 		current_process = old;
 		return;
 	}
-
-	//printk("switched to proc %d timer_triggered %d\n", current_process->pid, is_timer_triggered);
 
 	assert(current_process);
 	ksyscall_data.stack = current_process->m_actual_kern_stack_top;
@@ -105,7 +107,6 @@ void Process::sched(uintptr_t rsp, bool is_timer_triggered) {
 	x64_switch((void *)current_process->m_kern_stack_top,
 			   (uint64_t)current_process->m_pglv);
 }
-
 
 #if 0
 void Process::sched(uintptr_t rsp) {
@@ -180,22 +181,9 @@ void Process::resolve_cow_recurse(RootPageLevel *level, Process *current,
 
 #endif
 int Process::resolve_cow(Process *current, uintptr_t fault_addr) {
-	RootPageLevel *pglv = current->root_page_level();
-	CoWInfo *inf = current->cow_table->get(fault_addr);
-	if (!inf)
-		return 0;
-	/*
-	if (inf->owner == pglv) {
-		for (size_t i = 0; i < current->m_children.size(); i++) {
-			resolve_cow_recurse(pglv, current->m_children[i], fault_addr);
-		}
-		current->cow_table->remove(fault_addr);
-		return 1;
-	}*/
-
-	Paging::the()->resolve_cow_fault(*inf->owner, *pglv, fault_addr);
-	current->cow_table->remove(fault_addr);
-	return 1;
+	(void)current;
+	(void)fault_addr;
+	return 0;
 }
 
 Process *Process::create(void *func_ptr) {
@@ -221,12 +209,12 @@ Process *Process::create(void *func_ptr) {
 
 Process *Process::create_user(const char *path, size_t argc,
 							  const char **argv) {
-	(void)argv;
-	Process *proc = new Process(path);
+	PROFDEFER;
 	auto path_vec = VFS::the().parse_path(path);
 	auto exec_file = VFS::the().open(path_vec);
 	if (!exec_file)
 		return nullptr;
+	Process *proc = new Process(path);
 	auto file_sz = exec_file->size();
 	char *buffer = new char[file_sz];
 	exec_file->read(buffer, file_sz);
@@ -235,9 +223,12 @@ Process *Process::create_user(const char *path, size_t argc,
 		reinterpret_cast<const ELFSectionHeader64 *>(buffer + ehead->phtable);
 
 	auto current_pd = (RootPageLevel *)get_cr3();
-	RootPageLevel *pgl = Paging::the()->clone_for_fork_test(
-		*(RootPageLevel *)Paging::the()->kernel_root_directory(), true);
-	Paging::the()->switch_page_directory(pgl);
+	Pair<RootPageLevel *, void*> pgl = Paging::the()->clone(
+		*(RootPageLevel *)Paging::the()->kernel_root_directory());
+
+	proc->m_pglv_virt = pgl.right;
+
+	Paging::the()->switch_page_directory(pgl.left);
 
 	for (int i = 0; i < ehead->phnum; i++) {
 		const auto sechead = esecheads[i];
@@ -253,14 +244,14 @@ Process *Process::create_user(const char *path, size_t argc,
 		auto vaddr = sechead.vaddr; // 0x500000+sechead.off-0x1000;
 		for (size_t j = 0; j < sechead.memsz; j += PAGE_SIZE) {
 			auto paddr = Paging::the()->allocator()->find_free_page();
-			Paging::the()->map_page(*pgl, vaddr + j, paddr,
+			Paging::the()->map_page_user(*pgl.left, vaddr + j, paddr,
 									PAEPageFlags::User | flags);
 		}
 		memset((char *)vaddr, 0, sechead.memsz);
 		memcpy((char *)vaddr, buffer + sechead.off, sechead.filesz);
 	}
 
-	uintptr_t stack_begin = 0x400000;
+	uintptr_t stack_begin = 0x8000000000 + 0x400000;
 	uintptr_t stack_end = stack_begin + STACK_SIZE;
 
 	uintptr_t kstack_begin = (uintptr_t)kmalloc_really_aligned(KSTACK_SIZE, 16);
@@ -268,7 +259,7 @@ Process *Process::create_user(const char *path, size_t argc,
 
 	for (int i = 0; i < STACK_SIZE + 4096; i += 4096) {
 		uintptr_t stack_page = Paging::the()->allocator()->find_free_page();
-		Paging::the()->map_page(*pgl, stack_begin + i, stack_page,
+		Paging::the()->map_page_user(*pgl.left, stack_begin + i, stack_page,
 								PAEPageFlags::User | PAEPageFlags::Write |
 									PAEPageFlags::Present);
 		memset((char *)(stack_begin + i), 0, PAGE_SIZE);
@@ -297,7 +288,7 @@ Process *Process::create_user(const char *path, size_t argc,
 											   (uintptr_t)(ehead->entry),
 											   (uint64_t *)stack_end);
 
-	proc->m_pglv = pgl;
+	proc->m_pglv = pgl.left;
 	proc->m_stack_bot = stack_begin;
 	proc->m_stack_top = stack_end;
 	proc->m_kern_stack_bot = kstack_begin;
@@ -311,15 +302,17 @@ Process *Process::create_user(const char *path, size_t argc,
 // FIXME SSE complains because the stack is misaligned. -mstackrealign is a
 // bandaid fix
 Process *Process::fork(SyscallReg *regs) {
+	PROFDEFER;
 	uintptr_t kstack_begin = (uintptr_t)kmalloc_really_aligned(KSTACK_SIZE, 16);
 	uint64_t *kstack_end = (uint64_t *)(kstack_begin + KSTACK_SIZE);
 	// Process* new_proc = new Process(this);
 	Process *new_proc = new Process(m_name);
 	new_proc->m_parent = this;
 	m_children.push(this);
-	/*new_proc->m_pglv = Paging::the()->clone_for_fork_shallow_cow(
-		*m_pglv, cow_table, new_proc->cow_table);*/
-	new_proc->m_pglv = Paging::the()->clone_for_fork_test(*m_pglv);
+
+	Pair<RootPageLevel *, void*> pgl = Paging::the()->clone_for_fork_test(*m_pglv);
+	new_proc->m_pglv = pgl.left;
+	new_proc->m_pglv_virt = pgl.right;
 
 	new_proc->m_stack_bot = m_stack_bot;
 	new_proc->m_stack_top = (uintptr_t)ksyscall_data.user_stack;
@@ -370,11 +363,11 @@ Process *Process::fork(SyscallReg *regs) {
 
 	new_proc->m_kern_stack_bot = kstack_begin;
 	new_proc->m_kern_stack_top = (uintptr_t)kstack_end;
-	new_proc->m_file_handles.clear();
-	for (size_t i = 0; i < m_file_handles.size(); i++) {
+	new_proc->clear_file_handles();
+	for (size_t i = 0; i < m_file_handle_counter; i++) {
 		auto handle = new FileHandle(m_file_handles[i]->node());
 		handle->seek(m_file_handles[i]->tell(), SEEK_SET);
-		new_proc->m_file_handles.push(handle);
+		new_proc->push_handle(handle);
 	}
 	return new_proc;
 }
@@ -385,21 +378,32 @@ void Process::block_on_proc(Process *p) {
 	m_state = ProState::Blocked;
 }
 
-void Process::block_on_sleep(size_t ms) {
+void Process::block_on_sleep(size_t us) {
 	m_blocker.blocked_on = Blocker::SleepBlock;
-	m_blocker.sleep_waiter_ms = global_waiter_time + ms;
+	m_blocker.sleep_waiter_us = global_waiter_time + us;
 	m_state = ProState::Blocked;
 }
 
 void Process::block_on_handle_read(FileHandle *handle) {
 	m_blocker.blocked_on = Blocker::FileIOReadBlock;
-	m_blocker.file.blocked_handle = handle;
+	m_blocker.file.blocked_set = new Vec<FileHandle*>();
+	(*m_blocker.file.blocked_set).push(handle);
+	m_state = ProState::Blocked;
+}
+
+void Process::block_on_handle_read_mul(Vec<FileHandle*> handles) {
+	m_blocker.blocked_on = Blocker::FileIOReadBlock;
+	m_blocker.file.blocked_set = new Vec<FileHandle*>();
+	for (size_t i = 0; i < handles.size(); i++) {
+		(*m_blocker.file.blocked_set).push(handles[i]);
+	}
 	m_state = ProState::Blocked;
 }
 
 void Process::block_on_handle_write(FileHandle *handle, size_t sz) {
 	m_blocker.blocked_on = Blocker::FileIOWriteBlock;
-	m_blocker.file.blocked_handle = handle;
+	m_blocker.file.blocked_set = new Vec<FileHandle*>();
+	(*m_blocker.file.blocked_set).push(handle);
 	m_blocker.file.blocked_sz = sz;
 	m_state = ProState::Blocked;
 }
@@ -412,26 +416,56 @@ void Process::poll_is_blocked() {
 		}
 		break;
 	case Blocker::SleepBlock:
-		printk("%d %d\n", global_waiter_time, m_blocker.sleep_waiter_ms);
 		// Oh, waiter. Check, please.
-		if (global_waiter_time >= m_blocker.sleep_waiter_ms) {
+		if (global_waiter_time >= m_blocker.sleep_waiter_us) {
 			m_state = ProState::Running;
 		}
 		break;
 	case Blocker::FileIOReadBlock:
-		if (!m_blocker.file.blocked_handle->node()->check_blocked()) {
-			//printk("poll_is_blocked\n");
-			m_state = ProState::Running;
+		for (size_t i = 0; i < m_blocker.file.blocked_set->size(); i++) {
+			if (!(*m_blocker.file.blocked_set)[i]->node()->check_blocked()) {
+				m_state = ProState::Running;
+				delete m_blocker.file.blocked_set;
+			}
 		}
 		break;
 	case Blocker::FileIOWriteBlock:
-		if (!m_blocker.file.blocked_handle->node()->check_blocked_write(m_blocker.file.blocked_sz)) {
-			//printk("poll_is_blocked\n");
+		if (!m_blocker.file.blocked_set) {
 			m_state = ProState::Running;
+			break;
+		}
+		// AFAIK there's nothing that would cause a write block for multiple files.
+		if (!m_blocker.file.blocked_set->size() || !(*m_blocker.file.blocked_set)[0]->node()->check_blocked_write(
+				m_blocker.file.blocked_sz)) {
+			m_state = ProState::Running;
+			delete m_blocker.file.blocked_set;
 		}
 		break;
 	default:
 		panic("FIXME");
 		break;
 	}
+}
+
+void Process::del_handle(int fd) {
+	delete m_file_handles[fd];
+	m_file_handles[fd] = nullptr;
+}
+
+int Process::push_handle(FileHandle* handle) {
+	assert(handle);
+	// Start reusing handles
+	if ((m_file_handle_counter) >= FD_LIM) {
+		for (size_t i = 0; i < FD_LIM; i++) {
+			if (!m_file_handles[i]) {
+				m_file_handle_counter++;
+				m_file_handles[i] = handle;
+				return i;
+			}
+		}
+		panic("Out of file descriptors! Report this to the process?\n");
+	}
+	int handle_index = m_file_handle_counter++;
+	m_file_handles[handle_index] = handle;
+	return handle_index;
 }

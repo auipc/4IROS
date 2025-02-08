@@ -1,12 +1,19 @@
-#include <stdint.h>
+#include <dirent.h>
+#include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-int main(int argc, const char **argv) {
-	while (1) {
-		printf("Hello\n");
-		for (int i = 0; i < 100000; i++)
-			asm volatile("nop");
+int main(int argc, char** argv) {
+	char* path = ".";
+	if (argc > 1) {
+		path = argv[1];
+	}
+
+	DIR *d = opendir(path);
+	struct dirent *dir;
+	while ((dir = readdir(d))) {
+		printf("-%s\n", dir->d_name);
 	}
 	return 0;
 }

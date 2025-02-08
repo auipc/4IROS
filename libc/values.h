@@ -5,5 +5,7 @@
 
 #define MININT INT_MIN
 #define MAXINT INT_MAX
+#define MINSHORT SHORT_MIN
+#define MAXSHORT SHORT_MAX
 
 #endif

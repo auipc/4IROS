@@ -3,6 +3,7 @@
 
 #define NULL 0
 typedef __SIZE_TYPE__ size_t;
-#define offsetof(t, m) ((size_t)(&((t*)0)->m))
+typedef long long ssize_t;
+#define offsetof(t, m) ((size_t)(&((t *)0)->m))
 
 #endif

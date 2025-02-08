@@ -12,6 +12,12 @@ extern "C" {
 #define ESRCH 5
 #define ENODEV 6
 #define ENOMEM 7
+#define EINTR 8
+#define ETIME 9
+#define E2BIG 10
+#define EIO 11
+#define ENOSPC 12
+#define ENOTDIR 13
 
 #ifndef LIBK
 extern int _errno;

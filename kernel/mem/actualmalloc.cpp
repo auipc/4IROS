@@ -15,7 +15,7 @@ struct SlowLinkedList {
 	size_t size : 48;
 	size_t alignment = 0;
 	SlowLinkedList *next = nullptr;
-}; //PACKED;
+}; // PACKED;
 
 SlowLinkedList *last_node = nullptr;
 uintptr_t last_addr = 0;
@@ -32,8 +32,8 @@ void actual_malloc_init(void *addr, size_t size) {
 	s_use_actual_allocator = true;
 }
 
-static void group_free(SlowLinkedList * node, uintptr_t addr) {
-	SlowLinkedList * cur = node;
+static void group_free(SlowLinkedList *node, uintptr_t addr) {
+	SlowLinkedList *cur = node;
 	(void)cur;
 	(void)addr;
 	do {
@@ -44,12 +44,12 @@ static void group_free(SlowLinkedList * node, uintptr_t addr) {
 		node = node->next;
 	} while (node->free);
 
-	cur->size = ((uintptr_t)node)-addr;
+	cur->size = ((uintptr_t)node) - addr;
 	cur->next = node;
 }
 
 static uintptr_t slow_align(uintptr_t addr, uintptr_t align) {
-	return (addr % align) ? (addr+(align - (addr % align))) : addr;
+	return (addr % align) ? (addr + (align - (addr % align))) : addr;
 }
 
 static void *actual_malloc_find_free(size_t size, size_t alignment = 0) {
@@ -70,12 +70,13 @@ static void *actual_malloc_find_free(size_t size, size_t alignment = 0) {
 			if (current_node->next)
 				group_free(current_node, next_addr);
 
-			if ((current_node->size-size) > sizeof(SlowLinkedList)) {
+			if ((current_node->size - size) > sizeof(SlowLinkedList)) {
 				auto split_node =
-					new ((void *)(next_addr+size)) SlowLinkedList();
-				split_node->size = (current_node->size-size)-sizeof(SlowLinkedList);
+					new ((void *)(next_addr + size)) SlowLinkedList();
+				split_node->size =
+					(current_node->size - size) - sizeof(SlowLinkedList);
 				split_node->free = true;
-				if (!((((uintptr_t)split_node)+sizeof(SlowLinkedList))%16))
+				if (!((((uintptr_t)split_node) + sizeof(SlowLinkedList)) % 16))
 					split_node->alignment = 16;
 				else
 					split_node->alignment = 0;
@@ -89,12 +90,12 @@ static void *actual_malloc_find_free(size_t size, size_t alignment = 0) {
 		}
 
 		if (current_node->alignment > 1)
-			next_addr =
-				slow_align(next_addr, current_node->alignment);
+			next_addr = slow_align(next_addr, current_node->alignment);
 
 #ifdef DEBUG_CANARY
 		if (current_node->dbg_canary != 0xDEAD) {
-			printk("current_node %x %x %x\n", current_node, &current_node->dbg_canary, current_node->size);
+			printk("current_node %x %x %x\n", current_node,
+				   &current_node->dbg_canary, current_node->size);
 		}
 		assert(current_node->dbg_canary == 0xDEAD);
 #endif
@@ -145,11 +146,12 @@ void actual_free(void *addr) {
 
 	do {
 		if (current_node->alignment > 1)
-			next_addr =
-				slow_align(next_addr, current_node->alignment);
+			next_addr = slow_align(next_addr, current_node->alignment);
 
-		if(current_node->dbg_canary != 0xDEAD) {
-			printk("corrupted header addr %x next_addr %x header %x prev_node %x prev_node->next %x\n", addr, next_addr, current_node, prev_node, prev_node->next);
+		if (current_node->dbg_canary != 0xDEAD) {
+			printk("corrupted header addr %x next_addr %x header %x prev_node "
+				   "%x prev_node->next %x\n",
+				   addr, next_addr, current_node, prev_node, prev_node->next);
 		}
 		assert(current_node->dbg_canary == 0xDEAD);
 		if (next_addr == (uintptr_t)addr) {

@@ -1,5 +1,6 @@
 set(LIBC_CRT0_SRCS
 	crt0.c
+	../unistd.c
 	asm/crt0s.S
 )
 

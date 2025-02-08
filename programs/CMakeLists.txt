@@ -11,6 +11,7 @@ set(PROGRAMS_SRCS
 	gol.c
 	touch.c
 	say.c
+	time.c
 )
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE -fPIC -O3 -mred-zone")

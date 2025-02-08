@@ -19,7 +19,7 @@ bool g_use_halfway_allocator = false;
 
 [[maybe_unused]] static uintptr_t s_alloc_base = 0;
 static const uintptr_t k_allocation_block_size = 4096;
-static const uintptr_t BOOTSTRAP_MEMORY = 0x2a000;
+static const uintptr_t BOOTSTRAP_MEMORY = 0x40000;
 
 void kmalloc_temp_init() {
 	s_mem_offset = reinterpret_cast<uintptr_t>(&_heap_start);
@@ -83,8 +83,7 @@ static void *allocate_block(uintptr_t blocks_needed) {
 	return nullptr;
 }
 
-extern "C"
-void *kmalloc(size_t size) {
+extern "C" void *kmalloc(size_t size) {
 #ifdef __i386__
 	if (g_use_halfway_allocator) {
 		return reinterpret_cast<void *>(Paging::pf_allocator(size));
