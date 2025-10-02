@@ -1,6 +1,7 @@
 # 4IR
 
 ![But that is the beginning of a new story—the story of the gradual renewal of a man, the story of his gradual regeneration, of his passing from one world into another, of his initiation into a new unknown life.](/media/screen.png)
+(Running the frotz Z-Machine emulator)
 
 A crummy kernel presented as an OS. Targets x86-64.
 
