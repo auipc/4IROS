@@ -1,7 +1,7 @@
 #pragma once
+#include <kernel/Debug.h>
 #include <kernel/arch/amd64/x86_64.h>
 #include <kernel/vfs/vfs.h>
-#include <kernel/Debug.h>
 
 class ATAManager {
   public:

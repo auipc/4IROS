@@ -11,7 +11,7 @@
 char stdin_buf[1024] = {};
 char stdout_buf[1024] = {};
 
-//#define STDIO_NOLBF
+// #define STDIO_NOLBF
 #ifdef STDIO_NOLBF
 FILE _stdin = {.fd = 0,
 			   .eof = 0,
@@ -121,9 +121,7 @@ FILE *fdopen(int fd, const char *mode) {
 	return f;
 }
 
-int remove(const char *path) {
-	return 0;
-}
+int remove(const char *path) { return 0; }
 
 int fclose(FILE *stream) { return close(stream->fd); }
 

@@ -47,7 +47,8 @@ class Process {
 	~Process();
 	static void init();
 	static void yield();
-	static void sched(uintptr_t rsp, uintptr_t user_rsp=0, bool is_timer_triggered = false);
+	static void sched(uintptr_t rsp, uintptr_t user_rsp = 0,
+					  bool is_timer_triggered = false);
 	static void reentry();
 	void collapse_cow();
 	static void resolve_cow_recurse(RootPageLevel *level, Process *current,
@@ -61,7 +62,7 @@ class Process {
 	inline void kill() { m_state = ProState::Dead; }
 	inline void set_state(ProState state) { m_state = state; }
 
-	void register_signal_handler(void* ptr);
+	void register_signal_handler(void *ptr);
 
 	void send_signal(int sig);
 	void sigret();
@@ -117,9 +118,7 @@ class Process {
 		return np;
 	}
 
-	inline bool has_signal_handler() {
-		return m_sig_handler;
-	}
+	inline bool has_signal_handler() { return m_sig_handler; }
 
 	void del_handle(int fd);
 	int push_handle(FileHandle *handle);
@@ -162,10 +161,10 @@ class Process {
 	bool m_is_kernel_task = false;
 	RootPageLevel *m_pglv;
 	void *m_pglv_virt;
-	uintptr_t m_sig_handler=0;
+	uintptr_t m_sig_handler = 0;
 	const char *m_name;
 	bool m_in_signal = false;
-	HashTable<CoWPage*>* m_cow_tbl;
+	HashTable<CoWPage *> *m_cow_tbl;
 };
 
 extern Process *current_process;

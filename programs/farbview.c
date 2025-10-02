@@ -14,8 +14,8 @@
 #define STBI_NO_STDIO
 #define STBI_NO_THREAD_LOCALS
 #include <dirent.h>
-#include <stb_image.h>
 #include <fcntl.h>
+#include <stb_image.h>
 
 uint16_t endswap16(uint16_t n) {
 	uint8_t *b = (uint8_t *)(&n);
@@ -171,27 +171,3 @@ int main(int argc, const char **argv) {
 #endif
 	return 0;
 }
-#if 0
-int main() { 
-	int fd = open("/dev/bochs", 0);
-	if (fd < 0) return 1;
-	for (size_t y = 0; y < 800; y++) {
-		for (size_t x = 0; x < 1280; x++) {
-			lseek(fd, (y*1280+x)*4, SEEK_SET);
-			size_t xx = x-500;
-			size_t yy = y-500;
-			uint32_t lol = 0;
-
-			float col_f = 1.0f/(sqrt((xx*xx)+(yy*yy))/(100.0f));
-			uint8_t col = 255.0f*(col_f);
-			col = (sqrt((xx*xx)+(yy*yy))<100) ? col : 0;
-			//printf("%d\n", x-xx);
-
-			lol += col | (col<<8) | (col<<16);
-
-			write(fd, &lol, sizeof(lol));
-		}
-	}
-	return 0; 
-}
-#endif

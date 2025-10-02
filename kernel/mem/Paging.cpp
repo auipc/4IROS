@@ -482,9 +482,9 @@ Paging::clone_for_fork_test(const RootPageLevel &pml4, bool just_copy) {
 	return Pair(root_pd, virt);
 }
 
-Pair<RootPageLevel *, void *> Paging::cow_clone(HashTable<CoWPage *>* owner,
-                                                HashTable<CoWPage *>* child,
-                                                RootPageLevel &pml4) {
+Pair<RootPageLevel *, void *> Paging::cow_clone(HashTable<CoWPage *> *owner,
+												HashTable<CoWPage *> *child,
+												RootPageLevel &pml4) {
 	void *virt = (void *)kmalloc_really_aligned(4096, 4096);
 	auto root_page = page_map((uint64_t)virt);
 	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
@@ -564,8 +564,10 @@ Pair<RootPageLevel *, void *> Paging::cow_clone(HashTable<CoWPage *>* owner,
 						continue;
 					}
 
-					uintptr_t addr = ((uint64_t)i<<39ull)|((uint64_t)j<<30ull)|((uint64_t)k<<21ull)|((uint64_t)l<<12ull);
-					CoWPage* cow_page = nullptr;
+					uintptr_t addr =
+						((uint64_t)i << 39ull) | ((uint64_t)j << 30ull) |
+						((uint64_t)k << 21ull) | ((uint64_t)l << 12ull);
+					CoWPage *cow_page = nullptr;
 
 					if (owner->get(addr)) {
 						cow_page = *owner->get(addr);
@@ -713,7 +715,8 @@ Pair<RootPageLevel *, void *> Paging::cow_clone(HashTable<CoWPage *>* owner,
 }
 
 // FIXME free level structs
-int BasePageLevel::recursive_release(HashTable<CoWPage*>* cow_table, uintptr_t addraccum, int depth) {
+int BasePageLevel::recursive_release(HashTable<CoWPage *> *cow_table,
+									 uintptr_t addraccum, int depth) {
 	if (depth > 3)
 		return 0;
 
@@ -723,14 +726,14 @@ int BasePageLevel::recursive_release(HashTable<CoWPage*>* cow_table, uintptr_t a
 	for (int i = 0; i < 512; i++) {
 		if (i != 1 && depth == 0)
 			continue;
-		uintptr_t vaddr = addraccum|((uintptr_t)i<<(39ull-(depth*9)));
+		uintptr_t vaddr = addraccum | ((uintptr_t)i << (39ull - (depth * 9)));
 		auto &entry = entries[i];
 		auto addr = entry.addr();
 		// FIXME
 		if ((entry.flags() & (PAEPageFlags::User)) &&
 			entry.flags() & (PAEPageFlags::Present)) {
 			if (cow_table->get(vaddr)) {
-				CoWPage** cow_page = cow_table->get(vaddr);
+				CoWPage **cow_page = cow_table->get(vaddr);
 				(*cow_page)->refs--;
 				if ((*cow_page)->refs > 0) {
 					continue;
@@ -738,7 +741,8 @@ int BasePageLevel::recursive_release(HashTable<CoWPage*>* cow_table, uintptr_t a
 				delete *cow_page;
 			}
 			if (depth != 3) {
-				//printk("Trying to fetch %x at depth %d %d\n", addr, depth, i);
+				// printk("Trying to fetch %x at depth %d %d\n", addr, depth,
+				// i);
 				auto fe = entry.fetch();
 				fe->recursive_release(cow_table, vaddr, depth + 1);
 				entry.commit(*fe.ptr());
@@ -755,7 +759,8 @@ int BasePageLevel::recursive_release(HashTable<CoWPage*>* cow_table, uintptr_t a
 	return 0;
 }
 
-void Paging::release(RootPageLevel &page_level, HashTable<CoWPage*>* cow_table) {
+void Paging::release(RootPageLevel &page_level,
+					 HashTable<CoWPage *> *cow_table) {
 	page_level.recursive_release(cow_table);
 }
 

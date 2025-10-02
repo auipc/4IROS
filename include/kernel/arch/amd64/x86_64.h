@@ -78,8 +78,8 @@ inline void write_msr(uint32_t msr, uint32_t low, uint32_t high) {
 
 inline uint64_t read_msr(uint32_t msr) {
 	uint32_t low = 0, high = 0;
-	asm volatile("rdmsr" : "=a"(low), "=d"(high) :"c"(msr));
-	return ((uint64_t)high<<32)|((uint64_t)low<<32);
+	asm volatile("rdmsr" : "=a"(low), "=d"(high) : "c"(msr));
+	return ((uint64_t)high << 32) | ((uint64_t)low << 32);
 }
 
 static_assert(sizeof(TSS) == 104);

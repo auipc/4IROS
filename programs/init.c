@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -6,7 +7,6 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 static const char scancode_ascii[] = {
 	0,	 0,	  '1',	'2',  '3',	'4', '5', '6', '7', '8', '9', '0',
@@ -29,7 +29,7 @@ static const char scancode_ascii_caps[] = {
 	'J', 'K', 'L',	';',  '"',	'`', 0,	  '|', 'Z', 'X', 'C', 'V',
 	'B', 'N', 'M',	',',  '.',	'/', 0,	  0,   0,	' '};
 
-//#define HERETIC
+// #define HERETIC
 #ifdef HERETIC
 void heretic() {
 	int serial_fd = open("/dev/serial", O_WRONLY);
@@ -55,11 +55,11 @@ int main() {
 		char l = '\n';
 		write(0, &l, 1);
 #endif
-		//const char* lol[] = {"doom", "-file", "bw-pal.wad", 0};
-		//execvp("DOOM", lol);
-		//const char* lol[] = {"test", 0};
-		//execvp("test", lol);
-		const char* targ[] = {"term", 0};
+		// const char* lol[] = {"doom", "-file", "bw-pal.wad", 0};
+		// execvp("DOOM", lol);
+		// const char* lol[] = {"test", 0};
+		// execvp("test", lol);
+		const char *targ[] = {"term", 0};
 		execvp("term", targ);
 		return 127;
 	}

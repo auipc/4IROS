@@ -3,7 +3,6 @@
 #include <kernel/util/ism.h>
 #include <kernel/vfs/fs/ext2.h>
 #include <sys/types.h>
-#include <kernel/minmax.h>
 
 uint32_t block_size = 1024;
 uint32_t *s_singly_blocks;
@@ -146,11 +145,12 @@ void Ext2FileSystem::write_inode(INode *node, size_t index) {
 	m_block_dev->write((char *)node, sizeof(INode));
 }
 
-int Ext2FileSystem::release_block_bitmap(const BlockGroupDescriptor &bgd, uint32_t index) {
+int Ext2FileSystem::release_block_bitmap(const BlockGroupDescriptor &bgd,
+										 uint32_t index) {
 	uint8_t *block_bitmap = new uint8_t[block.blocks_per_group / 8];
 	seek_block(bgd.block_address_bm);
 	m_block_dev->read(block_bitmap, block.blocks_per_group / 8);
-	block_bitmap[index/8] = 1<<(index%8);
+	block_bitmap[index / 8] = 1 << (index % 8);
 	seek_block(bgd.block_address_bm);
 	m_block_dev->write(block_bitmap, block.blocks_per_group / 8);
 	delete[] block_bitmap;
@@ -285,7 +285,8 @@ VFSNode *Ext2FileSystem::create(const char *name) {
 
 	// Create Inode
 	// FIXME All empty files should be hardlinked to the same INode.
-	// This prevents a filesystem from leaking excessive amounts of nodes when an empty file is made. (Probably deviates from the ext2 spec)
+	// This prevents a filesystem from leaking excessive amounts of nodes when
+	// an empty file is made. (Probably deviates from the ext2 spec)
 	INode *node = new INode();
 	memset(node, 0, sizeof(INode));
 	node->type = 0x8000 | 0x1ff;

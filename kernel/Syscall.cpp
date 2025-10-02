@@ -10,12 +10,12 @@
 #include <kernel/vfs/vfs.h>
 #include <poll.h>
 #include <priv/common.h>
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <signal.h>
 
 extern uint64_t second_base;
 extern uint64_t us_elapsed;
@@ -488,7 +488,8 @@ static int sys$gettimeofday(Process *current, timeval *tv, void *,
 	return 0;
 }
 
-static int sys$kill(Process *current, pid_t pid, int sig, [[maybe_unused]] int *errno) {
+static int sys$kill(Process *current, pid_t pid, int sig,
+					[[maybe_unused]] int *errno) {
 	(void)current;
 	Process **p = process_pid_map->get(pid);
 	if (!p) {
@@ -499,25 +500,24 @@ static int sys$kill(Process *current, pid_t pid, int sig, [[maybe_unused]] int *
 
 	printk("Sending signal kill\n");
 	switch (sig) {
-		case SIGKILL: {
-			if ((*p)->state() != ProState::Dead) {
-				(*p)->exit_code = 129;
-				(*p)->kill();
-			}
-		} break;
-		case SIGINT: {
-			if((*p)->has_signal_handler()) {
-				(*p)->send_signal(SIGINT);
-			} else {
-				(*p)->exit_code = 130;
-				(*p)->kill();
-			}
-		} break;
-		default:
-			*errno = EINVAL;
-			return -1;
-			break;
-
+	case SIGKILL: {
+		if ((*p)->state() != ProState::Dead) {
+			(*p)->exit_code = 129;
+			(*p)->kill();
+		}
+	} break;
+	case SIGINT: {
+		if ((*p)->has_signal_handler()) {
+			(*p)->send_signal(SIGINT);
+		} else {
+			(*p)->exit_code = 130;
+			(*p)->kill();
+		}
+	} break;
+	default:
+		*errno = EINVAL;
+		return -1;
+		break;
 	}
 	return 0;
 }
@@ -580,7 +580,7 @@ static int sys$poll(Process *current, struct pollfd *fds, size_t fd_no,
 		return -1;
 	}
 
-	Process::resolve_cow(current, (uintptr_t)(fds+fd_no));
+	Process::resolve_cow(current, (uintptr_t)(fds + fd_no));
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)(fds + fd_no),
 					   PAGE_SIZE)) {
 		*errno = EFAULT;
@@ -816,7 +816,8 @@ void handler(SyscallReg *regs) {
 							 reinterpret_cast<void *>(regs->rdx), &errno);
 	} break;
 	case SYS_KILL: {
-		return_value = sys$kill(current, static_cast<pid_t>(regs->rbx), static_cast<int>(regs->rdx), &errno);
+		return_value = sys$kill(current, static_cast<pid_t>(regs->rbx),
+								static_cast<int>(regs->rdx), &errno);
 	} break;
 	case SYS_STAT: {
 		return_value =
@@ -855,7 +856,7 @@ void handler(SyscallReg *regs) {
 			current, reinterpret_cast<const char *>(regs->rbx), &errno);
 	} break;
 	case SYS_SIGNAL: {
-		current->register_signal_handler((void*)regs->rdx);
+		current->register_signal_handler((void *)regs->rdx);
 		return_value = 0;
 	} break;
 	case SYS_SIGRET: {

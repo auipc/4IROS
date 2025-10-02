@@ -134,7 +134,7 @@ void parse_symtab_task() {
 	}
 	current_process->kill();
 	Process::sched(0);
-	while(1) {
+	while (1) {
 		asm volatile("nop");
 	}
 }
@@ -154,8 +154,7 @@ uint8_t read_fixed_port(uint8_t index) {
 	return val;
 }
 
-void write_index_port(uint16_t port, uint8_t index,
-									  uint8_t byte) {
+void write_index_port(uint16_t port, uint8_t index, uint8_t byte) {
 	outb(port, index);
 	outb(port + 1, byte);
 }

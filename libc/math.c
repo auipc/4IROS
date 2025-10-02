@@ -29,9 +29,7 @@ float sqrtf(float x) {
 
 // double round_to_nearest(double value);
 //
-float floorf(float x) {
-	return floor((double)x);
-}
+float floorf(float x) { return floor((double)x); }
 
 double floor(double x) {
 	volatile int64_t y = x;
@@ -76,18 +74,18 @@ double pow(double x, double y) {
 
 double cos(double x) {
 	double res = 0;
-	asm volatile("fcos":"=t"(res):"0"(x));
+	asm volatile("fcos" : "=t"(res) : "0"(x));
 	return res;
 }
 
 double sin(double x) {
 	double res = 0;
-	asm volatile("fsin":"=t"(res):"0"(x));
+	asm volatile("fsin" : "=t"(res) : "0"(x));
 	return res;
 }
 
 void sincos(double x, double *s, double *c) {
-	asm volatile("fsincos":"=t"(*c), "=u"(*s):"0"(x));
+	asm volatile("fsincos" : "=t"(*c), "=u"(*s) : "0"(x));
 }
 
 // Yes, I know this sucks.
@@ -105,9 +103,7 @@ int abs(int x) { return x > 0 ? x : -x; }
 
 double fmod(double x, double y) { return __builtin_fmod(x, y); }
 
-float ceilf(float x) {
-	return ceil((double)x);
-}
+float ceilf(float x) { return ceil((double)x); }
 
 double ceil(double x) {
 	int64_t y = x;

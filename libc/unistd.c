@@ -7,10 +7,7 @@
 
 int optind = 1;
 
-
-char *getcwd(char* buf, size_t size) { 
-	return NULL;
-}
+char *getcwd(char *buf, size_t size) { return NULL; }
 
 int access(const char *path, int mode) {
 	struct stat st;

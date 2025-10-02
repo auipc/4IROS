@@ -151,7 +151,8 @@ void actual_free(void *addr) {
 		if (current_node->dbg_canary != 0xDEAD) {
 			printk("corrupted header addr %x next_addr %x header %x prev_node "
 				   "%x prev_node->next %x\n",
-				   addr, next_addr, current_node->dbg_canary, prev_node, prev_node->next);
+				   addr, next_addr, current_node->dbg_canary, prev_node,
+				   prev_node->next);
 		}
 		assert(current_node->dbg_canary == 0xDEAD);
 		if (next_addr == (uintptr_t)addr) {

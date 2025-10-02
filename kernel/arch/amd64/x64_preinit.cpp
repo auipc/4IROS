@@ -60,10 +60,10 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 	/*idtgate[no].ist = 1;*/                                                   \
 	idtgate[no].segment = 0x8;                                                 \
 	idtgate[no].type = (no < 0x10) ? 0xe : 0xf;                                \
-	idtgate[no].offset_lo = (uint64_t) & interrupt_##no##_begin & 0xFFFF;      \
+	idtgate[no].offset_lo = (uint64_t)&interrupt_##no##_begin & 0xFFFF;        \
 	idtgate[no].offset_mid =                                                   \
-		((uint64_t) & interrupt_##no##_begin >> 16) & 0xFFFF;                  \
-	idtgate[no].offset_hi = ((uint64_t) & interrupt_##no##_begin >> 32);
+		((uint64_t)&interrupt_##no##_begin >> 16) & 0xFFFF;                    \
+	idtgate[no].offset_hi = ((uint64_t)&interrupt_##no##_begin >> 32);
 
 #define INT_IST1(no)                                                           \
 	idtgate[no].present = 1;                                                   \
@@ -72,10 +72,10 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 	idtgate[no].segment = 0x8;                                                 \
 	idtgate[no].type = (no < 0x10) ? 0xe : 0xf;                                \
 	idtgate[no].ist = 1;                                                       \
-	idtgate[no].offset_lo = (uint64_t) & interrupt_##no##_begin & 0xFFFF;      \
+	idtgate[no].offset_lo = (uint64_t)&interrupt_##no##_begin & 0xFFFF;        \
 	idtgate[no].offset_mid =                                                   \
-		((uint64_t) & interrupt_##no##_begin >> 16) & 0xFFFF;                  \
-	idtgate[no].offset_hi = ((uint64_t) & interrupt_##no##_begin >> 32);
+		((uint64_t)&interrupt_##no##_begin >> 16) & 0xFFFF;                    \
+	idtgate[no].offset_hi = ((uint64_t)&interrupt_##no##_begin >> 32);
 
 INTEXT(0);
 INTEXT(5);
@@ -93,7 +93,7 @@ INTEXT(78);
 INTEXT(48);
 
 __attribute__((optnone)) void interrupts_init() {
-	memset(idtgate, 0, sizeof(IDTGate)*256);
+	memset(idtgate, 0, sizeof(IDTGate) * 256);
 	// get_idt(&idtptr);
 	idtptr.limit = 256 * 8;
 	idtptr.base = (uint64_t)idtgate;
@@ -238,7 +238,7 @@ __attribute__((optnone)) uintptr_t get_page_map(uint64_t virt) {
 
 __attribute__((optnone)) void simp_map_page(uint64_t virt, uint64_t phys) {
 	info("Map %x\n", virt);
-	RootPageLevel* pml4 = (RootPageLevel*)get_cr3();
+	RootPageLevel *pml4 = (RootPageLevel *)get_cr3();
 
 	auto &pdpt = pml4->entries[(virt >> 39) & 0x1ff];
 
@@ -250,7 +250,9 @@ __attribute__((optnone)) void simp_map_page(uint64_t virt, uint64_t phys) {
 
 	auto &pdpte = pdpt.level()->entries[(virt >> 30) & 0x1ff];
 	if (!pdpte.is_mapped()) {
-		void* addr = s_use_actual_allocator ? kmalloc_really_aligned(PAGE_SIZE, PAGE_SIZE) : kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+		void *addr = s_use_actual_allocator
+						 ? kmalloc_really_aligned(PAGE_SIZE, PAGE_SIZE)
+						 : kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
 		pdpte.set_addr(get_page_map((uint64_t)addr));
 		pdpte.pdata |= pdpt.flags();
 	}
@@ -259,7 +261,9 @@ __attribute__((optnone)) void simp_map_page(uint64_t virt, uint64_t phys) {
 
 	auto &pdt = pdpte.level()->entries[(virt >> 21) & 0x1ff];
 	if (!pdt.is_mapped()) {
-		void* addr = s_use_actual_allocator ? kmalloc_really_aligned(PAGE_SIZE, PAGE_SIZE) : kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+		void *addr = s_use_actual_allocator
+						 ? kmalloc_really_aligned(PAGE_SIZE, PAGE_SIZE)
+						 : kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
 		pdt.set_addr(get_page_map((uint64_t)addr));
 		pdt.pdata |= pdpt.flags();
 	}
@@ -267,7 +271,7 @@ __attribute__((optnone)) void simp_map_page(uint64_t virt, uint64_t phys) {
 	pdt.pdata |= PAEPageFlags::Write | PAEPageFlags::Present;
 
 	auto &pt = pdt.level()->entries[(virt >> 12) & 0x1ff];
-	pt.pdata = (phys&~4095) | PAEPageFlags::Write | PAEPageFlags::Present;
+	pt.pdata = (phys & ~4095) | PAEPageFlags::Write | PAEPageFlags::Present;
 	uint64_t virt_aligned = virt & ~4095;
 	asm volatile("invlpg %0" ::"m"(virt_aligned));
 }
@@ -388,13 +392,9 @@ __attribute__((optnone)) extern "C" void write_eoi() {
 }
 
 bool timer_disabled = false;
-void disable_timer() {
-	ioapic_set_ioredir_val(21, 1 << 16);
-}
+void disable_timer() { ioapic_set_ioredir_val(21, 1 << 16); }
 
-void enable_timer() {
-	ioapic_set_ioredir_val(21, 48);
-}
+void enable_timer() { ioapic_set_ioredir_val(21, 48); }
 
 extern "C" void unhandled_interrupt() { panic("Unhandled Interrupt\n"); }
 
@@ -410,13 +410,13 @@ extern "C" void gpf_interrupt(ExceptReg &eregs) {
 		const char *table_str = "GDT";
 		uint8_t table = ((eregs.error >> 1) & 3);
 		switch (table) {
-			case 1:
-			case 3:
-				table_str = "IDT";
-				break;
-			case 2:
-				table_str = "LDT";
-				break;
+		case 1:
+		case 3:
+			table_str = "IDT";
+			break;
+		case 2:
+			table_str = "LDT";
+			break;
 		}
 		printk("GPF caused by segment %x in table %s ss %d\n", eregs.error >> 3,
 			   table_str, eregs.ss);
@@ -443,9 +443,7 @@ extern "C" void invalid_opcode_interrupt(ExceptReg &eregs) {
 	panic("Bad Opcode Fault\n");
 }
 
-extern "C" void stack_segment_interrupt() {
-	panic("Stack Segment Fault\n");
-}
+extern "C" void stack_segment_interrupt() { panic("Stack Segment Fault\n"); }
 
 extern "C" void df_interrupt() { panic("Double Fault"); }
 
@@ -458,7 +456,7 @@ extern "C" void pf_interrupt(ExceptReg &eregs) {
 		printk("Process %s[%d] faulted on address %x while executing at %x\n",
 			   current_process->name(), current_process->pid, fault_addr,
 			   eregs.rip);
-		//Debug::stack_trace((uint64_t *)eregs.rbp);
+		// Debug::stack_trace((uint64_t *)eregs.rbp);
 		int fault_succ = Process::resolve_cow(current_process,
 											  fault_addr & ~(PAGE_SIZE - 1));
 		if (fault_succ)
@@ -527,8 +525,8 @@ extern "C" void timer_interrupt(InterruptReg *regs) {
 		second_base = Syscall::timeofday();
 	}
 
-	//printk("timer\n");
-	// FIXME this will overflow
+	// printk("timer\n");
+	//  FIXME this will overflow
 	uint64_t timer_ticks =
 		(*(uint64_t *)(hpet->address.address + 0xF0) * fp_per_tick);
 	uint64_t seconds = timer_ticks / 1000000000000000;
@@ -639,7 +637,7 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	// Load new GDT
 	asm volatile("lgdt %0" ::"m"(gdt_ptr));
 
-	asm volatile("mov %0, %%ss"::"a"(0x10));
+	asm volatile("mov %0, %%ss" ::"a"(0x10));
 
 	// Load TSS
 	// From the documentation: a stack switch in IA-32e mode works like the
@@ -701,7 +699,8 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 
 	info("? %x\n", *(uint32_t *)(ioapic + 0x10));
 
-	// the IOAPIC handles a maximum of 24 interrupts (the manual says this somewhere)
+	// the IOAPIC handles a maximum of 24 interrupts (the manual says this
+	// somewhere)
 	for (int i = 0; i < 24; i++) {
 		// help i don't know what this interrupt does but i disabled it
 		if (i == 2) {
@@ -711,8 +710,9 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 
 		// 21 is the HPET timer
 		if (i == 21) {
-			// The HPET intentionally has one of the lowest interrupt priorities (bits 7:4).
-			// This permits other interrupts to overlap the timer interrupt, when no process is available to be run.
+			// The HPET intentionally has one of the lowest interrupt priorities
+			// (bits 7:4). This permits other interrupts to overlap the timer
+			// interrupt, when no process is available to be run.
 			ioapic_set_ioredir_val(i, 48);
 			continue;
 		}
@@ -738,16 +738,15 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 
 	printk("Available memory %x\n", (1 * MB) + (boot_head->mem_upper * KB));
 
-	//static constexpr size_t FAKE_MEM = 100 * MB;
-	//printk("Fake mem %x\n", FAKE_MEM);
+	// static constexpr size_t FAKE_MEM = 100 * MB;
+	// printk("Fake mem %x\n", FAKE_MEM);
 	size_t total_memory = (1 * MB) + (boot_head->mem_upper * KB);
 
-	Paging::setup(total_memory-(40*MB),
-				  kbootinfo);
+	Paging::setup(total_memory - (40 * MB), kbootinfo);
 
 	// Allocate fixed amount of memory for the kernel.
 	// Kinda bad, this should grow dynamically.
-	size_t base = total_memory-(39*MB);
+	size_t base = total_memory - (39 * MB);
 	int i = 0;
 	for (i = 0; i <= 20 * MB; i += PAGE_SIZE) {
 		simp_map_page((uint64_t)base + i, (uint64_t)base + i);

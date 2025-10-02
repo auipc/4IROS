@@ -6,10 +6,7 @@
 sighandler_t s_handler = NULL;
 
 void sigreturn() {
-	asm volatile("syscall"
-				 :
-				 : "a"(SYS_SIGRET)
-				 : "rcx", "r11", "memory");
+	asm volatile("syscall" : : "a"(SYS_SIGRET) : "rcx", "r11", "memory");
 }
 
 void sigtramp(int sig) {

@@ -18,7 +18,7 @@ extern "C" {
 
 extern int optind;
 
-char *getcwd(char* buf, size_t size);
+char *getcwd(char *buf, size_t size);
 int access(const char *path, int mode);
 int sleep(unsigned int s);
 int isatty();

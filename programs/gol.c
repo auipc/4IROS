@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -7,7 +8,6 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <fcntl.h>
 #define INT_MIN (-((1 << 32) - 1))
 #define SHRT_MAX (((1 << 16) - 1))
 #define SHRT_MIN (-((1 << 16) - 1))

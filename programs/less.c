@@ -1,8 +1,8 @@
+#include <fcntl.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 #define CHARS_WIDTH 40
 #define CHARS_HEIGHT 25

@@ -5,15 +5,15 @@
 #include <string.h>
 #include <unistd.h>
 #define STB_TRUETYPE_IMPLEMENTATION
+#include <fcntl.h>
 #include <math.h>
 #include <poll.h>
+#include <signal.h>
 #include <stb_truetype.h>
 #include <stdbool.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <fcntl.h>
-#include <signal.h>
 
 static const char scancode_ascii[] = {
 	0,	 0,	  '1',	'2',  '3',	'4', '5', '6', '7', '8', '9', '0',
@@ -164,10 +164,11 @@ void draw_line(struct TextRendererInfo tr, int y_adv, const char *str,
 
 		int advanceXtra = 0;
 		if (prev_char) {
-			advanceXtra = stbtt_GetCodepointKernAdvance(&tr.fontinfo, prev_char, *str);
+			advanceXtra =
+				stbtt_GetCodepointKernAdvance(&tr.fontinfo, prev_char, *str);
 		}
 
-		x_off += (advanceWidth+advanceXtra) * tr.scale;
+		x_off += (advanceWidth + advanceXtra) * tr.scale;
 		stbtt_FreeBitmap(bitmap, tr.fontinfo.userdata);
 		prev_char = *str;
 		str++;
@@ -217,7 +218,7 @@ void push_char(struct TextRendererInfo renderinfo, int tty_fd, char c) {
 		return;
 	}
 
-	if ((1280-25) < x_off) {
+	if ((1280 - 25) < x_off) {
 		linebreak_index[linebreak_index_size++] = old_x_off;
 		prev_char = 0;
 		int line_stride =
@@ -255,7 +256,7 @@ int main() {
 	int fd = open("/dev/bochs", O_WRONLY);
 	size_t input_linesz = 1632;
 	size_t input_idx = 0;
-	char* input_linebuf = (char*)malloc(input_linesz);
+	char *input_linebuf = (char *)malloc(input_linesz);
 
 	uint32_t *framebuffer = malloc(FRAMEBUFFER_SIZE);
 	uint32_t *xtra_framebuffer = malloc(FRAMEBUFFER_SIZE);
@@ -264,7 +265,7 @@ int main() {
 		return 1;
 	}
 	int ret;
-	if((ret = startanim(fd, framebuffer))) {
+	if ((ret = startanim(fd, framebuffer))) {
 		free(framebuffer);
 		close(fd);
 		return ret;
@@ -322,12 +323,12 @@ int main() {
 
 					if (ctrl_held) {
 						switch (scancode_ascii[buf[i + 1]]) {
-							case 'c':
-								kill(shell_pid, SIGINT);
-								input_idx = 0;
-								break;
-							default:
-								break;
+						case 'c':
+							kill(shell_pid, SIGINT);
+							input_idx = 0;
+							break;
+						default:
+							break;
 						}
 						continue;
 					}
@@ -338,7 +339,7 @@ int main() {
 					if (buf[i + 1] >= sizeof(scancode_ascii))
 						continue;
 					input_linebuf[input_idx++] = scancode_set[buf[i + 1]];
-					if (input_linebuf[input_idx-1] == '\b') {
+					if (input_linebuf[input_idx - 1] == '\b') {
 						if (input_idx < 2) {
 							input_idx -= 1;
 							continue;
@@ -346,25 +347,32 @@ int main() {
 						input_idx -= 2;
 
 						int advanceWidth, lsBearing;
-						stbtt_GetCodepointHMetrics(&renderinfo.fontinfo, input_linebuf[input_idx], &advanceWidth,
-												   &lsBearing);
+						stbtt_GetCodepointHMetrics(&renderinfo.fontinfo,
+												   input_linebuf[input_idx],
+												   &advanceWidth, &lsBearing);
 						int advanceXtra = 0;
 						int line_stride =
-							(renderinfo.ascent - renderinfo.descent) + renderinfo.lineGap;
-						int advance = ((advanceWidth+advanceXtra)*scale);
-						if ((x_off-advance) < 0) {
-							x_off = linebreak_index[linebreak_index_size-1];
+							(renderinfo.ascent - renderinfo.descent) +
+							renderinfo.lineGap;
+						int advance = ((advanceWidth + advanceXtra) * scale);
+						if ((x_off - advance) < 0) {
+							x_off = linebreak_index[linebreak_index_size - 1];
 							y_advance -= line_stride;
 							linebreak_index_size--;
 						}
 						x_off -= advance;
-						for (int line = 0; line < (int)(line_stride)*scale; line++) {
-							memset(&renderinfo.framebuffer[((int)(y_advance*scale)+line)*1280+x_off], 0, advance*sizeof(uint32_t));
+						for (int line = 0; line < (int)(line_stride)*scale;
+							 line++) {
+							memset(
+								&renderinfo.framebuffer
+									 [((int)(y_advance * scale) + line) * 1280 +
+									  x_off],
+								0, advance * sizeof(uint32_t));
 						}
 						continue;
 					}
 
-					if (input_linebuf[input_idx-1] == '\n') {
+					if (input_linebuf[input_idx - 1] == '\n') {
 						write(0, input_linebuf, input_idx);
 						input_idx = 0;
 					}

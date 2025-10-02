@@ -30,7 +30,8 @@ int ATABlockNode::read_512(uint8_t *buffer, size_t under) {
 	outb(0x1F5, (lba_pos >> 16) & 0xFF);
 	outb(COMMAND_PORT, 0x24);
 
-	while ((!(inb(STATUS_PORT) & 0x8)));
+	while ((!(inb(STATUS_PORT) & 0x8)))
+		;
 
 	int blocks_remaining = 256;
 
@@ -130,7 +131,8 @@ int ATABlockNode::read_block(uint16_t *buffer) {
 	outb(0x1F5, (lba_pos >> 16) & 0xFF);
 	outb(COMMAND_PORT, 0x24);
 
-	while (!(inb(STATUS_PORT) & 0x8));
+	while (!(inb(STATUS_PORT) & 0x8))
+		;
 
 	int blocks_remaining = 256;
 	while (blocks_remaining--) {

@@ -1,11 +1,11 @@
 #include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <signal.h>
-#include <fcntl.h>
 
 typedef void (*builtin_ptr_t)(int, char **);
 
@@ -118,7 +118,7 @@ void handle_signal(int) {
 
 int main() {
 	signal(SIGINT, &handle_signal);
-	//parse_autorun();
+	// parse_autorun();
 	char *buf = (char *)malloc(0x1000);
 	printf("?");
 	fflush(stdout);

@@ -67,7 +67,7 @@ extern "C" [[noreturn]] void kx86_64_start(uint32_t multiboot_header,
 		uint64_t off = 0x20000 + sechead.off;
 		uint64_t flags = 1;
 		// Disable execution if no ELF executable flag
-		flags |= ((uint64_t) !(sechead.flags & 1ull)) << 63ull;
+		flags |= ((uint64_t)!(sechead.flags & 1ull)) << 63ull;
 		// Writable? Ideally, panic if both eXecute and Writable are enabled.
 		flags |= (!!(sechead.flags & 2ull)) << 1ull;
 

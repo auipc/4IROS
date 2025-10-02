@@ -33,26 +33,25 @@ Process::Process(const char *name) : pid(s_pid++) {
 	if (!process_pid_map)
 		process_pid_map = new HashTable<Process *>();
 
-	m_cow_tbl = new HashTable<CoWPage*>();
+	m_cow_tbl = new HashTable<CoWPage *>();
 	process_pid_map->push(pid, this);
 	// FIXME clear FPU registers and state before calling this
 	initialize_fpu(m_saved_fpu);
 }
 
-Process::Process(Process *p) : pid(s_pid++) { 
-	m_cow_tbl = new HashTable<CoWPage*>();
-	copy_handles(p); 
+Process::Process(Process *p) : pid(s_pid++) {
+	m_cow_tbl = new HashTable<CoWPage *>();
+	copy_handles(p);
 }
 
 Process::~Process() {}
 
-void Process::yield() {
-}
+void Process::yield() {}
 
 void kgrim() {
 	asm volatile("sti");
-	while(1) {
-			asm volatile("nop");
+	while (1) {
+		asm volatile("nop");
 	}
 #if 0
 	while(1) {
@@ -88,7 +87,7 @@ void kgrim() {
 extern void parse_symtab_task();
 // FIXME separate kernel process PIDs from user ones
 void Process::init() {
-	//Process *proc = Process::create_user("DOOM");
+	// Process *proc = Process::create_user("DOOM");
 	Process *proc = Process::create_user("init");
 	proc->next = proc;
 	proc->prev = proc;
@@ -118,7 +117,7 @@ void Process::init() {
 			   (uint64_t)proc->root_page_level());
 }
 
-void Process::register_signal_handler(void* ptr) {
+void Process::register_signal_handler(void *ptr) {
 	m_sig_handler = (uintptr_t)ptr;
 }
 
@@ -128,7 +127,8 @@ void Process::kill_process(Process *p) {
 	delete p;
 }
 
-void Process::sched(uintptr_t rsp, uintptr_t user_rsp, bool is_timer_triggered) {
+void Process::sched(uintptr_t rsp, uintptr_t user_rsp,
+					bool is_timer_triggered) {
 	(void)is_timer_triggered;
 	if (current_process == current_process->next)
 		return;
@@ -168,25 +168,26 @@ void Process::sched(uintptr_t rsp, uintptr_t user_rsp, bool is_timer_triggered) 
 			   (uint64_t)current_process->m_pglv);
 }
 
-// FIXME POSIX mandates we queue signals (also that the queue acts as a set) 
+// FIXME POSIX mandates we queue signals (also that the queue acts as a set)
 void Process::send_signal(int sig) {
 	(void)sig;
-	if (m_in_signal) return;
+	if (m_in_signal)
+		return;
 	m_in_signal = true;
 	printk("send_signal\n");
 	m_signal_saved_kern_stack_top = m_kern_stack_top;
 	m_signal_saved_actual_kern_stack_top = m_actual_kern_stack_top;
 	// FIXME free this
-	uint64_t* new_stack = (uint64_t *)kmalloc_really_aligned(PAGE_SIZE, 16);
-	uint64_t* new_stack_top = (uint64_t*)(((uint64_t)new_stack)+PAGE_SIZE);
+	uint64_t *new_stack = (uint64_t *)kmalloc_really_aligned(PAGE_SIZE, 16);
+	uint64_t *new_stack_top = (uint64_t *)(((uint64_t)new_stack) + PAGE_SIZE);
 	uint64_t *stp = x64_create_user_task_stack((uint64_t *)(new_stack_top),
 											   (uintptr_t)(m_sig_handler),
-											   (uint64_t*)(m_stack_top-128));
+											   (uint64_t *)(m_stack_top - 128));
 	m_kern_stack_top = (uint64_t)stp;
 	m_actual_kern_stack_top = (uint64_t)new_stack_top;
 
 	if (m_state == ProState::Blocked) {
-		m_state = ProState::Running; 
+		m_state = ProState::Running;
 		was_blocked = true;
 	}
 }
@@ -202,7 +203,6 @@ void Process::sigret() {
 	m_actual_kern_stack_top = m_signal_saved_actual_kern_stack_top;
 	Process::sched(0);
 }
-
 
 #if 0
 void Process::sched(uintptr_t rsp) {
@@ -278,16 +278,17 @@ void Process::resolve_cow_recurse(RootPageLevel *level, Process *current,
 #endif
 extern char *temp_area[6];
 int Process::resolve_cow(Process *current, uintptr_t fault_addr) {
-	CoWPage** cow_page = current->m_cow_tbl->get(fault_addr);
-	if(!cow_page) return 0;
+	CoWPage **cow_page = current->m_cow_tbl->get(fault_addr);
+	if (!cow_page)
+		return 0;
 
-	auto &pdpt = current->m_pglv->entries[(fault_addr >> 39)&0x1ff];
+	auto &pdpt = current->m_pglv->entries[(fault_addr >> 39) & 0x1ff];
 	auto pdpte_lvl = pdpt.fetch();
-	auto &pdpte = pdpte_lvl->entries[(fault_addr >> 30)&0x1ff];
+	auto &pdpte = pdpte_lvl->entries[(fault_addr >> 30) & 0x1ff];
 	auto pdt_lvl = pdpte.fetch();
-	auto &pdt = pdt_lvl->entries[(fault_addr >> 21)&0x1ff];
+	auto &pdt = pdt_lvl->entries[(fault_addr >> 21) & 0x1ff];
 	auto pt_lvl = pdt.fetch();
-	auto &pt = pt_lvl->entries[(fault_addr >> 12)&0x1ff];
+	auto &pt = pt_lvl->entries[(fault_addr >> 12) & 0x1ff];
 
 	if (((*cow_page)->refs) == 1) {
 		(*cow_page)->refs--;
@@ -303,9 +304,9 @@ int Process::resolve_cow(Process *current, uintptr_t fault_addr) {
 
 	auto free_page = Paging::the()->allocator()->find_free_page();
 	Paging::the()->map_page(*(RootPageLevel *)get_cr3(),
-			 (uintptr_t)temp_area[0], (*cow_page)->skel.addr());
+							(uintptr_t)temp_area[0], (*cow_page)->skel.addr());
 	Paging::the()->map_page(*(RootPageLevel *)get_cr3(),
-			 (uintptr_t)temp_area[1], free_page);
+							(uintptr_t)temp_area[1], free_page);
 	memcpy((void *)temp_area[1], (void *)temp_area[0],
 		   sizeof(char) * PAGE_SIZE);
 	pt.copy_flags((*cow_page)->skel.pdata);
@@ -334,12 +335,13 @@ Process *Process::create(void *func_ptr) {
 	uintptr_t stack_begin = (uintptr_t)kmalloc_really_aligned(KSTACK_SIZE, 16);
 	uintptr_t stack_end = stack_begin + KSTACK_SIZE;
 	stack_end -= 8;
-	*(uint64_t*)stack_end = (uint64_t)&__kprocess_failsafe_panic;
+	*(uint64_t *)stack_end = (uint64_t)&__kprocess_failsafe_panic;
 
 	uint64_t *stp = x64_create_kernel_task_stack((uint64_t *)stack_end,
 												 (uintptr_t)func_ptr);
 	// Push failsafe return val onto the stack
-	// This prevents kernel processes from returning to whatever garbage is on the stack
+	// This prevents kernel processes from returning to whatever garbage is on
+	// the stack
 	proc->m_pglv = (RootPageLevel *)get_cr3();
 	proc->m_stack_bot = stack_begin;
 	proc->m_stack_top = (uintptr_t)stp;

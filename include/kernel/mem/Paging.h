@@ -79,7 +79,9 @@ class Paging {
 								  bool just_copy = false);
 	Pair<RootPageLevel *, void *> clone_for_fork_test(const RootPageLevel &,
 													  bool just_copy = false);
-	Pair<RootPageLevel *, void *> cow_clone(HashTable<CoWPage*>* owner, HashTable<CoWPage*>* child, RootPageLevel &pml4);
+	Pair<RootPageLevel *, void *> cow_clone(HashTable<CoWPage *> *owner,
+											HashTable<CoWPage *> *child,
+											RootPageLevel &pml4);
 
 	inline static RootPageLevel *kernel_root_directory() {
 		// This shouldn't be null
@@ -105,7 +107,7 @@ class Paging {
 			  uintptr_t fault_addr);
 	bool resolve_fault(PageLevel *pd, size_t fault_addr);
 
-	void release(RootPageLevel &page_level, HashTable<CoWPage*>* cow_table);
+	void release(RootPageLevel &page_level, HashTable<CoWPage *> *cow_table);
 	static Paging *the();
 	static void *pf_allocator(size_t size);
 
@@ -210,7 +212,8 @@ struct BasePageLevel {
 		return (PageLevel *)map_page;
 	}
 
-	int recursive_release(HashTable<CoWPage*>* cow_table, uintptr_t addraccum=0, int depth=0);
+	int recursive_release(HashTable<CoWPage *> *cow_table,
+						  uintptr_t addraccum = 0, int depth = 0);
 
 	PageSkellington entries[512];
 };
