@@ -1,4 +1,4 @@
-name: Test generic i686 4IROS build with Clang
+name: Test generic x86-64 4IROS build with Clang
 
 on:
   push:
@@ -37,7 +37,7 @@ jobs:
 
       - name: Configure CMake
         run: |
-          cmake -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/toolchain-clang.cmake -S ${{ github.workspace }}
+          cmake -B ${{ steps.strings.outputs.build-output-dir }} -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/toolchain-clang-x64.cmake -S ${{ github.workspace }}
 
       - name: Build
         run: |
