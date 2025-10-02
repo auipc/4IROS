@@ -70,14 +70,21 @@ template <typename T> class Vec {
 		container[m_size - 1] = entry;
 	}
 
+	T pop() {
+		assert(m_size > 0);
+		T entry;
+		memcpy(&entry, get(m_size-1), sizeof(T));
+		remove(m_size-1);
+		return entry;
+	}
+
 	void remove(size_t pos) {
 		assert(container);
 
-		if (pos == (m_size-1)) {
+		if (pos == (m_size - 1)) {
 			m_size--;
 			return;
 		}
-
 
 		T *tmp = nullptr;
 

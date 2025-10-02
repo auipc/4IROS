@@ -14,7 +14,7 @@ set(PROGRAMS_SRCS
 	time.c
 )
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE -fPIC -O3 -mred-zone")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIE -fPIC -O0 -mred-zone")
 
 foreach(PROGRAM IN LISTS PROGRAMS_SRCS)
 	string(REPLACE ".c" "" PROGRAM_BIN ${PROGRAM})

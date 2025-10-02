@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 project(BOOT_SHIM C CXX ASM)
 set(CMAKE_CXX_STANDARD 17)
 
-option(STRIP_BOOT_SHIM "Strip symbols from boot shim" ON)
+option(STRIP_BOOT_SHIM "Strip symbols from boot shim" OFF)
 
 set(SRCS
         asm/boot.S

@@ -1,5 +1,6 @@
 // #define TEST_TIMER
 #include <kernel/Debug.h>
+#include <kernel/Syscall.h>
 #include <kernel/arch/amd64/kernel.h>
 #include <kernel/arch/amd64/x64_sched_help.h>
 #include <kernel/arch/amd64/x86_64.h>
@@ -11,7 +12,6 @@
 #include <kernel/unix/ELF.h>
 #include <kernel/vfs/vfs.h>
 #include <string.h>
-#include <kernel/Syscall.h>
 
 struct IDTPTR {
 	uint16_t limit;
@@ -63,8 +63,7 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 	idtgate[no].offset_lo = (uint64_t) & interrupt_##no##_begin & 0xFFFF;      \
 	idtgate[no].offset_mid =                                                   \
 		((uint64_t) & interrupt_##no##_begin >> 16) & 0xFFFF;                  \
-	idtgate[no].offset_hi =                                                    \
-		((uint64_t) & interrupt_##no##_begin >> 32);
+	idtgate[no].offset_hi = ((uint64_t) & interrupt_##no##_begin >> 32);
 
 #define INT_IST1(no)                                                           \
 	idtgate[no].present = 1;                                                   \
@@ -76,8 +75,7 @@ IDTGate idtgate[256] __attribute__((aligned(8)));
 	idtgate[no].offset_lo = (uint64_t) & interrupt_##no##_begin & 0xFFFF;      \
 	idtgate[no].offset_mid =                                                   \
 		((uint64_t) & interrupt_##no##_begin >> 16) & 0xFFFF;                  \
-	idtgate[no].offset_hi =                                                    \
-		((uint64_t) & interrupt_##no##_begin >> 32);
+	idtgate[no].offset_hi = ((uint64_t) & interrupt_##no##_begin >> 32);
 
 INTEXT(0);
 INTEXT(5);
@@ -95,6 +93,7 @@ INTEXT(78);
 INTEXT(48);
 
 __attribute__((optnone)) void interrupts_init() {
+	memset(idtgate, 0, sizeof(IDTGate)*256);
 	// get_idt(&idtptr);
 	idtptr.limit = 256 * 8;
 	idtptr.base = (uint64_t)idtgate;
@@ -214,10 +213,12 @@ struct HPET {
 	uint16_t counter_min;
 } __attribute__((packed));
 
+// FIXME wrong
 uint64_t to_phys(uint64_t addr) {
 	return (addr - 0xffffff8000215090) + (0x20000);
 }
 
+// FIXME wrong
 uint64_t to_virt(uint64_t addr) {
 	return (addr + 0xffffff8000215090) - (0x20000);
 }
@@ -237,37 +238,38 @@ __attribute__((optnone)) uintptr_t get_page_map(uint64_t virt) {
 
 __attribute__((optnone)) void simp_map_page(uint64_t virt, uint64_t phys) {
 	info("Map %x\n", virt);
-	uint64_t *pml4 = (uint64_t *)get_cr3();
-	uint64_t *pdpte =
-		(uint64_t *)VIRT_MASK(pml4, 39); //(*(pml4 + ((virt>>39)&0x1ff))&~4095);
-	if (!pdpte) {
-		panic("PDPTE is null");
+	RootPageLevel* pml4 = (RootPageLevel*)get_cr3();
+
+	auto &pdpt = pml4->entries[(virt >> 39) & 0x1ff];
+
+	if (!pdpt.is_mapped()) {
+		panic("Umm\n");
 	}
 
-	uint64_t *pd = (uint64_t *)VIRT_MASK(pdpte, 30);
-	if (!pd) {
-		panic("PD is null");
+	pdpt.pdata |= PAEPageFlags::Write | PAEPageFlags::Present;
+
+	auto &pdpte = pdpt.level()->entries[(virt >> 30) & 0x1ff];
+	if (!pdpte.is_mapped()) {
+		void* addr = s_use_actual_allocator ? kmalloc_really_aligned(PAGE_SIZE, PAGE_SIZE) : kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+		pdpte.set_addr(get_page_map((uint64_t)addr));
+		pdpte.pdata |= pdpt.flags();
 	}
 
-	uint64_t *pt = (uint64_t *)VIRT_MASK_ADDR(pd, 21);
-	if (!*pt) {
-		uint64_t pt_addr = 0;
-		if (s_use_actual_allocator)
-			pt_addr =
-				(uint64_t)kmalloc_really_aligned(sizeof(uint64_t) * 512, 4096);
-		else
-			pt_addr = (uint64_t)kmalloc(sizeof(uint64_t) * 512);
-		// offset into pd
-		*pt = get_page_map(pt_addr);
-		*pt |= 3;
+	pdpte.pdata |= PAEPageFlags::Write | PAEPageFlags::Present;
+
+	auto &pdt = pdpte.level()->entries[(virt >> 21) & 0x1ff];
+	if (!pdt.is_mapped()) {
+		void* addr = s_use_actual_allocator ? kmalloc_really_aligned(PAGE_SIZE, PAGE_SIZE) : kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+		pdt.set_addr(get_page_map((uint64_t)addr));
+		pdt.pdata |= pdpt.flags();
 	}
 
-	uint64_t *pte =
-		(uint64_t *)VIRT_MASK_ADDR((uint64_t *)(*pt & ~4095ull), 12);
+	pdt.pdata |= PAEPageFlags::Write | PAEPageFlags::Present;
 
-	*pte = phys & ~4095;
-	*pte |= 3;
-	asm volatile("invlpg %0" ::"m"(virt));
+	auto &pt = pdt.level()->entries[(virt >> 12) & 0x1ff];
+	pt.pdata = (phys&~4095) | PAEPageFlags::Write | PAEPageFlags::Present;
+	uint64_t virt_aligned = virt & ~4095;
+	asm volatile("invlpg %0" ::"m"(virt_aligned));
 }
 
 // https://wiki.osdev.org/RSDP#Detecting_the_RSDP
@@ -388,20 +390,18 @@ __attribute__((optnone)) extern "C" void write_eoi() {
 bool timer_disabled = false;
 void disable_timer() {
 	ioapic_set_ioredir_val(21, 1 << 16);
-	timer_disabled = true;
 }
 
 void enable_timer() {
 	ioapic_set_ioredir_val(21, 48);
-	timer_disabled = false;
 }
 
 extern "C" void unhandled_interrupt() { panic("Unhandled Interrupt\n"); }
 
-extern "C" void div_interrupt(ExceptReg &eregs) { 
+extern "C" void div_interrupt(ExceptReg &eregs) {
 	printk("Fault at 0x%x\n", eregs.error);
 	Debug::stack_trace((uint64_t *)eregs.rbp);
-	panic("Division Fault\n"); 
+	panic("Division Fault\n");
 }
 
 extern "C" void gpf_interrupt(ExceptReg &eregs) {
@@ -409,13 +409,17 @@ extern "C" void gpf_interrupt(ExceptReg &eregs) {
 		// lol
 		const char *table_str = "GDT";
 		uint8_t table = ((eregs.error >> 1) & 3);
-		if (table == 1 || table == 3) {
-			table_str = "IDT";
-		} else {
-			table_str = "LDT";
+		switch (table) {
+			case 1:
+			case 3:
+				table_str = "IDT";
+				break;
+			case 2:
+				table_str = "LDT";
+				break;
 		}
-		printk("GPF caused by segment %x in table %s", eregs.error >> 3,
-			   table_str);
+		printk("GPF caused by segment %x in table %s ss %d\n", eregs.error >> 3,
+			   table_str, eregs.ss);
 	}
 
 	printk("rax %x rbx %x rcx %x rdx %x cs %x\n", eregs.rax, eregs.rbx,
@@ -433,6 +437,16 @@ extern "C" void gpf_interrupt(ExceptReg &eregs) {
 	panic("General Protection Fault\n");
 }
 
+extern "C" void invalid_opcode_interrupt(ExceptReg &eregs) {
+	printk("RIP %x\n", eregs.rip);
+	Debug::stack_trace((uint64_t *)eregs.rbp);
+	panic("Bad Opcode Fault\n");
+}
+
+extern "C" void stack_segment_interrupt() {
+	panic("Stack Segment Fault\n");
+}
+
 extern "C" void df_interrupt() { panic("Double Fault"); }
 
 extern "C" void tss_interrupt() { panic("Invalid TSS"); }
@@ -440,11 +454,11 @@ extern "C" void tss_interrupt() { panic("Invalid TSS"); }
 extern "C" void pf_interrupt(ExceptReg &eregs) {
 	uintptr_t fault_addr = get_cr2();
 	bool user = eregs.error & 4;
-	if (user) {
+	if (user && (eregs.error & 2)) {
 		printk("Process %s[%d] faulted on address %x while executing at %x\n",
 			   current_process->name(), current_process->pid, fault_addr,
 			   eregs.rip);
-		Debug::stack_trace((uint64_t *)eregs.rbp);
+		//Debug::stack_trace((uint64_t *)eregs.rbp);
 		int fault_succ = Process::resolve_cow(current_process,
 											  fault_addr & ~(PAGE_SIZE - 1));
 		if (fault_succ)
@@ -501,27 +515,29 @@ uint64_t tick_counter = 0;
 uint64_t second_base = 0;
 uint64_t last_second_counter = 0;
 uint64_t us_elapsed = 0;
-#define HPET0_TICK_COUNT 0xB00B //B00B135
+#define HPET0_TICK_COUNT 0xB00B // B00B135
 
 uint64_t global_waiter_time = 0;
 extern bool sched_enabled;
 
-HPET * hpet;
+HPET *hpet;
 
 extern "C" void timer_interrupt(InterruptReg *regs) {
 	if (!second_base) {
 		second_base = Syscall::timeofday();
 	}
 
+	//printk("timer\n");
 	// FIXME this will overflow
-	uint64_t timer_ticks = (*(uint64_t*)(hpet->address.address+0xF0) * fp_per_tick);
-	uint64_t seconds = timer_ticks/1000000000000000;
-	//us_elapsed = (timer_ticks%(seconds*1000000000000000))/1000000000;
-	us_elapsed = (timer_ticks%(1000000000000000))/1000000000;
+	uint64_t timer_ticks =
+		(*(uint64_t *)(hpet->address.address + 0xF0) * fp_per_tick);
+	uint64_t seconds = timer_ticks / 1000000000000000;
+	// us_elapsed = (timer_ticks%(seconds*1000000000000000))/1000000000;
+	us_elapsed = (timer_ticks % (1000000000000000)) / 1000000000;
 
-	second_base += (seconds-last_second_counter);
+	second_base += (seconds - last_second_counter);
 	last_second_counter = seconds;
-	//printk("%d\n", second_base);
+	// printk("%d\n", second_base);
 
 	global_waiter_time =
 		(tick_counter * HPET0_TICK_COUNT * fp_per_tick) / 1000000000;
@@ -547,7 +563,8 @@ tick_counter*fp_per_tick, ms_elapsed); uint64_t cr3; asm volatile("movq %%cr3,
 end:
 */
 	if (sched_enabled)
-		Process::sched((uintptr_t)regs, true);
+		Process::sched((uintptr_t)regs, (uintptr_t)regs->rsp, true);
+
 	write_eoi();
 }
 
@@ -612,6 +629,7 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	gdt[11] |= ((tss_ptr >> 16) & 0xff);
 	gdt[11] |= ((tss_ptr >> 24) & 0xff) << 24;
 
+	// Arm the swapgs kernel register
 	// IA32_KERNEL_GS_BASE
 	write_msr(0xC0000102, (uint32_t)(uintptr_t)&ksyscall_data,
 			  (uint32_t)((uintptr_t)&ksyscall_data >> 32));
@@ -620,6 +638,8 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 
 	// Load new GDT
 	asm volatile("lgdt %0" ::"m"(gdt_ptr));
+
+	asm volatile("mov %0, %%ss"::"a"(0x10));
 
 	// Load TSS
 	// From the documentation: a stack switch in IA-32e mode works like the
@@ -642,13 +662,14 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	asm volatile("mov %%rax, %%cr4" ::"a"(cr4));
 
 	// enable the Local APIC
-	// useless in qemu...
+	// this is already enabled when qemu boots the image...
 	asm volatile("mov $0x1B, %%ecx\n"
 				 "rdmsr\n"
 				 "orl $0x800, %%eax\n"
 				 "wrmsr\n" ::
 					 : "eax", "ecx");
 
+	// Initialize VGA text mode
 	screen_init();
 	kmalloc_temp_init();
 	interrupts_init();
@@ -680,17 +701,18 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 
 	info("? %x\n", *(uint32_t *)(ioapic + 0x10));
 
+	// the IOAPIC handles a maximum of 24 interrupts (the manual says this somewhere)
 	for (int i = 0; i < 24; i++) {
+		// help i don't know what this interrupt does but i disabled it
 		if (i == 2) {
 			ioapic_set_ioredir_val(i, 1 << 16);
 			continue;
 		}
 
+		// 21 is the HPET timer
 		if (i == 21) {
-			// The HPET has a lower priority (bits 7:4) than the keyboard
-			// interrupt, which is intentional. Since most interrupts don't have
-			// a high chance to block for who knows long, it's probably best to
-			// keep the HPET at the lowest priority.
+			// The HPET intentionally has one of the lowest interrupt priorities (bits 7:4).
+			// This permits other interrupts to overlap the timer interrupt, when no process is available to be run.
 			ioapic_set_ioredir_val(i, 48);
 			continue;
 		}
@@ -703,8 +725,9 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	// Enable all HPETs
 	*(uint64_t *)(hpet->address.address + 0x10) |= 1;
 	// Setup HPET0
+	// FIXME make the values named constants
 	*(uint64_t *)(hpet->address.address + 0x100) |=
-		21 << 9 | 1 << 2 | 1 << 1 | 1 << 3;
+		21 << 9 | 1 << 2 | 0 << 1 | 1 << 3;
 
 	fp_per_tick = *(uint64_t *)(hpet->address.address) >> 32;
 
@@ -715,23 +738,27 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 
 	printk("Available memory %x\n", (1 * MB) + (boot_head->mem_upper * KB));
 
-	static constexpr size_t FAKE_MEM = 100 * MB;
-	printk("Fake mem %x\n", FAKE_MEM);
+	//static constexpr size_t FAKE_MEM = 100 * MB;
+	//printk("Fake mem %x\n", FAKE_MEM);
+	size_t total_memory = (1 * MB) + (boot_head->mem_upper * KB);
 
-	Paging::setup(/*(1 * MB) + (boot_head->mem_upper * KB)*/ FAKE_MEM,
+	Paging::setup(total_memory-(40*MB),
 				  kbootinfo);
 
-	size_t base = FAKE_MEM + 1 * MB;
+	// Allocate fixed amount of memory for the kernel.
+	// Kinda bad, this should grow dynamically.
+	size_t base = total_memory-(39*MB);
 	int i = 0;
-	// Paging::the()->allocator()->mark_range(base, kbootinfo.kmap_end+10*MB);
 	for (i = 0; i <= 20 * MB; i += PAGE_SIZE) {
 		simp_map_page((uint64_t)base + i, (uint64_t)base + i);
 	}
-	actual_malloc_init((void *)base, 30 * MB);
+	actual_malloc_init((void *)base, 20 * MB);
+#if 0
 	for (; i <= 30 * MB; i += PAGE_SIZE) {
 		Paging::the()->map_page(*(RootPageLevel *)get_cr3(), (uint64_t)base + i,
 								(uint64_t)base + i);
 	}
+#endif
 
 	nested_interrupt_stack =
 		(void *)(((uint64_t)kmalloc_really_aligned(PAGE_SIZE, 16)) + PAGE_SIZE);
@@ -744,7 +771,7 @@ kx86_64_preinit(const KernelBootInfo &kbootinfo, multiboot_info *boot_head) {
 	write_msr(0xC0000082, (uint32_t)(uintptr_t)&syscall_entry,
 			  (uint32_t)((uintptr_t)&syscall_entry >> 32));
 	// IA32_STAR
-	write_msr(0xC0000081, 0x0, 0x8 | (0x10 << 16));
+	write_msr(0xC0000081, 0x0, 0x8 | (0x13 << 16));
 	// IA32_FMASK EFLAGS mask
 	write_msr(0xC0000084, (1 << 9) | (3 << 12) | (1 << 17), 0);
 

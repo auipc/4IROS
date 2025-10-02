@@ -38,7 +38,7 @@ extern FILE *stderr;
 // line buffered
 #define _IOLBF 2
 
-void perror(const char* s);
+void perror(const char *s);
 void clearerr(FILE *stream);
 int fileno(FILE *stream);
 int setvbuf(FILE *stream, char *buf, int mode, size_t size);
@@ -48,11 +48,15 @@ int ferror(FILE *stream);
 int fflush(FILE *stream);
 int getchar(void);
 
-int __attribute__ ((format (scanf, 2, 3))) sscanf(const char *s, const char *format, ...);
+int __attribute__((format(scanf, 2, 3))) sscanf(const char *s,
+												const char *format, ...);
+int remove(const char *path);
 int putchar(int ch);
 int fputc(int ch, FILE *stream);
+#define putc fputc
 int ungetc(int ch, FILE *stream);
 int fgetc(FILE *stream);
+FILE *fdopen(int fd, const char *mode);
 FILE *fopen(const char *filename, const char *mode);
 int fclose(FILE *stream);
 int fseek(FILE *stream, long offset, int origin);
@@ -61,16 +65,19 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream);
 char *fgets(char *str, int count, FILE *stream);
 int vfprintf(FILE *stream, const char *format, __builtin_va_list list);
 int vsprintf(char *str, const char *format, __builtin_va_list list);
-int __attribute__ ((format (printf, 2, 3))) sprintf(char *str, const char *format, ...);
-int __attribute__ ((format (printf, 3, 4))) snprintf(char *str, size_t size, const char *format, ...);
+int __attribute__((format(printf, 2, 3))) sprintf(char *str, const char *format,
+												  ...);
+int __attribute__((format(printf, 3, 4))) snprintf(char *str, size_t size,
+												   const char *format, ...);
 int vsnprintf(char *str, size_t size, const char *format,
 			  __builtin_va_list list);
-int __attribute__ ((format (printf, 2, 3))) fprintf(FILE *stream, const char *format, ...);
+int __attribute__((format(printf, 2, 3))) fprintf(FILE *stream,
+												  const char *format, ...);
 int puts(const char *str);
 int fputs(const char *str, FILE *stream);
 // Sidenote: printf can fail? I'd like to see the C code that has error checking
 // for every print call...
-int __attribute__ ((format (printf, 1, 2))) printf(const char *format, ...);
+int __attribute__((format(printf, 1, 2))) printf(const char *format, ...);
 #ifdef __cplusplus
 };
 #endif

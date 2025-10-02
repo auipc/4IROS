@@ -6,8 +6,7 @@
 #include <math.h>
 
 PageFrameAllocator::PageFrameAllocator(size_t base, size_t memory_size)
-	: m_addr_base(base)
-{
+	: m_addr_base(base) {
 	m_pages = memory_size / PAGE_SIZE;
 	for (int i = 1; i <= 4; i++) {
 		m_buddies.push(new Bitmap(m_pages / pow(2, i - 1)));
@@ -21,7 +20,7 @@ PageFrameAllocator::~PageFrameAllocator() {
 }
 
 size_t PageFrameAllocator::mem_in_use() {
-	return (m_pages - m_buddies[0]->count_unset())*PAGE_SIZE;
+	return (m_pages - m_buddies[0]->count_unset()) * PAGE_SIZE;
 }
 
 void PageFrameAllocator::mark_range(uintptr_t start, size_t end) {
@@ -52,7 +51,7 @@ size_t PageFrameAllocator::find_free_page() {
 		}
 	}
 
-	return m_addr_base+address;
+	return m_addr_base + address;
 }
 
 size_t PageFrameAllocator::find_free_pages(size_t pages) {
@@ -71,7 +70,7 @@ size_t PageFrameAllocator::find_free_pages(size_t pages) {
 		}
 	}
 
-	return m_addr_base+(start * PAGE_SIZE);
+	return m_addr_base + (start * PAGE_SIZE);
 }
 
 size_t PageFrameAllocator::largest_container(size_t size) {

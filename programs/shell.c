@@ -1,9 +1,11 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <errno.h>
+#include <signal.h>
+#include <fcntl.h>
 
 typedef void (*builtin_ptr_t)(int, char **);
 
@@ -31,9 +33,10 @@ void builtin_echo(int argc, char **argv) {
 
 void builtin_exit(int argc, char **argv) { exit(0); }
 
-static const builtin_t s_builtins[] = {{"echo", &builtin_echo},
-									   {"exit", &builtin_exit}, {"cd", &builtin_cd}};
+static const builtin_t s_builtins[] = {
+	{"echo", &builtin_echo}, {"exit", &builtin_exit}, {"cd", &builtin_cd}};
 
+int foreground_pid = 0;
 void handle_cmd(char *buf, size_t buf_sz) {
 	pid_t pid = 0;
 	int status = 0;
@@ -48,15 +51,15 @@ void handle_cmd(char *buf, size_t buf_sz) {
 	for (size_t i = 0; i < buf_sz; i++) {
 		if (buf[i] == ' ') {
 			buf[i] = '\0';
-			argv[argc-1] = &buf[last_bound];
+			argv[argc - 1] = &buf[last_bound];
 			argv = realloc(argv, sizeof(char *) * (2 + ++argc));
-			if ((i+1) < buf_sz) {
-				last_bound = i+1;
+			if ((i + 1) < buf_sz) {
+				last_bound = i + 1;
 			}
 		}
 	}
 
-	argv[argc-1] = &buf[last_bound];
+	argv[argc - 1] = &buf[last_bound];
 	// Last char* pointer is NULL to indicate the end
 	argv[argc] = 0;
 
@@ -67,26 +70,21 @@ void handle_cmd(char *buf, size_t buf_sz) {
 		}
 	}
 
-	if (spawn(&pid, argv[0], argv) < 0) {
-		printf("Not found\n");
-		goto end;
-		//exit(127);
-	}
-#if 0
 	if (!(pid = fork())) {
 		execvp(argv[0], argv);
 		printf("Not found\n");
 		exit(127);
 	}
-#endif
+	foreground_pid = pid;
+	printf("Waitpid waiting on %d\n", pid);
 	waitpid(pid, &status, 0);
-	// fprintf(stderr, "Exit status %d\n", status);
+	printf("Waitpid end %d\n", status);
 end:
 	free(argv);
 }
 
 void parse_autorun() {
-	int autorun_fd = open(".shell", 0);
+	int autorun_fd = open(".shell", O_RDONLY);
 	int sz = lseek(autorun_fd, 0, SEEK_END);
 	lseek(autorun_fd, 0, SEEK_SET);
 	char *autorun_buf = (char *)malloc(sz);
@@ -97,7 +95,7 @@ void parse_autorun() {
 		if (autorun_buf[i] == '\n') {
 			autorun_buf[i] = '\0';
 			handle_cmd(&autorun_buf[last], i);
-			last = i+1;
+			last = i + 1;
 		}
 	}
 
@@ -106,10 +104,22 @@ void parse_autorun() {
 	}
 }
 
+size_t buf_sz = 0;
+void handle_signal(int) {
+	puts("^C");
+	if (foreground_pid) {
+		kill(foreground_pid, SIGKILL);
+		foreground_pid = 0;
+	} else {
+		printf("?");
+		buf_sz = 0;
+	}
+}
+
 int main() {
-	parse_autorun();
+	signal(SIGINT, &handle_signal);
+	//parse_autorun();
 	char *buf = (char *)malloc(0x1000);
-	size_t buf_sz = 0;
 	printf("?");
 	fflush(stdout);
 	while (1) {

@@ -1,9 +1,9 @@
 #pragma once
+#include <errno.h>
 #include <kernel/util/Singleton.h>
 #include <kernel/util/Vec.h>
 #include <limits.h>
 #include <string.h>
-#include <errno.h>
 
 enum VFSError {
 	VFSFULL = -1,
@@ -128,11 +128,11 @@ class VFS {
 	~VFS();
 	static void init();
 	Vec<const char *> parse_path(const char *path);
-	Vec<const char *> parse_path_cwd(Vec<const char*> cwd, const char *path);
-	Vec<const char *> add_paths(Vec<const char*> lhs, Vec<const char*> rhs);
+	Vec<const char *> parse_path_cwd(Vec<const char *> cwd, const char *path);
+	Vec<const char *> add_paths(Vec<const char *> lhs, Vec<const char *> rhs);
 	VFSNode *open(Vec<const char *> &name);
 	FileHandle *open_fh(Vec<const char *> &name);
-	VFSNode* stat(Vec<const char *> &name);
+	VFSNode *stat(Vec<const char *> &name);
 
 	void print_fs(VFSNode *root, int depth = 0);
 
@@ -141,11 +141,10 @@ class VFS {
 	inline VFSNode *get_root_fs() { return m_root_vfs_node; }
 	inline VFSNode *get_dev_fs() { return m_dev_fs; }
 
-
 	static int vfs2posixerr(VFSError error) {
 		switch (error) {
-			case VFSFULL:
-				return ENOSPC;
+		case VFSFULL:
+			return ENOSPC;
 		}
 	}
 

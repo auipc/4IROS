@@ -68,7 +68,7 @@ interrupt_5_begin:
 interrupt_6_begin:
 	cli
 	pushregs
-	call unhandled_interrupt
+	call invalid_opcode_interrupt
 	popregs
 	sti
 	iretq
@@ -115,7 +115,7 @@ interrupt_11_begin:
 interrupt_12_begin:
 	cli
 	pushregs
-	call unhandled_interrupt
+	call stack_segment_interrupt
 	popregs
 	sti
 	iretq
@@ -158,7 +158,6 @@ interrupt_65_begin:
 	sti
 	iretq
 
-
 .global interrupt_78_begin
 interrupt_78_begin:
 	cli
@@ -167,8 +166,6 @@ interrupt_78_begin:
 	popregs
 	sti
 	iretq
-
-
 .global interrupt_48_begin
 interrupt_48_begin:
 	cli

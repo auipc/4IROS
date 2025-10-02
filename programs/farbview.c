@@ -13,8 +13,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_NO_STDIO
 #define STBI_NO_THREAD_LOCALS
-#include <stb_image.h>
 #include <dirent.h>
+#include <stb_image.h>
+#include <fcntl.h>
 
 uint16_t endswap16(uint16_t n) {
 	uint8_t *b = (uint8_t *)(&n);
@@ -47,14 +48,14 @@ uint64_t rdtsc() {
 uint32_t *downscale(uint32_t *buf, size_t w, size_t h, size_t dw, size_t dh) {
 	if ((w < dw) && (h < dh))
 		return buf;
-	if ((w == dw) && (h==dh))
+	if ((w == dw) && (h == dh))
 		return buf;
 	uint32_t *dest_buf = (uint32_t *)malloc(sizeof(uint32_t) * dw * dh);
-	float ratio_x = w/dw;
+	float ratio_x = w / dw;
 	printf("RATIO %d %d %f\n", w, dw, ratio_x);
 	for (size_t y = 0; y < dh; y++) {
 		for (size_t x = 0; x < dw; x++) {
-			dest_buf[y * dw + x] = buf[y*w+(int)(x*ratio_x)];
+			dest_buf[y * dw + x] = buf[y * w + (int)(x * ratio_x)];
 		}
 	}
 	free(buf);
@@ -62,17 +63,17 @@ uint32_t *downscale(uint32_t *buf, size_t w, size_t h, size_t dw, size_t dh) {
 }
 
 int main(int argc, const char **argv) {
-	int fd = open("/dev/bochs", 0);
+	int fd = open("/dev/bochs", O_WRONLY);
 	if (fd < 0)
 		return 1;
 
-	int kbdfd = open("/dev/keyboard", 0);
+	int kbdfd = open("/dev/keyboard", O_RDONLY);
 	uint16_t xres = 1280;
 	uint16_t yres = 800;
 	uint32_t *display_buffer =
 		(uint32_t *)malloc(sizeof(uint32_t) * xres * yres);
 
-	char* path = "hi";
+	char *path = "hi";
 	DIR *d = opendir(path);
 	if (!d) {
 		printf("Error: %d\n", errno);
@@ -84,7 +85,7 @@ int main(int argc, const char **argv) {
 		char path[100];
 		sprintf(path, "hi/%s", dir->d_name);
 		// Read farbfeld image
-		int image_fd = open(path, 0);
+		int image_fd = open(path, O_RDONLY);
 		if (image_fd < 0)
 			return 1;
 
@@ -102,7 +103,8 @@ int main(int argc, const char **argv) {
 		int render_height = (height > yres) ? yres : height;
 		int render_width = (width > xres) ? xres : width;
 
-		//image_buffer = downscale(image_buffer, width, height, render_width, render_height);
+		// image_buffer = downscale(image_buffer, width, height, render_width,
+		// render_height);
 		for (size_t py = 0; py < render_height; py++) {
 			for (size_t px = 0; px < render_width; px++) {
 				uint8_t r = image_buffer[(py * width + px) * 3];
@@ -117,7 +119,7 @@ int main(int argc, const char **argv) {
 		free(buf);
 		free(image_buffer);
 		lseek(fd, 0, SEEK_SET);
-		write(fd, display_buffer, sizeof(uint32_t)*xres*yres);
+		write(fd, display_buffer, sizeof(uint32_t) * xres * yres);
 #if 0
 		char lol[2];
 		do {

@@ -3,6 +3,7 @@
 #include <kernel/util/ism.h>
 #include <kernel/vfs/fs/ext2.h>
 #include <sys/types.h>
+#include <kernel/minmax.h>
 
 uint32_t block_size = 1024;
 uint32_t *s_singly_blocks;
@@ -18,11 +19,13 @@ int Ext2Entry::read(void *buffer, size_t size) {
 		// Ext2 directories always contain at least 2 directories (. and ..).
 		// I'd rather have the VFS layer handle these, so we skip over them.
 		auto dir_entries = m_fs->scan_dir_entries(*m_inode);
-		if ((m_position+2) >= dir_entries.size()) return -1;
-		auto dir_entry = dir_entries[m_position+2];
+		if ((m_position + 2) >= dir_entries.size())
+			return -1;
+		auto dir_entry = dir_entries[m_position + 2];
 		*(ino_t *)buffer = 0;
 		size_t len = strlen(dir_entry.name);
-		memcpy((char *)((uintptr_t)buffer + sizeof(ino_t)), dir_entry.name, len);
+		memcpy((char *)((uintptr_t)buffer + sizeof(ino_t)), dir_entry.name,
+			   len);
 		memset((char *)((uintptr_t)buffer + sizeof(ino_t) + len), 0, 1);
 		m_position++;
 		return 1;
@@ -44,7 +47,8 @@ bool Ext2Entry::check_blocked_write(size_t) {
 }
 
 int Ext2Entry::write(void *buffer, size_t size) {
-	if (is_directory()) return 0;
+	if (is_directory())
+		return 0;
 	// FIXME multiple cores will make the locking process more headache inducing
 	__atomic_store_n(&write_lock, 1, __ATOMIC_RELAXED);
 	size_t ret =
@@ -55,6 +59,40 @@ int Ext2Entry::write(void *buffer, size_t size) {
 }
 
 void Ext2Entry::set_size(size_t sz) {
+	// FIXME this code is cooked bro
+#if 0
+	size_t removed_sibp_blocks = 0;
+	// free blocks
+	for (size_t k = sz; k < m_inode->size_low; k += block_size) {
+		size_t block_idx = k/block_size;
+		m_fs->block.empty_blocks++;
+		switch (k/block_size) {
+			case 0 ... 11: {
+				m_fs->release_block_bitmap(m_fs->bgd_from_inode(m_inode_no), m_inode->dbp[block_idx]);
+				m_inode->dbp[block_idx] = 0;
+			} break;
+			case 12 ... 267: {
+				m_fs->seek_block(m_inode->sibp);
+				m_fs->m_block_dev->read((char *)s_singly_blocks, (size_t)block_size);
+				m_fs->release_block_bitmap(m_fs->bgd_from_inode(m_inode_no), s_singly_blocks[block_idx - 12]);
+				s_singly_blocks[block_idx-12] = 0;
+				m_fs->seek_block(m_inode->sibp);
+				m_fs->m_block_dev->write((char *)s_singly_blocks, (size_t)block_size);
+				removed_sibp_blocks++;
+				if (sz < (12*block_size) && (removed_sibp_blocks) > min((size_t)((((m_inode->size_low+block_size-1)/block_size)-12)), (size_t)267)) {
+					m_fs->release_block_bitmap(m_fs->bgd_from_inode(m_inode_no), m_inode->sibp);
+					m_inode->sibp = 0;
+				}
+			} break;
+			default:
+				panic("Block idx too large to release");
+				break;
+		}
+	}
+
+	m_fs->m_block_dev->seek(1024);
+	m_fs->m_block_dev->write(&m_fs->block, sizeof(Ext2SuperBlock));
+#endif
 	m_inode->size_low = sz;
 	m_fs->write_inode(m_inode, m_inode_no);
 }
@@ -108,6 +146,17 @@ void Ext2FileSystem::write_inode(INode *node, size_t index) {
 	m_block_dev->write((char *)node, sizeof(INode));
 }
 
+int Ext2FileSystem::release_block_bitmap(const BlockGroupDescriptor &bgd, uint32_t index) {
+	uint8_t *block_bitmap = new uint8_t[block.blocks_per_group / 8];
+	seek_block(bgd.block_address_bm);
+	m_block_dev->read(block_bitmap, block.blocks_per_group / 8);
+	block_bitmap[index/8] = 1<<(index%8);
+	seek_block(bgd.block_address_bm);
+	m_block_dev->write(block_bitmap, block.blocks_per_group / 8);
+	delete[] block_bitmap;
+	return 0;
+}
+
 // FIXME subtract block from BGD
 int Ext2FileSystem::scan_block_bitmap(const BlockGroupDescriptor &bgd) {
 	int block_index = 0;
@@ -125,12 +174,18 @@ int Ext2FileSystem::scan_block_bitmap(const BlockGroupDescriptor &bgd) {
 		}
 	}
 
+	delete[] block_bitmap;
 	return 0;
 done:
 
-        block_bitmap[(block_index-1)/8] |= (1<<((block_index-1)%8));
+	block_bitmap[(block_index - 1) / 8] |= (1 << ((block_index - 1) % 8));
 	seek_block(bgd.block_address_bm);
-        m_block_dev->write(block_bitmap, block.blocks_per_group/8);
+	m_block_dev->write(block_bitmap, block.blocks_per_group / 8);
+
+	block.empty_blocks--;
+	m_block_dev->seek(1024);
+	m_block_dev->write(&block, sizeof(Ext2SuperBlock));
+
 	delete[] block_bitmap;
 	return block_index;
 }
@@ -155,9 +210,9 @@ int Ext2FileSystem::scan_inode_bitmap(const BlockGroupDescriptor &bgd) {
 	return 0;
 done:
 
-        inode_bitmap[(inode_index-1)/8] |= (1<<((inode_index-1)%8));
-        seek_block(bgd.block_address_inode_bm);
-        m_block_dev->write(inode_bitmap, block.inodes_per_group/8);
+	inode_bitmap[(inode_index - 1) / 8] |= (1 << ((inode_index - 1) % 8));
+	seek_block(bgd.block_address_inode_bm);
+	m_block_dev->write(inode_bitmap, block.inodes_per_group / 8);
 	delete[] inode_bitmap;
 	return inode_index;
 }
@@ -229,16 +284,18 @@ VFSNode *Ext2FileSystem::create(const char *name) {
 	m_block_dev->write((char *)name, entry.name_length);
 
 	// Create Inode
+	// FIXME All empty files should be hardlinked to the same INode.
+	// This prevents a filesystem from leaking excessive amounts of nodes when an empty file is made. (Probably deviates from the ext2 spec)
 	INode *node = new INode();
 	memset(node, 0, sizeof(INode));
 	node->type = 0x8000 | 0x1ff;
 	node->access_time = node->creation_time = node->modification_time =
 		Syscall::timeofday();
 
-	// When the link count reaches 0 the inode and all its associated blocks are freed.
+	// When the link count reaches 0 the inode and all its associated blocks are
+	// freed.
 	node->hardlinks_count = 1;
 	write_inode(node, inode_index);
-
 
 	// Subtract from empty_inodes
 	block.empty_inodes--;
@@ -251,7 +308,8 @@ VFSNode *Ext2FileSystem::create(const char *name) {
 	m_block_dev->seek_cur(bgd_index * block_size);
 	m_block_dev->write((char *)&bgd, sizeof(BlockGroupDescriptor));
 
-	auto entry_node = new Ext2Entry(this, strdup(name), move(node), inode_index);
+	auto entry_node =
+		new Ext2Entry(this, strdup(name), move(node), inode_index);
 	push(entry_node);
 	return entry_node;
 }
@@ -287,21 +345,23 @@ void Ext2FileSystem::read_indirect_singly(INode &inode, size_t singly_position,
 
 // FIXME Subtract from the number of unallocated blocks
 // FIXME Add number of blocks to the INode
-ssize_t Ext2FileSystem::write_to_inode(INode &inode, size_t inode_no,
-										void *out, size_t size,
-										size_t position) {
+ssize_t Ext2FileSystem::write_to_inode(INode &inode, size_t inode_no, void *out,
+									   size_t size, size_t position) {
 	(void)position;
 	size_t size_to_write = size;
-	size_t block_idx = position/block_size;
+	size_t block_idx = position / block_size;
 	size_t out_ptr = 0;
+
 	printk("Writing %x %d\n", size_to_write, position);
 	while (size_to_write) {
-		size_t sz_write = min(min(size_to_write, (size_t)block_size), block_size-(position%block_size));
+		size_t sz_write = min(min(size_to_write, (size_t)block_size),
+							  block_size - (position % block_size));
 		size_t current_block_addr = 0;
 		switch (block_idx) {
 		case 0 ... 11: {
 			if (!inode.dbp[block_idx]) {
-				// FIXME An inode can contain blocks across multiple block groups. Adjust this to be the case.
+				// FIXME An inode can contain blocks across multiple block
+				// groups. Adjust this to be the case.
 				inode.dbp[block_idx] =
 					scan_block_bitmap(bgd_from_inode(inode_no));
 
@@ -309,7 +369,7 @@ ssize_t Ext2FileSystem::write_to_inode(INode &inode, size_t inode_no,
 					printk("Filesystem ran out of blocks!\n");
 					return VFSError::VFSFULL;
 				}
-				//write_inode(&inode, inode_no);
+				// write_inode(&inode, inode_no);
 			}
 			current_block_addr = inode.dbp[block_idx];
 		} break;
@@ -322,28 +382,29 @@ ssize_t Ext2FileSystem::write_to_inode(INode &inode, size_t inode_no,
 				}
 				memset(s_singly_blocks, 0, block_size);
 				seek_block(inode.sibp);
-				m_block_dev->write((char*)s_singly_blocks, (size_t)block_size);
+				m_block_dev->write((char *)s_singly_blocks, (size_t)block_size);
 			} else {
 				seek_block(inode.sibp);
-				m_block_dev->read((char*)s_singly_blocks, (size_t)block_size);
+				m_block_dev->read((char *)s_singly_blocks, (size_t)block_size);
 			}
 
-			if (!s_singly_blocks[block_idx-12]) {
-				s_singly_blocks[block_idx-12] = scan_block_bitmap(bgd_from_inode(inode_no));
-				if (!s_singly_blocks[block_idx-12]) {
+			if (!s_singly_blocks[block_idx - 12]) {
+				s_singly_blocks[block_idx - 12] =
+					scan_block_bitmap(bgd_from_inode(inode_no));
+				if (!s_singly_blocks[block_idx - 12]) {
 					printk("Filesystem ran out of blocks!\n");
 					return VFSError::VFSFULL;
 				}
 				seek_block(inode.sibp);
-				m_block_dev->write((char*)s_singly_blocks, (size_t)block_size);
+				m_block_dev->write((char *)s_singly_blocks, (size_t)block_size);
 			}
-			current_block_addr = s_singly_blocks[block_idx-12]; 
+			current_block_addr = s_singly_blocks[block_idx - 12];
 		} break;
 		}
 
 		seek_block(current_block_addr);
-		m_block_dev->seek_cur(position%block_size);
-		m_block_dev->write((char*)out+out_ptr, sz_write);
+		m_block_dev->seek_cur(position % block_size);
+		m_block_dev->write((char *)out + out_ptr, sz_write);
 		position = 0;
 
 		out_ptr += block_size;
@@ -360,14 +421,13 @@ int Ext2FileSystem::read_from_inode(INode &inode, void *out, size_t size,
 	if (position >= inode.size_low)
 		return -1;
 	size_t actual_size = min(size, (size_t)(inode.size_low - position));
-	size_t end_idx = (position+actual_size+(block_size-1))/block_size;
+	size_t end_idx = (position + actual_size + (block_size - 1)) / block_size;
 	size_t block_idx = position / block_size;
 	size_t output_ptr = 0;
 	// FIXME Temporary fix for a bug involving directly copying to the output
 	// buffer. Something goes wrong when the position isn't aligned by 1024
 	// bytes.
-	char *temp_buf =
-		new char[(end_idx-block_idx)*block_size];
+	char *temp_buf = new char[(end_idx - block_idx) * block_size];
 
 	uint32_t *doubly_blocks = nullptr;
 	while (end_idx > block_idx) {
@@ -527,13 +587,13 @@ VFSNode *Ext2FileSystem::traverse_internal(INode *cur_inode,
 		return nullptr;
 
 	if (path[path_index][0] == '/') {
-		return traverse_internal(cur_inode, path, path_index+1);
+		return traverse_internal(cur_inode, path, path_index + 1);
 	}
 
 	for (size_t i = 0; i < nodes.size(); i++) {
 		auto node = nodes[i];
 		if (!strcmp(node->name(), path[path_index])) {
-			if (node->is_directory() && (path_index+1) < path.size()) {
+			if (node->is_directory() && (path_index + 1) < path.size()) {
 				return traverse_internal(
 					static_cast<Ext2Entry *>(node)->m_inode, path,
 					path_index + 1);
@@ -549,7 +609,7 @@ VFSNode *Ext2FileSystem::traverse_internal(INode *cur_inode,
 	for (size_t i = 2; i < dir_entries.size(); i++) {
 		if (!strcmp(dir_entries[i].name, path[path_index])) {
 			auto inode = read_inode(dir_entries[i].entry.inode);
-			if ((inode->type & EXT2_DIR) && (path_index+1) < path.size()) {
+			if ((inode->type & EXT2_DIR) && (path_index + 1) < path.size()) {
 				return traverse_internal(inode, path, path_index + 1);
 			}
 			return new Ext2Entry(this, dir_entries[i].name, move(inode),

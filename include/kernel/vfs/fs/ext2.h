@@ -1,8 +1,8 @@
 #pragma once
 
 #include <kernel/vfs/vfs.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define EXT2_DIR 0x4000
 #define EXT2_REG 0x8000
@@ -101,7 +101,7 @@ class Ext2Entry : public VFSNode {
 	virtual size_t size() override { return m_inode->size_low; }
 	virtual void set_size(size_t sz) override;
 
-	virtual inline bool is_directory() override { 
+	virtual inline bool is_directory() override {
 		return (bool)(m_inode->type & EXT2_DIR);
 	}
 
@@ -126,6 +126,7 @@ class Ext2FileSystem : public VFSNode {
 	virtual inline bool is_directory() override { return true; }
 
   private:
+	int release_block_bitmap(const BlockGroupDescriptor &bgd, uint32_t index);
 	int scan_block_bitmap(const BlockGroupDescriptor &bgd);
 	int scan_inode_bitmap(const BlockGroupDescriptor &bgd);
 	void read_indirect_singly(INode &inode, size_t singly_position, void *out,
@@ -142,7 +143,7 @@ class Ext2FileSystem : public VFSNode {
 	void seek_block(size_t block_addr);
 	Vec<Directory> scan_dir_entries(INode &inode);
 	ssize_t write_to_inode(INode &inode, size_t inode_no, void *out,
-							size_t size, size_t position);
+						   size_t size, size_t position);
 	int read_from_inode(INode &inode, void *out, size_t size, size_t position);
 	VFSNode *m_block_dev;
 	Ext2SuperBlock block;

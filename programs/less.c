@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #define CHARS_WIDTH 40
 #define CHARS_HEIGHT 25
@@ -10,7 +11,7 @@ int main(int argc, const char **argv) {
 	if (argc < 2)
 		return 1;
 
-	int fd = open(argv[1], 0);
+	int fd = open(argv[1], O_RDONLY);
 	int sz = lseek(fd, 0, SEEK_END);
 	lseek(fd, 0, SEEK_SET);
 	char *buf = (char *)malloc(sz);

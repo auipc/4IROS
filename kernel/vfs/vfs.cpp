@@ -1,10 +1,10 @@
+#include <kernel/minmax.h>
 #include <kernel/util/Spinlock.h>
 #include <kernel/vfs/block/ata.h>
 #include <kernel/vfs/fs/ext2.h>
 #include <kernel/vfs/vfs.h>
 #include <string.h>
 #include <sys/types.h>
-#include <kernel/minmax.h>
 
 static VFS *s_vfs;
 
@@ -52,7 +52,7 @@ VFSNode *VFSNode::traverse(Vec<const char *> &path, size_t path_index) {
 		if (path_index == 0 && path.size() == 1) {
 			return VFS::the().get_root_fs();
 		}
-		return VFS::the().get_root_fs()->traverse(path, path_index+1);
+		return VFS::the().get_root_fs()->traverse(path, path_index + 1);
 	}
 
 	for (size_t i = 0; i < nodes.size(); i++) {
@@ -179,7 +179,7 @@ end:
 	return path_vec;
 }
 
-Vec<const char *> VFS::parse_path_cwd(Vec<const char*> cwd, const char *path) {
+Vec<const char *> VFS::parse_path_cwd(Vec<const char *> cwd, const char *path) {
 	auto d = parse_path(path);
 
 	if (d[0][0] != '/') {
@@ -189,10 +189,11 @@ Vec<const char *> VFS::parse_path_cwd(Vec<const char*> cwd, const char *path) {
 
 	// FIXME add a string class ffs
 	for (size_t i = 0; i < d.size(); i++) {
-		char* s = const_cast<char*>(d[i]);
+		char *s = const_cast<char *>(d[i]);
 		int dots = 0;
 		while (*s) {
-			if (*s == '.') dots++;
+			if (*s == '.')
+				dots++;
 			else
 				dots = 0;
 			s++;
@@ -201,8 +202,8 @@ Vec<const char *> VFS::parse_path_cwd(Vec<const char*> cwd, const char *path) {
 		if (dots < 3 && dots > 0) {
 			if (i > 1) {
 				if (dots == 2) {
-					d.remove(i-1);
-					d.remove(i-1);
+					d.remove(i - 1);
+					d.remove(i - 1);
 				} else {
 					d.remove(i);
 				}
@@ -212,15 +213,11 @@ Vec<const char *> VFS::parse_path_cwd(Vec<const char*> cwd, const char *path) {
 		}
 	}
 
-	for (size_t i = 0; i < d.size(); i++) {
-		printk("%s\n", d[i]);
-	}
-
 	return d;
 }
 
-Vec<const char *> VFS::add_paths(Vec<const char*> lhs, Vec<const char*> rhs) {
-	Vec<const char*> p;
+Vec<const char *> VFS::add_paths(Vec<const char *> lhs, Vec<const char *> rhs) {
+	Vec<const char *> p;
 	for (size_t i = 0; i < lhs.size(); i++) {
 		p.push(strdup(lhs[i]));
 	}
@@ -262,7 +259,7 @@ FileHandle *VFS::open_fh(Vec<const char *> &name) {
 	return new FileHandle(node);
 }
 
-VFSNode* VFS::stat(Vec<const char *> &name) {
+VFSNode *VFS::stat(Vec<const char *> &name) {
 	VFSNode *node = m_root_vfs_node->traverse(name);
 	return node;
 }

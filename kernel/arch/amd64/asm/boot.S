@@ -180,7 +180,6 @@ beg:
 
 	# set long mode, execute disable, and syscall enable bits
 	movl $0x901, %eax
-	#orl %ebx, %ecx
 	movl $0xC0000080, %ecx
 	wrmsr
 
@@ -189,13 +188,13 @@ beg:
 	orl $0x80000001, %eax
 	movl %eax, %cr0
 
+	lgdt gdtptr
 	mov $0x10, %eax
 	movw %eax, %ds
 	movw %eax, %fs
 	movw %eax, %gs
-	movw %eax, %ss
+	//movw %eax, %ss
 	movw %eax, %es
-	lgdt gdtptr
 	# finish the transition into 64 bit by far returning
 	pushl $0x08
 	pushl $kx86_cont

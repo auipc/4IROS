@@ -19,7 +19,7 @@ bool g_use_halfway_allocator = false;
 
 [[maybe_unused]] static uintptr_t s_alloc_base = 0;
 static const uintptr_t k_allocation_block_size = 4096;
-static const uintptr_t BOOTSTRAP_MEMORY = 0x40000;
+static const uintptr_t BOOTSTRAP_MEMORY = 0x80000;
 
 void kmalloc_temp_init() {
 	s_mem_offset = reinterpret_cast<uintptr_t>(&_heap_start);

@@ -14,6 +14,7 @@ class PageFrameAllocator {
 	size_t find_free_pages(size_t pages);
 	bool pertains(size_t page);
 	void release_page(size_t page);
+
   private:
 	size_t largest_container(size_t size);
 	uint32_t m_pages;

@@ -1,7 +1,7 @@
 #include <alloca.h>
+#include <ctype.h>
 #include <math.h>
 #include <stdlib.h>
-#include <ctype.h>
 #include <string.h>
 #ifdef LIBK
 extern void *kmalloc(size_t size);
@@ -77,9 +77,10 @@ char *strncpy(char *destination, const char *source, size_t n) {
 	if (n == 0)
 		return (0);
 
-	memset(destination, 0, n); 
+	memset(destination, 0, n);
 	for (size_t i = 0; i < n; i++) {
-		if (!source[i]) break;
+		if (!source[i])
+			break;
 		destination[i] = source[i];
 	}
 	return destination;
@@ -118,7 +119,8 @@ int strncasecmp(const char *s1, const char *s2, size_t n) {
 		return 0;
 
 	for (int i = 0; i < n; i++) {
-		if (!s1[i] && !s2[i]) break;
+		if (!s1[i] && !s2[i])
+			break;
 		if (toupper((unsigned char)s1[i]) != toupper((unsigned char)s2[i])) {
 			return -1;
 		}
@@ -157,7 +159,7 @@ int strcasecmp(const char *s1, const char *s2) {
 	return (*(unsigned char *)s1 - *(unsigned char *)--s2);
 }
 
-void* memset(char *buffer, char value, size_t size) {
+void *memset(char *buffer, char value, size_t size) {
 	for (size_t i = 0; i < size; i++) {
 		buffer[i] = value;
 	}

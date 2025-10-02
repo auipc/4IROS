@@ -2,7 +2,6 @@
 #include <kernel/minmax.h>
 #include <kernel/printk.h>
 #include <kernel/vfs/block/ata.h>
-#include <kernel/minmax.h>
 
 #define DRIVE_SELECT_PORT 0x1F6
 #define COMMAND_PORT 0x1F7
@@ -31,8 +30,7 @@ int ATABlockNode::read_512(uint8_t *buffer, size_t under) {
 	outb(0x1F5, (lba_pos >> 16) & 0xFF);
 	outb(COMMAND_PORT, 0x24);
 
-	while (!(inb(STATUS_PORT) & 0x8))
-		;
+	while ((!(inb(STATUS_PORT) & 0x8)));
 
 	int blocks_remaining = 256;
 
@@ -92,7 +90,7 @@ int ATABlockNode::read_512_temp(uint8_t *buffer, size_t under) {
 	(void)under;
 	size_t begin = max((size_t)0, m_position % 512);
 	size_t min_sz = min((size_t)512, begin + under);
-	//assert(!(begin % 2));
+	// assert(!(begin % 2));
 	LeftRight lr = {};
 
 	for (i = 0; i < begin / 2; i++) {
@@ -132,8 +130,7 @@ int ATABlockNode::read_block(uint16_t *buffer) {
 	outb(0x1F5, (lba_pos >> 16) & 0xFF);
 	outb(COMMAND_PORT, 0x24);
 
-	while (!(inb(STATUS_PORT) & 0x8))
-		;
+	while (!(inb(STATUS_PORT) & 0x8));
 
 	int blocks_remaining = 256;
 	while (blocks_remaining--) {
@@ -142,7 +139,7 @@ int ATABlockNode::read_block(uint16_t *buffer) {
 	return 0;
 }
 
-int ATABlockNode::write_512(uint8_t* buffer, size_t) {
+int ATABlockNode::write_512(uint8_t *buffer, size_t) {
 	size_t lba_pos = m_position / 512;
 	outb(DRIVE_SELECT_PORT, m_config);
 	outb(0x1F2, 0);
@@ -156,7 +153,7 @@ int ATABlockNode::write_512(uint8_t* buffer, size_t) {
 	outb(COMMAND_PORT, 0x30);
 
 	for (int i = 0; i < 256; i++) {
-		outw(DATA_PORT, (buffer[(i*2)+1]<<8) | buffer[i*2]);
+		outw(DATA_PORT, (buffer[(i * 2) + 1] << 8) | buffer[i * 2]);
 		outb(COMMAND_PORT, 0xE7);
 		uint8_t status;
 		do {
@@ -171,22 +168,24 @@ int ATABlockNode::write(void *buffer, size_t size) {
 	uint8_t overwrite_buf[512];
 	size_t old_pos = m_position;
 	size_t size_rem = size;
-	size_t sub_pos = m_position%512;
+	size_t sub_pos = m_position % 512;
 	size_t output_pos = 0;
 
 	while (size_rem) {
-		size_t read_sz = min(min((size_t)512, size_rem), (size_t)(512-sub_pos));
-		read_block((uint16_t*)overwrite_buf);
-		memcpy(&overwrite_buf[sub_pos], ((uint8_t*)buffer)+output_pos, read_sz);
+		size_t read_sz =
+			min(min((size_t)512, size_rem), (size_t)(512 - sub_pos));
+		read_block((uint16_t *)overwrite_buf);
+		memcpy(&overwrite_buf[sub_pos], ((uint8_t *)buffer) + output_pos,
+			   read_sz);
 
 		write_512(overwrite_buf, 512);
-		
+
 		output_pos += read_sz;
 		size_rem -= read_sz;
 		sub_pos = 0;
 	}
 
-	m_position = old_pos+size;
+	m_position = old_pos + size;
 	return 0;
 }
 
@@ -203,8 +202,9 @@ int ATABlockNode::read(void *buffer, size_t size) {
 	size_t old_pos = m_position;
 	size_t left = size;
 	size_t off = 0;
-	while(left) {
-		read_512_temp((uint8_t *)((size_t)buffer+off), min(left,(size_t)512));
+	while (left) {
+		read_512_temp((uint8_t *)((size_t)buffer + off),
+					  min(left, (size_t)512));
 		off += 512;
 		left -= min(left, (size_t)512);
 	}

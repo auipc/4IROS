@@ -32,7 +32,7 @@ struct ExceptReg {
 	uint64_t rax, rbx, rcx, rdx, rsi, rdi, r15, r14, r13, r12, r11, r10, r9, r8,
 		rbp /*, rsp*/;
 	// Sys
-	uint64_t error, rip, cs, eflags;
+	uint64_t error, rip, cs, eflags, rsp, ss;
 } PACKED;
 
 inline uint64_t get_cr2() {
@@ -74,6 +74,12 @@ struct TSS {
 
 inline void write_msr(uint32_t msr, uint32_t low, uint32_t high) {
 	asm volatile("wrmsr" ::"c"(msr), "a"(low), "d"(high));
+}
+
+inline uint64_t read_msr(uint32_t msr) {
+	uint32_t low = 0, high = 0;
+	asm volatile("rdmsr" : "=a"(low), "=d"(high) :"c"(msr));
+	return ((uint64_t)high<<32)|((uint64_t)low<<32);
 }
 
 static_assert(sizeof(TSS) == 104);

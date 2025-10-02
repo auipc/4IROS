@@ -6,8 +6,8 @@ set(CMAKE_C_COMPILER   clang)
 set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_ASM_COMPILER clang)
 
-set(CMAKE_CXX_FLAGS "--target=x86_64-pc-none-elf -march=x86-64 -m64")
-set(CMAKE_C_FLAGS "--target=x86_64-pc-none-elf -march=x86-64 -m64")
+set(CMAKE_CXX_FLAGS "--target=x86_64-pc-none-elf -march=x86-64 -m64 -nostdinc -nostdlib")
+set(CMAKE_C_FLAGS "--target=x86_64-pc-none-elf -march=x86-64 -m64 -nostdinc -nostdlib")
 set(CMAKE_LINKER_FLAGS "--target=x86_64-pc-none-elf -march=x86-64 -m64")
 set(CMAKE_ASM_FLAGS "--target=x86_64-pc-none-elf -march=x86-64 -m64")
 

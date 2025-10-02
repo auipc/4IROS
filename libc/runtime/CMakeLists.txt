@@ -1,6 +1,24 @@
 set(LIBC_CRT0_SRCS
-	crt0.c
+	../errno.c
 	../unistd.c
+	../stdio.c
+	../string.c
+	../sys/mman.c
+	../stdlib.c
+	../math.c
+	../asm/mathhelp.S
+	../temporary_malloc.cpp
+	../gprof.c
+	../sys/time.c
+	../sys/ioctl.c
+	../time.c
+	../ctype.c
+	../signal.c
+	../dirent.c
+	../termios.c
+	../sys/stat.c
+	../poll.c
+	crt0.c
 	asm/crt0s.S
 )
 

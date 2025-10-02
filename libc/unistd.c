@@ -1,13 +1,18 @@
 #include <errno.h>
 #include <priv/common.h>
 #include <priv/util.h>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 int optind = 1;
 
-int access(const char* path, int mode) {
+
+char *getcwd(char* buf, size_t size) { 
+	return NULL;
+}
+
+int access(const char *path, int mode) {
 	struct stat st;
 	return stat(path, &st);
 }
@@ -63,7 +68,8 @@ off_t lseek(int fd, off_t offset, int whence) {
 
 _Noreturn void exit(int status) {
 	// Flush the big 3 stdio handles
-	// however I think I'm supposed to flush everything including weird line buffered files made by the program
+	// however I think I'm supposed to flush everything including weird line
+	// buffered files made by the program
 	fflush(stdin);
 	fflush(stdout);
 	fflush(stderr);
@@ -85,7 +91,7 @@ int execvp(const char *path, const char **argv) {
 	return r;
 }
 
-int spawn(int* pid, const char *path, const char **argv) {
+int spawn(int *pid, const char *path, const char **argv) {
 	int r = 0;
 	asm volatile("syscall"
 				 : "=a"(r), "=b"(_errno)
@@ -125,18 +131,15 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags, voi
 
 int sleep(unsigned int s) { return msleep(s * 1000); }
 
-int msleep(uint64_t ms) {
-	return usleep(ms*1000);
-}
+int msleep(uint64_t ms) { return usleep(ms * 1000); }
 
-int usleep(uint64_t us) { 
+int usleep(uint64_t us) {
 	int r = 0;
 	asm volatile("syscall"
 				 : "=a"(r), "=b"(_errno)
 				 : "a"(SYS_SLEEP), "b"(us)
 				 : "rcx", "r11", "memory");
 	return r;
-
 }
 
 int close(int fd) {
@@ -148,7 +151,7 @@ int close(int fd) {
 	return r;
 }
 
-int chdir(const char* path) {
+int chdir(const char *path) {
 	int r = 0;
 	asm volatile("syscall"
 				 : "=a"(r), "=b"(_errno)

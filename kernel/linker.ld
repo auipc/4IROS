@@ -31,7 +31,7 @@ SECTIONS
 
 	.temp_page ALIGN(4K) : {
 		_heap_start = .;
-		. += 0x40000;
+		. += 0x80000;
 		_heap_end = .;
 	}
 

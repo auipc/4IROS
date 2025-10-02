@@ -18,7 +18,8 @@ extern "C" {
 
 extern int optind;
 
-int access(const char* path, int mode);
+char *getcwd(char* buf, size_t size);
+int access(const char *path, int mode);
 int sleep(unsigned int s);
 int isatty();
 int fork();
@@ -28,13 +29,13 @@ int write(int fd, void *buffer, size_t len);
 off_t lseek(int fd, off_t offset, int whence);
 _Noreturn void exit(int status);
 int execvp(const char *path, const char **argv);
-int spawn(int* pid, const char *path, const char **argv);
+int spawn(int *pid, const char *path, const char **argv);
 int waitpid(pid_t pid, int *wstatus, int options);
 void *mmap(void *address, size_t length);
 int msleep(uint64_t ms);
 int usleep(uint64_t us);
 int close(int fd);
-int chdir(const char* path);
+int chdir(const char *path);
 
 #ifdef __cplusplus
 };

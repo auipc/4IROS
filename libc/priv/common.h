@@ -21,5 +21,7 @@ enum {
 	SYS_IOCTL = 18,
 	SYS_SPAWN = 19,
 	SYS_CHDIR = 20,
+	SYS_SIGNAL = 21,
+	SYS_SIGRET = 22,
 };
 #endif

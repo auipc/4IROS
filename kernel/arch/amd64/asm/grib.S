@@ -40,7 +40,7 @@ x64_switch:
 	//pushq $0x0
 	#iretq
 
-// MORON: Since we're creating another stack, why not push to it using the accepted method? <-- This is horrible
+// MORON: Since we're creating another stack, why not push to it using the accepted method? <-- This is horrid
 .global x64_create_kernel_task_stack
 x64_create_kernel_task_stack:
 	cli

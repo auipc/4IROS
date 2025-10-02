@@ -27,7 +27,7 @@ void *memchr(const void *s, int c, size_t n);
 void *memrchr(const void *s, int c, size_t n);
 void *memmove(void *s1, const void *s2, size_t n);
 void *memcpy(void *dest, const void *src, size_t size);
-void* memset(char *buffer, char value, size_t size);
+void *memset(char *buffer, char value, size_t size);
 int atoi(const char *str);
 void ulltoa(uint64_t n, char *buf, int base);
 void itoa(int64_t n, char *buf, int base);
@@ -45,7 +45,7 @@ template <typename T> void *memcpy(T *dest, const void *src, size_t size) {
 	return memcpy((void *)dest, src, size);
 }
 
-template <typename T> void* memset(T *buffer, char value, size_t size) {
+template <typename T> void *memset(T *buffer, char value, size_t size) {
 	return memset((char *)buffer, value, size);
 }
 #endif

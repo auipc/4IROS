@@ -8,13 +8,14 @@
 #include <kernel/shedule/proc.h>
 #include <kernel/vfs/stddev.h>
 #include <kernel/vfs/vfs.h>
+#include <poll.h>
 #include <priv/common.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
-#include <sys/stat.h>
-#include <poll.h>
+#include <signal.h>
 
 extern uint64_t second_base;
 extern uint64_t us_elapsed;
@@ -31,7 +32,6 @@ static void sys$exit(Process *current, int status,
 	Paging::the()->switch_page_directory(
 		Paging::the()->s_kernel_page_directory);
 	current->drop_page_dir();
-	//printk("mmap mem left: %d/%d\n", Paging::the()->allocator()->mem_in_use()/1024/1024, 100);
 	Process::sched(0);
 }
 
@@ -44,7 +44,6 @@ static size_t sys$fork(Process *current, SyscallReg *regs,
 	child->next = current_process->next;
 	child->prev = current_process;
 	current_process->next = child;
-#if 0
 	info("Run queue: \n");
 	printk("%d", current_process->pid);
 	Process *p = current_process->next;
@@ -56,11 +55,9 @@ static size_t sys$fork(Process *current, SyscallReg *regs,
 	}
 	printk("\n");
 	printk("fork %d\n", child->pid);
-#endif
 	return child->pid;
 }
 
-// FIXME Make verify_buffer work with CoW
 static bool verify_buffer(RootPageLevel *pd, uintptr_t buffer_addr,
 						  size_t size) {
 	uintptr_t start_addr = buffer_addr & ~(PAGE_SIZE - 1);
@@ -110,6 +107,7 @@ KSyscallData data;
 // for another process reading it).
 static int sys$read(Process *current, int fd, const char *buffer, size_t count,
 					[[maybe_unused]] int *errno) {
+	Process::resolve_cow(current, (uintptr_t)buffer);
 	// FIXME check writable
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)buffer, count)) {
 		*errno = EFAULT;
@@ -160,6 +158,7 @@ static size_t sys$write(Process *current, uint32_t handle,
 						[[maybe_unused]] int *errno) {
 	auto current_pd = current->root_page_level();
 
+	Process::resolve_cow(current, (uintptr_t)buffer_addr);
 	if (!verify_buffer(current_pd, buffer_addr, length)) {
 		printk("Invalid buffer\n");
 		*errno = EFAULT;
@@ -174,9 +173,11 @@ static size_t sys$write(Process *current, uint32_t handle,
 
 	// FIXME stderr is fucked
 	if (handle == 2) {
+#if 0
 		for (size_t i = 0; i < length; i++) {
 			printk("%c", ((char *)(buffer_addr))[i]);
 		}
+#endif
 		return length;
 	}
 
@@ -226,7 +227,8 @@ static int sys$open(Process *current, const char *buffer, int flags,
 	FileHandle *handle = VFS::the().open_fh(path);
 	if (!handle) {
 		if (flags & (O_WRONLY | O_CREAT)) {
-			(void)VFS::the().get_root_fs()->mounted_filesystem()->create(buffer);
+			(void)VFS::the().get_root_fs()->mounted_filesystem()->create(
+				buffer);
 			handle = VFS::the().open_fh(path);
 		} else {
 			printk("NO SUCH FILE %s\n", buffer);
@@ -239,6 +241,7 @@ static int sys$open(Process *current, const char *buffer, int flags,
 		handle->seek(0, (SeekMode)SEEK_END);
 	} else if (flags & O_WRONLY) {
 		handle->node()->set_size(0);
+		handle->seek(0, (SeekMode)SEEK_SET);
 	}
 
 	int fd = current->push_handle(handle);
@@ -285,7 +288,7 @@ static void *sys$mmap(Process *current, void *address, size_t length,
 	if (!length)
 		return nullptr;
 
-	if (!(addr>>39))
+	if (!(addr >> 39))
 		panic("Tried to map pml4[0]");
 
 	uintptr_t free_page = Paging::the()->allocator()->find_free_pages(
@@ -301,18 +304,22 @@ static void *sys$mmap(Process *current, void *address, size_t length,
 			free_page + (extent * PAGE_SIZE),
 			PAEPageFlags::User | PAEPageFlags::Present | PAEPageFlags::Write);
 	}
-	
-	//printk("mmap mem left: %d/%d\n", Paging::the()->allocator()->mem_in_use()/1024/1024, 100);
+
+	// printk("mmap mem left: %d/%d\n",
+	// Paging::the()->allocator()->mem_in_use()/1024/1024, 100);
 	return (void *)addr;
 }
 
+// FIXME verify argv
 static size_t sys$exec(Process *current, const char *buffer, const char **argv,
 					   [[maybe_unused]] int *errno) {
+	printk("exec %s\n", buffer);
+	Process::resolve_cow(current, (uintptr_t)buffer);
+	Process::resolve_cow(current, (uintptr_t)argv);
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)buffer, 255)) {
 		*errno = EFAULT;
 		return -1;
 	}
-	info("exec %s\n", buffer);
 
 	size_t argc = 0;
 	if (argv) {
@@ -339,8 +346,15 @@ static size_t sys$exec(Process *current, const char *buffer, const char **argv,
 	// Lazily just kill the process, copy the pid, and file descriptors.
 	auto proc = Process::create_user(buffer, argc,
 									 const_cast<const char **>(argv_copy));
-	if (!proc)
+	if (!proc) {
+		if (argv_copy) {
+			for (size_t i = 0; i < argc; i++) {
+				delete[] argv_copy[i];
+			}
+			delete[] argv_copy;
+		}
 		return -1;
+	}
 
 	auto next = current->next;
 	auto prev = current->prev;
@@ -352,7 +366,7 @@ static size_t sys$exec(Process *current, const char *buffer, const char **argv,
 #endif
 	current->dont_goto_me = true;
 
-	//current->collapse_cow();
+	// current->collapse_cow();
 
 	proc->copy_handles(current);
 
@@ -457,24 +471,24 @@ int timeofday() {
 	outb(0x70, 9);
 	uint8_t years_bcd = inb(0x71);
 	int years = (((years_bcd >> 4) & 0xf) * 10) + (years_bcd & 0xf);
-	return (((30+(years-1)) * 32142400) + ((month-1) * 2678400) +
-		   ((day-1) * 86400) + ((hour) * 3600) + ((minutes) * 60) +
-		   seconds);
+	return (((30 + (years - 1)) * 32142400) + ((month - 1) * 2678400) +
+			((day - 1) * 86400) + ((hour) * 3600) + ((minutes) * 60) + seconds);
 }
 
 static int sys$gettimeofday(Process *current, timeval *tv, void *,
 							[[maybe_unused]] int *errno) {
+	Process::resolve_cow(current, (uintptr_t)tv);
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)tv, PAGE_SIZE)) {
 		*errno = EFAULT;
 		return -1;
 	}
 
 	tv->tv_sec = second_base;
-	tv->tv_usec = us_elapsed%1000000;
+	tv->tv_usec = us_elapsed % 1000000;
 	return 0;
 }
 
-static int sys$kill(Process *current, pid_t pid, [[maybe_unused]] int *errno) {
+static int sys$kill(Process *current, pid_t pid, int sig, [[maybe_unused]] int *errno) {
 	(void)current;
 	Process **p = process_pid_map->get(pid);
 	if (!p) {
@@ -483,17 +497,36 @@ static int sys$kill(Process *current, pid_t pid, [[maybe_unused]] int *errno) {
 		return -1;
 	}
 
-	info("sys$kill\n");
-	if ((*p)->state() != ProState::Dead) {
-		(*p)->exit_code = 129;
-		(*p)->kill();
-		// Paging::the()->release(*(*p)->root_page_level());
+	printk("Sending signal kill\n");
+	switch (sig) {
+		case SIGKILL: {
+			if ((*p)->state() != ProState::Dead) {
+				(*p)->exit_code = 129;
+				(*p)->kill();
+			}
+		} break;
+		case SIGINT: {
+			if((*p)->has_signal_handler()) {
+				(*p)->send_signal(SIGINT);
+			} else {
+				(*p)->exit_code = 130;
+				(*p)->kill();
+			}
+		} break;
+		default:
+			*errno = EINVAL;
+			return -1;
+			break;
+
 	}
 	return 0;
 }
 
-static int sys$stat(Process *current, const char* path, struct stat* s, [[maybe_unused]] int *errno) {
-	if (!verify_buffer(current->root_page_level(), (uintptr_t)path, PAGE_SIZE)) {
+static int sys$stat(Process *current, const char *path, struct stat *s,
+					[[maybe_unused]] int *errno) {
+	Process::resolve_cow(current, (uintptr_t)s);
+	if (!verify_buffer(current->root_page_level(), (uintptr_t)path,
+					   PAGE_SIZE)) {
 		*errno = EFAULT;
 		return -1;
 	}
@@ -504,7 +537,7 @@ static int sys$stat(Process *current, const char* path, struct stat* s, [[maybe_
 	}
 
 	auto p = VFS::the().parse_path_cwd(current->get_cwd(), path);
-	VFSNode* node_stat = VFS::the().stat(p);
+	VFSNode *node_stat = VFS::the().stat(p);
 	if (!node_stat) {
 		*errno = ENOENT;
 		return -1;
@@ -514,7 +547,9 @@ static int sys$stat(Process *current, const char* path, struct stat* s, [[maybe_
 	return 0;
 }
 
-static int sys$fstat(Process *current, int fd, struct stat* s, [[maybe_unused]] int *errno) {
+static int sys$fstat(Process *current, int fd, struct stat *s,
+					 [[maybe_unused]] int *errno) {
+	Process::resolve_cow(current, (uintptr_t)s);
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)s, PAGE_SIZE)) {
 		*errno = EFAULT;
 		return -1;
@@ -537,14 +572,17 @@ static int sys$fstat(Process *current, int fd, struct stat* s, [[maybe_unused]] 
 }
 
 // FIXME support timeouts
-// FIXME support infinite timeouts or: blocking on multiple file descriptors
-static int sys$poll(Process *current, struct pollfd *fds, size_t fd_no, int timeout, [[maybe_unused]] int *errno) {
+// FIXME support infinite timeouts
+static int sys$poll(Process *current, struct pollfd *fds, size_t fd_no,
+					int timeout, [[maybe_unused]] int *errno) {
 	if (!fd_no) {
 		*errno = EINVAL;
 		return -1;
 	}
 
-	if (!verify_buffer(current->root_page_level(), (uintptr_t)(fds+fd_no), PAGE_SIZE)) {
+	Process::resolve_cow(current, (uintptr_t)(fds+fd_no));
+	if (!verify_buffer(current->root_page_level(), (uintptr_t)(fds + fd_no),
+					   PAGE_SIZE)) {
 		*errno = EFAULT;
 		return -1;
 	}
@@ -552,13 +590,13 @@ static int sys$poll(Process *current, struct pollfd *fds, size_t fd_no, int time
 	int no_fds_raised = 0;
 
 	for (size_t i = 0; i < fd_no; i++) {
-		struct pollfd& fde = fds[i];
+		struct pollfd &fde = fds[i];
 		fde.revents = 0;
 	}
 
 	// FIXME broken
 	if (timeout == -1) {
-		Vec<FileHandle*> handles;
+		Vec<FileHandle *> handles;
 		for (size_t i = 0; i < fd_no; i++) {
 			handles.push(current->m_file_handles[fds[i].fd]);
 		}
@@ -571,7 +609,7 @@ static int sys$poll(Process *current, struct pollfd *fds, size_t fd_no, int time
 	}
 
 	for (size_t i = 0; i < fd_no; i++) {
-		struct pollfd& fde = fds[i];
+		struct pollfd &fde = fds[i];
 		if ((size_t)fde.fd >= current->file_handles_size()) {
 			*errno = EBADF;
 			return -1;
@@ -596,8 +634,10 @@ static int sys$poll(Process *current, struct pollfd *fds, size_t fd_no, int time
 	return no_fds_raised;
 }
 
-static int sys$ioctl(Process* current, int fd, unsigned long op, char* argp, [[maybe_unused]] int *errno) {
-	if (!verify_buffer(current->root_page_level(), (uintptr_t)argp, PAGE_SIZE)) {
+static int sys$ioctl(Process *current, int fd, unsigned long op, char *argp,
+					 [[maybe_unused]] int *errno) {
+	if (!verify_buffer(current->root_page_level(), (uintptr_t)argp,
+					   PAGE_SIZE)) {
 		*errno = EFAULT;
 		return -1;
 	}
@@ -614,7 +654,8 @@ static int sys$ioctl(Process* current, int fd, unsigned long op, char* argp, [[m
 
 	auto fh = current->m_file_handles[fd];
 	if (op == FIONREAD) {
-		*((int*)argp) = fh->node()->size();
+		Process::resolve_cow(current, (uintptr_t)(argp));
+		*((int *)argp) = fh->node()->size();
 		return 0;
 	}
 
@@ -622,8 +663,8 @@ static int sys$ioctl(Process* current, int fd, unsigned long op, char* argp, [[m
 	return -1;
 }
 
-static int sys$spawn(Process* current, int* pid, const char *buffer, const char **argv,
-					   [[maybe_unused]] int *errno) {
+static int sys$spawn(Process *current, int *pid, const char *buffer,
+					 const char **argv, [[maybe_unused]] int *errno) {
 	if (!verify_buffer(current->root_page_level(), (uintptr_t)pid, 4)) {
 		*errno = EFAULT;
 		return -1;
@@ -655,7 +696,7 @@ static int sys$spawn(Process* current, int* pid, const char *buffer, const char 
 		info("%s\n", argv_copy[i]);
 	}
 
-	char* buffer_copy = strdup(buffer);
+	char *buffer_copy = strdup(buffer);
 	auto current_pgl = (PageLevel *)get_cr3();
 	Paging::the()->switch_page_directory(
 		Paging::the()->s_kernel_page_directory);
@@ -664,7 +705,6 @@ static int sys$spawn(Process* current, int* pid, const char *buffer, const char 
 									 const_cast<const char **>(argv_copy));
 	if (!proc)
 		return -1;
-
 
 	auto parent = current->parent();
 	auto cwd = current->get_cwd();
@@ -680,11 +720,14 @@ static int sys$spawn(Process* current, int* pid, const char *buffer, const char 
 	proc->set_parent(parent);
 	proc->set_state(ProState::Running);
 	current_process->next = proc;
+	printk("spawning %s %d\n", proc->name(), proc->pid);
 	return 0;
 }
 
-static int sys$chdir(Process *current, const char* path, [[maybe_unused]] int *errno) {
-	if (!verify_buffer(current->root_page_level(), (uintptr_t)path, PAGE_SIZE)) {
+static int sys$chdir(Process *current, const char *path,
+					 [[maybe_unused]] int *errno) {
+	if (!verify_buffer(current->root_page_level(), (uintptr_t)path,
+					   PAGE_SIZE)) {
 		*errno = EBADF;
 		return -1;
 	}
@@ -764,39 +807,60 @@ void handler(SyscallReg *regs) {
 						static_cast<int>(regs->rdi), &errno));
 	} break;
 	case SYS_SLEEP: {
-		return_value =  sys$sleep(current, static_cast<size_t>(regs->rbx), &errno);
+		return_value =
+			sys$sleep(current, static_cast<size_t>(regs->rbx), &errno);
 	} break;
 	case SYS_GETTIMEOFDAY: {
-		return_value = sys$gettimeofday(current, reinterpret_cast<timeval *>(regs->rbx),
+		return_value =
+			sys$gettimeofday(current, reinterpret_cast<timeval *>(regs->rbx),
 							 reinterpret_cast<void *>(regs->rdx), &errno);
 	} break;
 	case SYS_KILL: {
-		return_value = sys$kill(current, static_cast<pid_t>(regs->rbx), &errno);
+		return_value = sys$kill(current, static_cast<pid_t>(regs->rbx), static_cast<int>(regs->rdx), &errno);
 	} break;
 	case SYS_STAT: {
-		return_value = sys$stat(current, reinterpret_cast<const char*>(regs->rbx), reinterpret_cast<struct stat*>(regs->rdx), &errno);
+		return_value =
+			sys$stat(current, reinterpret_cast<const char *>(regs->rbx),
+					 reinterpret_cast<struct stat *>(regs->rdx), &errno);
 	} break;
 	case SYS_FSTAT: {
-		return_value = sys$fstat(current, static_cast<int>(regs->rbx), reinterpret_cast<struct stat*>(regs->rdx), &errno);
+		return_value =
+			sys$fstat(current, static_cast<int>(regs->rbx),
+					  reinterpret_cast<struct stat *>(regs->rdx), &errno);
 	} break;
 	case SYS_POLL: {
-		return_value = sys$poll(current, reinterpret_cast<struct pollfd*>(regs->rbx), static_cast<nfds_t>(regs->rdx), static_cast<int>(regs->rdi), &errno);
+		return_value =
+			sys$poll(current, reinterpret_cast<struct pollfd *>(regs->rbx),
+					 static_cast<nfds_t>(regs->rdx),
+					 static_cast<int>(regs->rdi), &errno);
 	} break;
 	case SYS_CLOSE: {
 		return_value = sys$close(current, static_cast<int>(regs->rbx), &errno);
 	} break;
 	case SYS_IOCTL: {
-		return_value = sys$ioctl(current, static_cast<int>(regs->rbx), static_cast<unsigned long>(regs->rdx), reinterpret_cast<char*>(regs->rdi), &errno);
+		return_value = sys$ioctl(current, static_cast<int>(regs->rbx),
+								 static_cast<unsigned long>(regs->rdx),
+								 reinterpret_cast<char *>(regs->rdi), &errno);
 	} break;
 	// Both fork and exec in one
 	// This is temporary until I figure out CoW
 	case SYS_SPAWN: {
 		return_value =
-			sys$spawn(current, reinterpret_cast<int*>(regs->rbx), reinterpret_cast<const char *>(regs->rdx),
-					 reinterpret_cast<const char **>(regs->rdi), &errno);
+			sys$spawn(current, reinterpret_cast<int *>(regs->rbx),
+					  reinterpret_cast<const char *>(regs->rdx),
+					  reinterpret_cast<const char **>(regs->rdi), &errno);
 	} break;
 	case SYS_CHDIR: {
-		return_value = sys$chdir(current, reinterpret_cast<const char*>(regs->rbx), &errno);
+		return_value = sys$chdir(
+			current, reinterpret_cast<const char *>(regs->rbx), &errno);
+	} break;
+	case SYS_SIGNAL: {
+		current->register_signal_handler((void*)regs->rdx);
+		return_value = 0;
+	} break;
+	case SYS_SIGRET: {
+		current->sigret();
+		return_value = 0;
 	} break;
 	default:
 		info("Unknown syscall %d\n", syscall_no);

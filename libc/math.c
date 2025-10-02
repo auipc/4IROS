@@ -5,6 +5,7 @@
 // FIXME this should just flip the sign bit!!
 // there's even a handy instruction fchs
 double fabs(double x) { return x > 0.0 ? x : -x; }
+long double fabsl(long double x) { return x > 0.0 ? x : -x; }
 
 double sqrt(double x) {
 	double res = 0;
@@ -27,6 +28,10 @@ float sqrtf(float x) {
 }
 
 // double round_to_nearest(double value);
+//
+float floorf(float x) {
+	return floor((double)x);
+}
 
 double floor(double x) {
 	volatile int64_t y = x;
@@ -69,34 +74,20 @@ double pow(double x, double y) {
 	return result;
 }
 
-double cos(double x) { 
+double cos(double x) {
 	double res = 0;
-	asm volatile("fldl %1\n"
-				 "fcos\n"
-				 "fstl %0"
-				 : "=m"(res)
-				 : "m"(x));
+	asm volatile("fcos":"=t"(res):"0"(x));
 	return res;
 }
 
-double sin(double x) { 
+double sin(double x) {
 	double res = 0;
-	asm volatile("fldl %1\n"
-				 "fsin\n"
-				 "fstl %0"
-				 : "=m"(res)
-				 : "m"(x));
+	asm volatile("fsin":"=t"(res):"0"(x));
 	return res;
 }
 
-void sincos(double x, double* sin, double* cos) {
-	asm volatile("fldl %2\n"
-				 "fsincos\n"
-				 "fstl %0\n"
-				 "fxch\n"
-				 "fstl %1\n"
-				 : "=m"(*cos), "=m"(*sin)
-				 : "m"(x));
+void sincos(double x, double *s, double *c) {
+	asm volatile("fsincos":"=t"(*c), "=u"(*s):"0"(x));
 }
 
 // Yes, I know this sucks.
@@ -113,6 +104,10 @@ double acos(double x) {
 int abs(int x) { return x > 0 ? x : -x; }
 
 double fmod(double x, double y) { return __builtin_fmod(x, y); }
+
+float ceilf(float x) {
+	return ceil((double)x);
+}
 
 double ceil(double x) {
 	int64_t y = x;

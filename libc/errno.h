@@ -18,6 +18,7 @@ extern "C" {
 #define EIO 11
 #define ENOSPC 12
 #define ENOTDIR 13
+#define ENOTTY 14
 
 #ifndef LIBK
 extern int _errno;

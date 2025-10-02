@@ -10,9 +10,9 @@
 #include <kernel/shedule/proc.h>
 #include <kernel/util/Pool.h>
 #include <string.h>
-#include <kernel/prof.h>
 
-// FIXME HUGE BUG NOT REALLY BUT WE SHOULD SEPARATE THE PAGE LEVEL ALLOCATIONS AGAINST THE ACTUAL PAGE MEMORY ALLOCATIONS
+// FIXME HUGE BUG NOT REALLY BUT WE SHOULD SEPARATE THE PAGE LEVEL ALLOCATIONS
+// AGAINST THE ACTUAL PAGE MEMORY ALLOCATIONS
 
 // #define TEMP_ZONE_1 (((1ull<<42ull)-1ull)-(PAGE_SIZE*8ull))
 #define TEMP_ZONE_1_INDEX 58
@@ -46,10 +46,10 @@ Paging::Paging(size_t total_memory, const KernelBootInfo &kbootinfo) {
 	static const size_t kend = reinterpret_cast<size_t>(kbootinfo.kmap_end);
 
 	printk("level allocator\n");
-	m_level_allocator = new PageFrameAllocator(0, 8*MB);
+	m_level_allocator = new PageFrameAllocator(0, 8 * MB);
 	m_level_allocator->mark_range(0x0, 0xFFFFF + kend + 0x00100000 + 100 * KB);
 	printk("m_allocator\n");
-	m_allocator = new PageFrameAllocator(8*MB, total_memory-(8*MB));
+	m_allocator = new PageFrameAllocator(8 * MB, total_memory - (8 * MB));
 	printk("m_allocator done\n");
 }
 
@@ -323,7 +323,8 @@ uintptr_t RootPageLevel::get_page_flags(uintptr_t addr) {
 	return flags;
 }
 
-// FIXME This pattern is really flawed. Worst case scenario fetching requires an exponentional amount of copies.
+// FIXME This pattern is really flawed. Worst case scenario fetching requires an
+// exponentional amount of copies.
 DumbSmart<LovelyPageLevel> PageSkellington::fetch() {
 	LovelyPageLevel *level = new LovelyPageLevel();
 	memset(level, 0, sizeof(LovelyPageLevel));
@@ -349,10 +350,12 @@ uintptr_t page_map(uint64_t virt) {
 }
 
 char *temp_area[6] = {};
-// FIXME We should unmap pml4[0] or find some way to make the process page level not have it mapped so we can use that virtual space
-Pair<RootPageLevel *, void*> Paging::clone(const RootPageLevel &pml4) {
-	PROFDEFER;
-	void* p = s_use_actual_allocator ? kmalloc_really_aligned(PAGE_SIZE, PAGE_SIZE) : kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+// FIXME We should unmap pml4[0] or find some way to make the process page level
+// not have it mapped so we can use that virtual space
+Pair<RootPageLevel *, void *> Paging::clone(const RootPageLevel &pml4) {
+	void *p = s_use_actual_allocator
+				  ? kmalloc_really_aligned(PAGE_SIZE, PAGE_SIZE)
+				  : kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
 	auto root_page = page_map((uint64_t)p);
 	// auto current_pgl = (RootPageLevel*)get_cr3();
 	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
@@ -363,7 +366,8 @@ Pair<RootPageLevel *, void*> Paging::clone(const RootPageLevel &pml4) {
 	for (int i = 0; i < 512; i++) {
 		auto &root_pdpt = root_pd->entries[i];
 		auto pdpt = pml4.entries[i];
-		if (!(pdpt.pdata & PAEPageFlags::User) && (pdpt.pdata & PAEPageFlags::Present)) {
+		if (!(pdpt.pdata & PAEPageFlags::User) &&
+			(pdpt.pdata & PAEPageFlags::Present)) {
 			root_pdpt.pdata = pdpt.pdata;
 		} else
 			root_pdpt.pdata = 0;
@@ -373,9 +377,8 @@ Pair<RootPageLevel *, void*> Paging::clone(const RootPageLevel &pml4) {
 	return Pair(root_pd, p);
 }
 
-Pair<RootPageLevel *, void*> Paging::clone_for_fork_test(const RootPageLevel &pml4,
-										   bool just_copy) {
-	PROFDEFER;
+Pair<RootPageLevel *, void *>
+Paging::clone_for_fork_test(const RootPageLevel &pml4, bool just_copy) {
 	void *virt = (void *)kmalloc_really_aligned(4096, 4096);
 	auto root_page = page_map((uint64_t)virt);
 	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
@@ -479,23 +482,265 @@ Pair<RootPageLevel *, void*> Paging::clone_for_fork_test(const RootPageLevel &pm
 	return Pair(root_pd, virt);
 }
 
-// FIXME free level structs
-int BasePageLevel::recursive_release(int depth) {
-	if (depth > 3) return 0;
+Pair<RootPageLevel *, void *> Paging::cow_clone(HashTable<CoWPage *>* owner,
+                                                HashTable<CoWPage *>* child,
+                                                RootPageLevel &pml4) {
+	void *virt = (void *)kmalloc_really_aligned(4096, 4096);
+	auto root_page = page_map((uint64_t)virt);
+	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
+	auto root_pd = new (virt) RootPageLevel();
 
-	//if (depth == 0)
-		//printk("%x\n", this);
-	
 	for (int i = 0; i < 512; i++) {
-		if (i != 1 && depth == 0) continue;
-		auto& entry = entries[i];
+		auto &root_pdpt = root_pd->entries[i];
+		auto pdpt = pml4.entries[i];
+		if (!pdpt.is_mapped()) {
+			root_pdpt.pdata = 0;
+			continue;
+		}
+		if ((!pdpt.is_user()) || i == TEMP_ZONE_1_INDEX) {
+			root_pdpt.pdata = pdpt.pdata;
+			continue;
+		}
+		// TODO copy
+		if (!root_pdpt.is_mapped()) {
+			root_pdpt.copy_flags(pdpt.pdata);
+			root_pdpt.set_addr(m_level_allocator->find_free_page());
+		}
+
+		for (int j = 0; j < 512; j++) {
+			auto root_pdpte_lvl = root_pdpt.fetch();
+			auto &root_pdpte = root_pdpte_lvl->entries[j];
+			auto pdpte = pdpt.fetch()->entries[j];
+			if (!pdpte.is_mapped()) {
+				root_pdpte.pdata = 0;
+				continue;
+			}
+
+			if (!pdpte.is_user()) {
+				root_pdpte.pdata = pdpte.pdata;
+				root_pdpt.commit(*root_pdpte_lvl.ptr());
+				continue;
+			}
+
+			if (!root_pdpte.is_mapped()) {
+				root_pdpte.copy_flags(pdpte.pdata);
+				root_pdpte.set_addr(m_level_allocator->find_free_page());
+			}
+
+			for (int k = 0; k < 512; k++) {
+				auto root_pdt_lvl = root_pdpte.fetch();
+				auto &root_pdt = root_pdt_lvl->entries[k];
+				auto pdt_lvl = pdpte.fetch();
+				auto &pdt = pdt_lvl->entries[k];
+				if (!pdt.is_mapped()) {
+					root_pdt.pdata = 0;
+					continue;
+				}
+
+				if (!pdt.is_user()) {
+					root_pdt.pdata = pdt.pdata;
+					root_pdpte.commit(*root_pdt_lvl.ptr());
+					continue;
+				}
+
+				if (!root_pdt.is_mapped()) {
+					root_pdt.copy_flags(pdt.pdata);
+					root_pdt.set_addr(m_level_allocator->find_free_page());
+				}
+
+				for (int l = 0; l < 512; l++) {
+					auto root_pt_lvl = root_pdt.fetch();
+					auto &root_pt = root_pt_lvl->entries[l];
+					auto pt_lvl = pdt.fetch();
+					auto &pt = pt_lvl->entries[l];
+					if (!pt.is_mapped()) {
+						root_pt.pdata = 0;
+						continue;
+					}
+
+					if (!pt.is_user()) {
+						root_pt.pdata = pt.pdata;
+						root_pdt.commit(*root_pt_lvl.ptr());
+						continue;
+					}
+
+					uintptr_t addr = ((uint64_t)i<<39ull)|((uint64_t)j<<30ull)|((uint64_t)k<<21ull)|((uint64_t)l<<12ull);
+					CoWPage* cow_page = nullptr;
+
+					if (owner->get(addr)) {
+						cow_page = *owner->get(addr);
+					} else {
+						cow_page = new CoWPage();
+						memset(cow_page, 0, sizeof(CoWPage));
+						cow_page->refs++;
+						cow_page->skel = pt;
+						owner->push(addr, cow_page);
+					}
+
+					cow_page->refs++;
+					child->push(addr, cow_page);
+
+					pt.pdata &= ~PAEPageFlags::Write;
+					root_pt.pdata = pt.pdata;
+					pdt.commit(*pt_lvl.ptr());
+					root_pdt.commit(*root_pt_lvl.ptr());
+				}
+				root_pdpte.commit(*root_pdt_lvl.ptr());
+			}
+			root_pdpt.commit(*root_pdpte_lvl.ptr());
+		}
+		// panic("wow");
+	}
+
+	return Pair(root_pd, virt);
+#if 0
+	void *virt = (void *)kmalloc_really_aligned(4096, 4096);
+	auto root_page = page_map((uint64_t)virt);
+	map_page(*(RootPageLevel *)get_cr3(), root_page, root_page);
+	auto root_pd = new (virt) RootPageLevel();
+
+	for (int i = 0; i < 512; i++) {
+		auto &root_pdpt = root_pd->entries[i];
+		auto &pdpt = pml4.entries[i];
+		if (!pdpt.is_mapped()) {
+			root_pdpt.pdata = 0;
+			continue;
+		}
+		if ((!pdpt.is_user()) || i == TEMP_ZONE_1_INDEX) {
+			root_pdpt.pdata = pdpt.pdata;
+			continue;
+		}
+
+		if (!root_pdpt.is_mapped()) {
+			root_pdpt.copy_flags(pdpt.pdata);
+			root_pdpt.set_addr(m_level_allocator->find_free_page());
+		}
+
+		for (int j = 0; j < 512; j++) {
+			auto root_pdpte_lvl = root_pdpt.fetch();
+			auto &root_pdpte = root_pdpte_lvl->entries[j];
+			auto &pdpte = pdpt.fetch()->entries[j];
+			if (!pdpte.is_mapped()) {
+				root_pdpte.pdata = 0;
+				continue;
+			}
+
+			if (!pdpte.is_user()) {
+				root_pdpte.pdata = pdpte.pdata;
+				root_pdpt.commit(*root_pdpte_lvl.ptr());
+				continue;
+			}
+
+			if (!root_pdpte.is_mapped()) {
+				root_pdpte.copy_flags(pdpte.pdata);
+				root_pdpte.set_addr(m_level_allocator->find_free_page());
+			}
+
+			for (int k = 0; k < 512; k++) {
+				auto root_pdt_lvl = root_pdpte.fetch();
+				auto &root_pdt = root_pdt_lvl->entries[k];
+				auto pdt_lvl = pdpte.fetch();
+				auto &pdt = pdt_lvl->entries[k];
+				if (!pdt.is_mapped()) {
+					root_pdt.pdata = 0;
+					continue;
+				}
+
+				if (!pdt.is_user()) {
+					root_pdt.pdata = pdt.pdata;
+					root_pdpte.commit(*root_pdt_lvl.ptr());
+					continue;
+				}
+
+				if (!root_pdt.is_mapped()) {
+					root_pdt.copy_flags(pdt.pdata);
+					root_pdt.set_addr(m_level_allocator->find_free_page());
+				}
+
+				for (int l = 0; l < 512; l++) {
+					auto root_pt_lvl = root_pdt.fetch();
+					auto &root_pt = root_pt_lvl->entries[l];
+					auto pt_lvl = pdt.fetch();
+					auto &pt = pt_lvl->entries[l];
+					if (!pt.is_mapped()) {
+						root_pt.pdata = 0;
+						root_pdt.commit(*root_pt_lvl.ptr());
+						continue;
+					}
+
+					if (!pt.is_user()) {
+						root_pt.pdata = pt.pdata;
+						root_pdt.commit(*root_pt_lvl.ptr());
+						continue;
+					}
+
+
+					uintptr_t addr = ((uint64_t)i<<39ull)|((uint64_t)j<<30ull)|((uint64_t)k<<21ull)|((uint64_t)l<<12ull);
+					CoWPage* cow_page = nullptr;
+
+#if 0
+					if (owner->get(addr)) {
+						cow_page = *owner->get(addr);
+					} else {
+#endif
+						cow_page = new CoWPage();
+						memset(cow_page, 0, sizeof(CoWPage));
+						cow_page->refs++;
+						cow_page->skel = pt;
+						owner->push(addr, cow_page);
+#if 0
+					}
+#endif
+
+					cow_page->refs++;
+					printk("Pushing %x %x\n", addr, cow_page);
+					child->push(addr, cow_page);
+
+					pt.pdata = 0;
+					root_pt.pdata = 0;
+					pdt.commit(*pt_lvl.ptr());
+					root_pdt.commit(*root_pt_lvl.ptr());
+				}
+				pdpte.commit(*pdt_lvl.ptr());
+				root_pdpte.commit(*root_pdt_lvl.ptr());
+			}
+			root_pdpt.commit(*root_pdpte_lvl.ptr());
+		}
+		// panic("wow");
+	}
+	return Pair(root_pd, virt);
+#endif
+}
+
+// FIXME free level structs
+int BasePageLevel::recursive_release(HashTable<CoWPage*>* cow_table, uintptr_t addraccum, int depth) {
+	if (depth > 3)
+		return 0;
+
+	// if (depth == 0)
+	// printk("%x\n", this);
+
+	for (int i = 0; i < 512; i++) {
+		if (i != 1 && depth == 0)
+			continue;
+		uintptr_t vaddr = addraccum|((uintptr_t)i<<(39ull-(depth*9)));
+		auto &entry = entries[i];
 		auto addr = entry.addr();
 		// FIXME
-		if ((entry.flags() & (PAEPageFlags::User)) && entry.flags() & (PAEPageFlags::Present)) {
+		if ((entry.flags() & (PAEPageFlags::User)) &&
+			entry.flags() & (PAEPageFlags::Present)) {
+			if (cow_table->get(vaddr)) {
+				CoWPage** cow_page = cow_table->get(vaddr);
+				(*cow_page)->refs--;
+				if ((*cow_page)->refs > 0) {
+					continue;
+				}
+				delete *cow_page;
+			}
 			if (depth != 3) {
-				printk("Trying to fetch %x at depth %d %d\n", addr, depth, i);
+				//printk("Trying to fetch %x at depth %d %d\n", addr, depth, i);
 				auto fe = entry.fetch();
-				fe->recursive_release(depth+1);
+				fe->recursive_release(cow_table, vaddr, depth + 1);
 				entry.commit(*fe.ptr());
 			}
 			if (depth == 3) {
@@ -510,8 +755,8 @@ int BasePageLevel::recursive_release(int depth) {
 	return 0;
 }
 
-void Paging::release(RootPageLevel &page_level) {
-	page_level.recursive_release();
+void Paging::release(RootPageLevel &page_level, HashTable<CoWPage*>* cow_table) {
+	page_level.recursive_release(cow_table);
 }
 
 uintptr_t page_map_level(uint64_t virt) {
@@ -524,19 +769,24 @@ uintptr_t page_map_level(uint64_t virt) {
 }
 
 void Paging::setup(size_t total_memory, const KernelBootInfo &kbootinfo) {
-        for (int i = 0; i < 2; i++) {
-                temp_area[i] = (char *)kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
-        }
+	for (int i = 0; i < 2; i++) {
+		temp_area[i] = (char *)kmalloc_aligned(PAGE_SIZE, PAGE_SIZE);
+	}
 	s_instance = new Paging(total_memory, kbootinfo);
 	Paging::the()->m_safe_pgl = (RootPageLevel *)get_cr3();
-	Paging::the()->m_safe_pgl->entries[TEMP_ZONE_1_INDEX].set_addr(page_map_level((uintptr_t)tz1pdpte));
-	Paging::the()->m_safe_pgl->entries[TEMP_ZONE_1_INDEX].pdata |= PAEPageFlags::Write | PAEPageFlags::Present;
-	tz1pdpte[0].pdata = (page_map_level((uintptr_t)tz1pd)) | PAEPageFlags::Write | PAEPageFlags::Present;
-	tz1pd[0].pdata = (page_map_level((uintptr_t)tz1pt)) | PAEPageFlags::Write | PAEPageFlags::Present;
+	Paging::the()->m_safe_pgl->entries[TEMP_ZONE_1_INDEX].set_addr(
+		page_map_level((uintptr_t)tz1pdpte));
+	Paging::the()->m_safe_pgl->entries[TEMP_ZONE_1_INDEX].pdata |=
+		PAEPageFlags::Write | PAEPageFlags::Present;
+	tz1pdpte[0].pdata = (page_map_level((uintptr_t)tz1pd)) |
+						PAEPageFlags::Write | PAEPageFlags::Present;
+	tz1pd[0].pdata = (page_map_level((uintptr_t)tz1pt)) | PAEPageFlags::Write |
+					 PAEPageFlags::Present;
 	tz1pt[0].pdata = 0 | PAEPageFlags::Write | PAEPageFlags::Present;
 
-	void* p = (void*)TEMP_ZONE_1;
+	void *p = (void *)TEMP_ZONE_1;
 	asm volatile("invlpg %0" ::"m"(p));
-	s_kernel_page_directory = Paging::the()->clone(*(RootPageLevel *)get_cr3()).left;
+	s_kernel_page_directory =
+		Paging::the()->clone(*(RootPageLevel *)get_cr3()).left;
 	switch_page_directory(s_kernel_page_directory);
 }

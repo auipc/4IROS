@@ -179,6 +179,7 @@ void info(const char *str, ...) {
 	outb(0x61, 0);
 	*/
 
-	while (1)
-		;
+	while (1) {
+		asm volatile("nop");
+	}
 }

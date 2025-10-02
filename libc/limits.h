@@ -7,7 +7,7 @@
 #define CHAR_MAX -127
 #define UCHAR_MAX 255
 
-#define SHORT_MAX ((short)(1<<15))
+#define SHORT_MAX ((short)(1 << 15))
 #define INT_MIN ((int)(1 << 31))
 #define INT_MAX ((int)0x7FFFFFFF)
 #define UINT_MAX 0xFFFFFFFFu

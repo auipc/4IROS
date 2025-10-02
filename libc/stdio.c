@@ -1,17 +1,17 @@
 #include <ctype.h>
 #include <fcntl.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <math.h>
 
 char stdin_buf[1024] = {};
 char stdout_buf[1024] = {};
 
-#define STDIO_NOLBF
+//#define STDIO_NOLBF
 #ifdef STDIO_NOLBF
 FILE _stdin = {.fd = 0,
 			   .eof = 0,
@@ -102,9 +102,30 @@ FILE *fopen(const char *filename, const char *mode) {
 	return f;
 }
 
-int fclose(FILE *stream) { 
-	return close(stream->fd);
+FILE *fdopen(int fd, const char *mode) {
+	int flags = 0;
+	while (*mode) {
+		switch (*mode) {
+		case 'w':
+			flags |= O_WRONLY;
+			break;
+		default:
+			break;
+		}
+		mode++;
+	}
+
+	FILE *f = (FILE *)malloc(sizeof(FILE));
+	memset((char *)f, 0, sizeof(FILE));
+	f->fd = fd;
+	return f;
 }
+
+int remove(const char *path) {
+	return 0;
+}
+
+int fclose(FILE *stream) { return close(stream->fd); }
 
 int getchar() { return fgetc(stdin); }
 
@@ -167,14 +188,14 @@ size_t fwrite(const void *buffer, size_t size, size_t count, FILE *stream) {
 		size_t buffer_idx = 0;
 		size_t size_rem = size * count;
 		if (size_rem >= stream->buffer.buf_sz) {
-			write(stream->fd, buffer, size_rem-stream->buffer.buf_sz);
-			buffer_idx += size_rem-stream->buffer.buf_sz;
+			write(stream->fd, buffer, size_rem - stream->buffer.buf_sz);
+			buffer_idx += size_rem - stream->buffer.buf_sz;
 		}
 
-		memcpy(&stream->buffer.buf[stream->buffer.buf_idx], ((uint8_t*)buffer)+buffer_idx,
-			   (size * count)-buffer_idx);
-		stream->buffer.buf_idx += (size * count)-buffer_idx;
-		for (size_t i = 0; i < size*count; i++) {
+		memcpy(&stream->buffer.buf[stream->buffer.buf_idx],
+			   ((uint8_t *)buffer) + buffer_idx, (size * count) - buffer_idx);
+		stream->buffer.buf_idx += (size * count) - buffer_idx;
+		for (size_t i = 0; i < size * count; i++) {
 			if (((char *)buffer)[i] == '\n') {
 				write(stream->fd, stream->buffer.buf, stream->buffer.buf_idx);
 				stream->buffer.buf_idx = 0;
@@ -204,19 +225,21 @@ char *fgets(char *str, int count, FILE *stream) {
 	return str;
 }
 
-int puts(const char *str) { 
-	return fputs(str, stdout);
-}
+int puts(const char *str) { return fputs(str, stdout); }
 
 int fputs(const char *str, FILE *stream) {
 	char newline = '\n';
-	if (!fwrite(str, strlen(str), 1, stream)) return 0;
-	if (!fwrite(&newline, 1, 1, stream)) return 0;
+	if (!fwrite(str, strlen(str), 1, stream))
+		return 0;
+	if (!fwrite(&newline, 1, 1, stream))
+		return 0;
 	return 1;
 }
 
 typedef void(write_func_t)(void *args, char *b, size_t len);
 
+// FIXME even without buffering the printf function should run moderately fast
+// do this by printing non-formatted bits in chunks instead of char by char.
 void funcprintf(write_func_t func, void *write_func_args, const char *format,
 				va_list ap) {
 	size_t last = 0;
@@ -224,7 +247,7 @@ void funcprintf(write_func_t func, void *write_func_args, const char *format,
 		char c = format[j];
 		switch (c) {
 		case '%': {
-ermm:
+		ermm:
 			j++;
 			int precision = -1;
 			char c2 = format[j];
@@ -258,7 +281,7 @@ ermm:
 				size_t buffer_len = strlen(buffer);
 
 				if (precision > 0 && buffer_len < precision) {
-					for (int _ = 0; _ < precision-buffer_len; _++) {
+					for (int _ = 0; _ < precision - buffer_len; _++) {
 						char zero = '0';
 						func(write_func_args, &zero, 1);
 					}
@@ -269,7 +292,7 @@ ermm:
 			case 'f': {
 				double value = va_arg(ap, double);
 				char neg = '-';
-				if ((uint32_t)value & (1<<31)) {
+				if ((uint32_t)value & (1 << 31)) {
 					func(write_func_args, &neg, 1);
 				}
 
@@ -318,7 +341,8 @@ ermm:
 			default:
 				func(write_func_args, &c, 1);
 				func(write_func_args, &c2, 1);
-			} break;
+			}
+			break;
 			break;
 		}
 		default:
@@ -445,6 +469,4 @@ int sscanf(const char *s, const char *format, ...) {
 	return match;
 }
 
-void perror(const char* s) {
-	fprintf(stderr, "error %s\n", s);
-}
+void perror(const char *s) { fprintf(stderr, "error %s\n", s); }

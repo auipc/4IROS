@@ -10,7 +10,7 @@ void BochsFramebuffer::init() {
 	uint16_t xres = *(uint16_t *)(FRAMEBUFFER_CONFIG_ADDR + 2);
 	uint16_t yres = *(uint16_t *)(FRAMEBUFFER_CONFIG_ADDR + 4);
 	printk("%dx%d\n", xres, yres);
-	for (int i = 0; i < (xres * yres * 4)+4096; i += 4096) {
+	for (int i = 0; i < (xres * yres * 4) + 4096; i += 4096) {
 		Paging::the()->map_page(*(RootPageLevel *)get_cr3(),
 								FRAMEBUFFER_ADDR + i, FRAMEBUFFER_ADDR + i);
 	}

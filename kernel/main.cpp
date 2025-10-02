@@ -116,87 +116,49 @@ void kidle2() {
 }
 #endif
 
-void kproc() {
-#if 0
-	auto pjth = VFS::the().parse_path("/dev/bochs");
-	auto bochs_file = VFS::the().open(pjth);
-
-	uint16_t xres = *(uint16_t*)(0xfebf8000+0x500+2); 
-	uint16_t yres = *(uint16_t*)(0xfebf8000+0x500+4); 
-	asm volatile("sti");
-	size_t index = 0;
-	while (true) {
-		size_t i = 0;
-		Vec<VFSNode*>& sub = VFS::the().get_root_fs()->mounted_filesystem()->nodes();
-		printk("sub %d\n", sub.size());
-		for (i = index; i < sub.size(); i++) {
-			auto name = sub[sub.size()-i-1]->get_name();
-			if (name[strlen(name)-1] == 'f') {
-				break;
-			}
-		}
-		
-		// Read farbfeld image
-		auto image_file = sub[sub.size()-index-1];
-		image_file->open(Vec<const char*>());
-
-		if (!image_file->size()) {
-			index++;
-			continue;
-		}
-		uint64_t magic;
-		image_file->read(&magic, 8);
-		// "farbfeld" in hex
-		if (magic != 0x646C656662726166) {
-			printk("Bad farbfeld header\n");
-			index++;
-			continue;
-		}
-		uint32_t width = 0;
-		uint32_t height = 0;
-		image_file->read(&width, 4);
-		image_file->read(&height, 4);
-		width = endswap32(width);
-		height = endswap32(height);
-
-		printk("Width %d Height %d\n", width, height);
-		printk("Begins at %x\n", image_file->position());
-		uint16_t* image_buffer = new uint16_t[width*height*4];
-		printk("sz %d\n", width*height*4*2);
-		image_file->read(image_buffer, width*height*4*sizeof(uint16_t));
-		printk("%d %x\n", (width*height*4)-1, image_buffer[(width*height*4)-1]);
-		memset((char*)0xfd000000, 25, xres*yres*4);
-
-		for (size_t py = 0; py < height; py++) {
-			for (size_t px = 0; px < width; px++) {
-				uint16_t r = image_buffer[(py*width+px)*4];
-				r = endswap16(r);
-				uint16_t g = image_buffer[(py*width+px)*4+1];
-				g = endswap16(g);
-				uint16_t b = image_buffer[(py*width+px)*4+2];
-				b = endswap16(b);
-				uint16_t a = image_buffer[(py*width+px)*4+3];
-				a = endswap16(a);
-
-				bochs_file->seek((py*xres+px)*4);
-				uint32_t col =  ((b&0xff)) | ((g&0xff)<<8) | ((r&0xff)<<16);
-				bochs_file->write(&col, sizeof(uint32_t));
-			}
-		}
-
-		//auto kbd_size = kbd->size();
-		//while (kbd->size() == kbd_size);
-		index++;
-		delete[] image_buffer;
-	}
-#endif
-	while (1)
-		;
-}
-// FIXME this should be the kernel stack
-
 extern bool s_use_actual_allocator;
 extern TSS tss;
+
+void parse_symtab_task() {
+	// Read generated symtab file
+	auto pth = VFS::the().parse_path("asymtab");
+	auto symtab_file = VFS::the().open(pth);
+	if (!symtab_file) {
+		printk("Warning!!! Symtab file missing\n");
+	} else {
+		auto symtab_sz = symtab_file->size();
+		char *sym_buf = new char[symtab_sz];
+		symtab_file->read(sym_buf, symtab_sz);
+		Debug::parse_symtab(sym_buf, symtab_sz);
+		delete[] sym_buf;
+	}
+	current_process->kill();
+	Process::sched(0);
+	while(1) {
+		asm volatile("nop");
+	}
+}
+
+void write_misc_port(uint8_t byte) { outb(0x3C2, byte); }
+
+void write_fixed_port(uint8_t index, uint8_t byte) {
+	outb(0x3C0, index);
+	outb(0x3C0, byte);
+}
+
+uint8_t read_fixed_port(uint8_t index) {
+	outb(0x3C0, index);
+	uint8_t val = inb(0x3C1);
+	// Reading from port 0x3DA will set port 0x3C0 to it's index state.
+	inb(0x3DA);
+	return val;
+}
+
+void write_index_port(uint16_t port, uint8_t index,
+									  uint8_t byte) {
+	outb(port, index);
+	outb(port + 1, byte);
+}
 
 extern "C" [[noreturn]] void kernel_main() {
 	printk("VFS init\n");
@@ -213,19 +175,6 @@ extern "C" [[noreturn]] void kernel_main() {
 	auto bochs = new BochsFramebuffer();
 	VFS::the().get_dev_fs()->push(bochs);
 	bochs->init();
-
-	// Read generated symtab file
-	auto pth = VFS::the().parse_path("asymtab");
-	auto symtab_file = VFS::the().open(pth);
-	if (!symtab_file) {
-		printk("Warning!!! Symtab file missing\n");
-	} else {
-		auto symtab_sz = symtab_file->size();
-		char *sym_buf = new char[symtab_sz];
-		symtab_file->read(sym_buf, symtab_sz);
-		Debug::parse_symtab(sym_buf, symtab_sz);
-		delete[] sym_buf;
-	}
 
 	Process::init();
 	panic("Task switch failed somehow???\n");

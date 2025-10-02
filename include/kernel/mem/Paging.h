@@ -41,7 +41,7 @@ template <typename T> class DumbSmart {
 	size_t *m_refs;
 };
 
-struct CoWInfo;
+struct CoWPage;
 struct PageLevel;
 struct LovelyPageLevel;
 struct RootPageLevel;
@@ -60,13 +60,8 @@ inline uint64_t get_cr3() {
 	return cr3;
 }
 
-template <typename T, typename U>
-struct Pair {
-	Pair(T t, U u)
-		: left(t)
-		, right(u)
-	{
-	}
+template <typename T, typename U> struct Pair {
+	Pair(T t, U u) : left(t), right(u) {}
 
 	T left;
 	U right;
@@ -79,12 +74,12 @@ class Paging {
 	~Paging();
 	static void setup(size_t total_memory, const KernelBootInfo &kbootinfo);
 
-	Pair<RootPageLevel *, void*> clone(const RootPageLevel &);
+	Pair<RootPageLevel *, void *> clone(const RootPageLevel &);
 	RootPageLevel *clone_for_fork(const RootPageLevel &,
 								  bool just_copy = false);
-	Pair<RootPageLevel *, void*> clone_for_fork_test(const RootPageLevel &,
-									   bool just_copy = false);
-	RootPageLevel *cow_clone(RootPageLevel &pml4);
+	Pair<RootPageLevel *, void *> clone_for_fork_test(const RootPageLevel &,
+													  bool just_copy = false);
+	Pair<RootPageLevel *, void *> cow_clone(HashTable<CoWPage*>* owner, HashTable<CoWPage*>* child, RootPageLevel &pml4);
 
 	inline static RootPageLevel *kernel_root_directory() {
 		// This shouldn't be null
@@ -110,7 +105,7 @@ class Paging {
 			  uintptr_t fault_addr);
 	bool resolve_fault(PageLevel *pd, size_t fault_addr);
 
-	void release(RootPageLevel &page_level);
+	void release(RootPageLevel &page_level, HashTable<CoWPage*>* cow_table);
 	static Paging *the();
 	static void *pf_allocator(size_t size);
 
@@ -215,7 +210,7 @@ struct BasePageLevel {
 		return (PageLevel *)map_page;
 	}
 
-	int recursive_release(int depth=0);
+	int recursive_release(HashTable<CoWPage*>* cow_table, uintptr_t addraccum=0, int depth=0);
 
 	PageSkellington entries[512];
 };
